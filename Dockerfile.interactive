@@ -1,0 +1,82 @@
+FROM python:3.11-slim-bullseye
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl wget git sudo \
+    alsa-utils pulseaudio \
+    net-tools iproute2 procps \
+    build-essential pkg-config \
+    supervisor nginx \
+    libasound2-dev libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Create directories
+RUN mkdir -p /app/backend /app/frontend /app/logs /app/data /app/config /app/scripts
+
+# Install Python dependencies
+RUN pip install --no-cache-dir flask flask-cors
+
+# Copy backend application
+COPY backend/simple_app.py /app/backend/app.py
+RUN chmod +x /app/backend/app.py
+
+# Install Spotifyd
+RUN cd /tmp && \
+    wget -q https://github.com/Spotifyd/spotifyd/releases/download/v0.3.5/spotifyd-linux-default-full.tar.gz && \
+    tar xzf spotifyd-linux-default-full.tar.gz && \
+    mv spotifyd /usr/local/bin/ && \
+    chmod +x /usr/local/bin/spotifyd && \
+    rm spotifyd-linux-default-full.tar.gz
+
+# Configure nginx for port 8080
+RUN echo 'server { \n\
+    listen 8080 default_server; \n\
+    listen [::]:8080 default_server; \n\
+    server_name _; \n\
+    \n\
+    location / { \n\
+        proxy_pass http://localhost:5000; \n\
+        proxy_http_version 1.1; \n\
+        proxy_set_header Host $host; \n\
+        proxy_set_header X-Real-IP $remote_addr; \n\
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; \n\
+        proxy_set_header X-Forwarded-Proto $scheme; \n\
+    } \n\
+    \n\
+    location /health { \n\
+        proxy_pass http://localhost:5000/health; \n\
+    } \n\
+}' > /etc/nginx/sites-available/default
+
+# Configure supervisor
+RUN echo '[supervisord] \n\
+nodaemon=true \n\
+logfile=/app/logs/supervisord.log \n\
+pidfile=/app/supervisord.pid \n\
+\n\
+[program:nginx] \n\
+command=nginx -g "daemon off;" \n\
+autostart=true \n\
+autorestart=true \n\
+stdout_logfile=/app/logs/nginx.log \n\
+stderr_logfile=/app/logs/nginx_error.log \n\
+\n\
+[program:flask] \n\
+command=python /app/backend/app.py \n\
+autostart=true \n\
+autorestart=true \n\
+environment=FLASK_APP=app.py,FLASK_ENV=production \n\
+stdout_logfile=/app/logs/flask.log \n\
+stderr_logfile=/app/logs/flask_error.log' > /etc/supervisor/conf.d/supervisord.conf
+
+# Create necessary directories
+RUN mkdir -p /app/data /app/logs /app/config /app/scripts
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

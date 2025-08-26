@@ -127,7 +127,7 @@ RUN echo '<!DOCTYPE html>\n\
             <div class="info-card">\n\
                 <h3>📱 Access</h3>\n\
                 <p>Web Interface Ready</p>\n\
-                <small>Port 80</small>\n\
+                <small>Port 8080</small>\n\
             </div>\n\
             <div class="info-card">\n\
                 <heline3>🔐 Login</h3>\n\
@@ -185,6 +185,6 @@ RUN mkdir -p /app/data /app/logs /app/config /app/scripts
 EXPOSE 8080 443
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost/health || exit 1
+    CMD curl -f http://localhost:8080 || exit 1
 
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
