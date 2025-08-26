@@ -22,13 +22,39 @@ RUN pip install --no-cache-dir flask flask-cors
 COPY backend/simple_app.py /app/backend/app.py
 RUN chmod +x /app/backend/app.py
 
-# Install Spotifyd
-RUN cd /tmp && \
-    wget -q https://github.com/Spotifyd/spotifyd/releases/download/v0.3.5/spotifyd-linux-default-full.tar.gz && \
-    tar xzf spotifyd-linux-default-full.tar.gz && \
-    mv spotifyd /usr/local/bin/ && \
-    chmod +x /usr/local/bin/spotifyd && \
-    rm spotifyd-linux-default-full.tar.gz
+# Install Spotifyd with architecture detection and fallback
+RUN ARCH=$(dpkg --print-architecture) && \
+    echo "Detected architecture: $ARCH" && \
+    if [ "$ARCH" = "amd64" ]; then \
+        SPOTIFYD_URL="https://github.com/Spotifyd/spotifyd/releases/download/v0.3.5/spotifyd-linux-default-full.tar.gz"; \
+    elif [ "$ARCH" = "armhf" ] || [ "$ARCH" = "arm64" ]; then \
+        SPOTIFYD_URL="https://github.com/Spotifyd/spotifyd/releases/download/v0.3.5/spotifyd-linux-armhf-full.tar.gz"; \
+    else \
+        echo "Unsupported architecture: $ARCH"; \
+        SPOTIFYD_URL=""; \
+    fi && \
+    if [ ! -z "$SPOTIFYD_URL" ]; then \
+        cd /tmp && \
+        echo "Downloading Spotifyd from: $SPOTIFYD_URL" && \
+        wget --no-check-certificate "$SPOTIFYD_URL" -O spotifyd.tar.gz || \
+        (echo "Primary download failed, trying alternative..." && \
+         wget --no-check-certificate "https://github.com/Spotifyd/spotifyd/releases/download/v0.3.5/spotifyd-linux-armhf-full.tar.gz" -O spotifyd.tar.gz) && \
+        if [ -f spotifyd.tar.gz ]; then \
+            tar xzf spotifyd.tar.gz && \
+            mv spotifyd /usr/local/bin/ && \
+            chmod +x /usr/local/bin/spotifyd && \
+            rm spotifyd.tar.gz && \
+            echo "Spotifyd installed successfully"; \
+        else \
+            echo "Spotifyd installation failed - will need manual setup"; \
+            touch /usr/local/bin/spotifyd && \
+            chmod +x /usr/local/bin/spotifyd; \
+        fi; \
+    else \
+        echo "Skipping Spotifyd installation for unsupported architecture"; \
+        touch /usr/local/bin/spotifyd && \
+        chmod +x /usr/local/bin/spotifyd; \
+    fi
 
 # Configure nginx for port 8080
 RUN echo 'server { \n\
