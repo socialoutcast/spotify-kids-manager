@@ -20,8 +20,31 @@ if [ "$EUID" -ne 0 ]; then
    exit 1
 fi
 
+# Clean up any failed previous installation
+echo "[1/9] Checking for previous installation..."
+if [ -d "$INSTALL_DIR" ]; then
+    echo "Found existing installation. Cleaning up..."
+    
+    # Stop any running containers
+    if [ -d "$INSTALL_DIR/spotify-kids-manager" ]; then
+        cd "$INSTALL_DIR/spotify-kids-manager"
+        docker-compose down 2>/dev/null || true
+    elif [ -f "$INSTALL_DIR/docker-compose.yml" ]; then
+        cd "$INSTALL_DIR"
+        docker-compose down 2>/dev/null || true
+    fi
+    
+    # Stop the service if it exists
+    systemctl stop ${SERVICE_NAME} 2>/dev/null || true
+    systemctl disable ${SERVICE_NAME} 2>/dev/null || true
+    
+    # Remove the old installation
+    rm -rf ${INSTALL_DIR}
+    echo "✓ Previous installation cleaned up"
+fi
+
 # Check for Docker
-echo "[1/7] Checking for Docker..."
+echo "[2/9] Checking for Docker..."
 if ! command -v docker &> /dev/null; then
     echo "Docker not found. Installing Docker..."
     curl -fsSL https://get.docker.com -o get-docker.sh
@@ -34,7 +57,7 @@ else
 fi
 
 # Check for Docker Compose
-echo "[2/7] Checking for Docker Compose..."
+echo "[3/9] Checking for Docker Compose..."
 if ! command -v docker-compose &> /dev/null; then
     echo "Installing Docker Compose..."
     apt-get update
@@ -44,44 +67,48 @@ else
 fi
 
 # Create installation directory
-echo "[3/7] Creating installation directory..."
+echo "[4/9] Creating installation directory..."
 mkdir -p $INSTALL_DIR
 cd $INSTALL_DIR
 
 # Download the application files
-echo "[4/7] Downloading application files..."
-if [ -d "spotify-kids-manager" ]; then
-    echo "Updating existing installation..."
-    cd spotify-kids-manager
-    git pull
-else
-    git clone https://github.com/socialoutcast/spotify-kids-manager.git
-    cd spotify-kids-manager
-fi
+echo "[5/9] Downloading application files..."
+git clone https://github.com/socialoutcast/spotify-kids-manager.git .
 
 # Build Docker image
-echo "[5/7] Building Docker image (this may take a while)..."
+echo "[6/9] Building Docker image (this may take a while)..."
 docker-compose build
 
 # Start the container immediately
-echo "[6/7] Starting Docker container..."
-cd ${INSTALL_DIR}/spotify-kids-manager
+echo "[7/9] Starting Docker container..."
 docker-compose down 2>/dev/null || true
 docker-compose up -d
+
+# Wait for container to start
+echo "Waiting for container to start..."
 sleep 10
 
 # Verify container is running
 if docker ps | grep -q spotify-kids-manager; then
     echo "✓ Container started successfully"
 else
-    echo "⚠ Container failed to start, attempting again..."
+    echo "⚠ Container failed to start, checking logs..."
     docker-compose logs --tail 20
+    echo ""
+    echo "Attempting to start again..."
     docker-compose up -d
     sleep 5
+    
+    if docker ps | grep -q spotify-kids-manager; then
+        echo "✓ Container started on second attempt"
+    else
+        echo "✗ Container failed to start. Please check logs with:"
+        echo "  cd $INSTALL_DIR && docker-compose logs"
+    fi
 fi
 
 # Create systemd service
-echo "[7/7] Creating systemd service..."
+echo "[8/9] Creating systemd service..."
 cat > /etc/systemd/system/${SERVICE_NAME}.service << EOF
 [Unit]
 Description=Spotify Kids Manager
@@ -93,11 +120,11 @@ Wants=network-online.target
 Type=simple
 Restart=always
 RestartSec=10
-WorkingDirectory=${INSTALL_DIR}/spotify-kids-manager
+WorkingDirectory=${INSTALL_DIR}
 ExecStartPre=/bin/sleep 10
-ExecStart=/usr/bin/docker-compose up -d
+ExecStart=/usr/bin/docker-compose up
 ExecStop=/usr/bin/docker-compose down
-RemainAfterExit=yes
+RemainAfterExit=no
 StandardOutput=journal
 StandardError=journal
 
@@ -106,7 +133,7 @@ WantedBy=multi-user.target
 EOF
 
 # Configure firewall
-echo "[7/8] Configuring firewall..."
+echo "[9/9] Configuring firewall and network..."
 # Check if ufw is installed and active
 if command -v ufw &> /dev/null; then
     echo "Configuring UFW firewall..."
@@ -121,7 +148,7 @@ elif command -v firewall-cmd &> /dev/null; then
     firewall-cmd --reload || true
     echo "✓ Firewall configured"
 else
-    echo "No firewall detected, skipping firewall configuration"
+    echo "No firewall detected, configuring iptables..."
 fi
 
 # Check if iptables needs direct configuration
@@ -133,27 +160,18 @@ if command -v iptables &> /dev/null; then
 fi
 
 # Enable and start the service
-echo "[8/8] Starting Spotify Kids Manager..."
 systemctl daemon-reload
 systemctl enable ${SERVICE_NAME}.service
-systemctl start ${SERVICE_NAME}.service
-
-# Wait for service to be ready
-echo ""
-echo "Waiting for service to start..."
-sleep 10
 
 # Check if port 80 is listening
+echo ""
 echo "Checking service status..."
 if netstat -tuln | grep -q ":80 "; then
     echo "✓ Web service is listening on port 80"
 else
-    echo "⚠ Warning: Port 80 may not be accessible"
-    echo "  Checking Docker container..."
-    docker ps
-    echo ""
-    echo "  Checking container logs..."
-    docker logs ${SERVICE_NAME} --tail 20
+    echo "⚠ Port 80 may not be accessible yet"
+    echo "  Container status:"
+    docker ps | grep spotify-kids-manager || echo "  Container not running"
 fi
 
 # Get IP address
@@ -183,10 +201,16 @@ echo "  Restart: sudo systemctl restart ${SERVICE_NAME}"
 echo "  Status:  sudo systemctl status ${SERVICE_NAME}"
 echo "  Logs:    sudo journalctl -u ${SERVICE_NAME} -f"
 echo ""
-echo "To uninstall:"
-echo "  sudo systemctl stop ${SERVICE_NAME}"
-echo "  sudo systemctl disable ${SERVICE_NAME}"
-echo "  sudo rm -rf ${INSTALL_DIR}"
-echo "  sudo rm /etc/systemd/system/${SERVICE_NAME}.service"
+echo "Docker commands:"
+echo "  View logs:    cd ${INSTALL_DIR} && docker-compose logs"
+echo "  Restart:      cd ${INSTALL_DIR} && docker-compose restart"
+echo "  Stop:         cd ${INSTALL_DIR} && docker-compose down"
+echo "  Start:        cd ${INSTALL_DIR} && docker-compose up -d"
 echo ""
+echo "If the web interface is not accessible:"
+echo "  1. Check container: docker ps"
+echo "  2. Check logs: cd ${INSTALL_DIR} && docker-compose logs"
+echo "  3. Restart: cd ${INSTALL_DIR} && docker-compose restart"
+echo ""
+echo "To completely reinstall, run this script again."
 echo "================================================"
