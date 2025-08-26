@@ -5,8 +5,7 @@ Spotify Kids Manager - Main Backend Application
 Complete web-based management system for locked-down Spotify player
 """
 
-from flask import Flask, render_template, jsonify, request, session, redirect, url_for
-from flask_cors import CORS
+from flask import Flask, render_template, jsonify, request, session, redirect, url_for, make_response
 from flask_socketio import SocketIO, emit
 from werkzeug.security import check_password_hash, generate_password_hash
 import subprocess
@@ -70,7 +69,29 @@ app = Flask(__name__,
     template_folder='templates'
 )
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', secrets.token_hex(32))
-CORS(app)
+
+# Secure CORS implementation without Flask-CORS vulnerabilities
+@app.after_request
+def after_request(response):
+    """Add secure CORS headers to responses"""
+    origin = request.headers.get('Origin')
+    if origin:
+        # Only allow specific origins in production
+        allowed_origins = [
+            'http://localhost:3000',  # Development
+            'http://localhost:8080',  # Local deployment
+            request.host_url.rstrip('/')  # Same origin
+        ]
+        # In container/production, also allow the container's IP
+        if origin in allowed_origins or origin.startswith('http://192.168.') or origin.startswith('http://10.'):
+            response.headers['Access-Control-Allow-Origin'] = origin
+            response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+            response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+            response.headers['Access-Control-Allow-Credentials'] = 'true'
+            # Explicitly set Private Network Access to false for security
+            response.headers['Access-Control-Allow-Private-Network'] = 'false'
+    return response
+
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Configuration
