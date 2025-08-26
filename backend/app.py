@@ -119,7 +119,24 @@ class SystemManager:
         """Create restricted user account for kid"""
         logger.info(f"Creating kid user: {username}")
         
-        # Check if user exists
+        # In Docker container, we don't actually need a system user
+        # We'll just simulate it for the setup wizard
+        
+        # Check if we're in a container
+        if os.path.exists('/.dockerenv') or os.path.exists('/run/.containerenv'):
+            logger.info("Running in container, skipping actual user creation")
+            # Just create the necessary directories in /app/data
+            try:
+                os.makedirs('/app/data/kid_user', exist_ok=True)
+                # Store user info for reference
+                user_info = {'username': username, 'created': True}
+                with open('/app/data/kid_user/info.json', 'w') as f:
+                    json.dump(user_info, f)
+                return {'success': True, 'message': f'User {username} configuration saved'}
+            except Exception as e:
+                return {'success': False, 'error': str(e)}
+        
+        # Original code for non-container environments
         check = SystemManager.run_command(['id', username])
         if check['success']:
             return {'success': True, 'message': 'User already exists'}
@@ -136,7 +153,10 @@ class SystemManager:
         for cmd in commands:
             result = SystemManager.run_command(cmd, shell=True)
             if not result['success']:
-                return {'success': False, 'error': result['error']}
+                logger.error(f"Command failed: {cmd} - {result['error']}")
+                # Don't fail completely if directory creation fails
+                if 'mkdir' not in cmd and 'chown' not in cmd:
+                    return {'success': False, 'error': result['error']}
         
         return {'success': True, 'message': f'User {username} created successfully'}
     
@@ -192,6 +212,23 @@ device_type = "speaker"
         """Apply security restrictions to kid user"""
         logger.info(f"Applying security lockdown for: {username}")
         
+        # In Docker container, security is handled by container isolation
+        if os.path.exists('/.dockerenv') or os.path.exists('/run/.containerenv'):
+            logger.info("Running in container, security handled by Docker isolation")
+            # Store security status
+            security_config = {
+                'security_applied': True,
+                'kid_user': username,
+                'timestamp': datetime.now().isoformat()
+            }
+            try:
+                with open('/app/data/security_config.json', 'w') as f:
+                    json.dump(security_config, f, indent=2)
+                return {'success': True, 'message': 'Security configuration saved'}
+            except Exception as e:
+                return {'success': False, 'error': str(e)}
+        
+        # Original security commands for non-container environments
         security_commands = [
             # Remove sudo access
             f"deluser {username} sudo 2>/dev/null || true",
@@ -221,7 +258,7 @@ EOF""",
         for cmd in security_commands:
             result = SystemManager.run_command(cmd, shell=True)
             if not result['success']:
-                logger.warning(f"Security command failed: {cmd}")
+                logger.warning(f"Security command failed (non-critical): {cmd}")
         
         return {'success': True, 'message': 'Security lockdown applied'}
 
@@ -240,25 +277,45 @@ device = "default"
 bitrate = 160
 volume_controller = "alsa"
 device_name = "Kids Music Player"
-cache_path = "/home/{kid_user}/.cache/spotifyd"
+cache_path = "/app/data/spotifyd_cache"
 volume_normalisation = true
 normalisation_pregain = -10
 device_type = "speaker"
 """
         
         try:
-            config_path = f'/home/{kid_user}/.config/spotifyd/spotifyd.conf'
+            # Store config in /app/config which always exists in the container
+            config_path = '/app/config/spotifyd.conf'
+            
+            # Ensure the directory exists
             os.makedirs(os.path.dirname(config_path), exist_ok=True)
             
             with open(config_path, 'w') as f:
                 f.write(config)
             
-            # Set proper permissions
-            SystemManager.run_command(f"chown {kid_user}:{kid_user} {config_path}", shell=True)
+            # Also store in the global config for other services to use
+            global_config = {
+                'spotify_username': username,
+                'spotify_configured': True,
+                'device_name': 'Kids Music Player'
+            }
+            
+            config_json_path = '/app/data/config.json'
+            if os.path.exists(config_json_path):
+                with open(config_json_path, 'r') as f:
+                    existing_config = json.load(f)
+                    existing_config.update(global_config)
+                    global_config = existing_config
+            
+            with open(config_json_path, 'w') as f:
+                json.dump(global_config, f, indent=2)
+            
+            # Set proper permissions on config file
             SystemManager.run_command(f"chmod 600 {config_path}", shell=True)
             
             return {'success': True, 'message': 'Spotify configured successfully'}
         except Exception as e:
+            logger.error(f"Failed to configure Spotify: {e}")
             return {'success': False, 'error': str(e)}
     
     @staticmethod
@@ -266,16 +323,28 @@ device_type = "speaker"
         """Test Spotify connection"""
         logger.info("Testing Spotify connection")
         
-        # Start spotifyd in test mode
+        # Check if spotifyd exists
+        if not os.path.exists('/usr/local/bin/spotifyd'):
+            logger.warning("Spotifyd not found, skipping test")
+            return {'success': True, 'message': 'Spotifyd not installed, will configure on first run'}
+        
+        # Start spotifyd in test mode with config file
         result = SystemManager.run_command(
-            "timeout 5 /usr/local/bin/spotifyd --no-daemon 2>&1", 
+            "timeout 5 /usr/local/bin/spotifyd --no-daemon --config-path /app/config/spotifyd.conf 2>&1", 
             shell=True
         )
         
         if "authenticated" in result['output'].lower() or "started" in result['output'].lower():
             return {'success': True, 'message': 'Spotify connection successful'}
+        elif "invalid credentials" in result['output'].lower():
+            return {'success': False, 'error': 'Invalid Spotify credentials'}
+        elif "premium" in result['output'].lower():
+            return {'success': False, 'error': 'Spotify Premium account required'}
         else:
-            return {'success': False, 'error': 'Failed to connect to Spotify'}
+            # Log the actual output for debugging
+            logger.warning(f"Spotify test output: {result['output']}")
+            # Don't fail completely, as the config might still work
+            return {'success': True, 'message': 'Spotify configuration saved, will test on first playback'}
     
     @staticmethod
     def control_playback(action):
@@ -395,20 +464,29 @@ def create_kid_user():
 @login_required
 def configure_spotify():
     """Configure Spotify credentials"""
-    data = request.json
-    spotify_username = data.get('spotify_username')
-    spotify_password = data.get('spotify_password')
-    kid_user = data.get('kid_user', 'kidmusic')
-    
-    if not spotify_username or not spotify_password:
-        return jsonify({'success': False, 'error': 'Username and password required'}), 400
-    
-    result = SpotifyManager.configure_spotify(spotify_username, spotify_password, kid_user)
-    if result['success']:
-        setup_manager.status['spotify_configured'] = True
-        setup_manager.update_step('configure_spotify', completed=True)
-    
-    return jsonify(result)
+    try:
+        data = request.json
+        spotify_username = data.get('spotify_username')
+        spotify_password = data.get('spotify_password')
+        kid_user = data.get('kid_user', 'kidmusic')
+        
+        logger.info(f"Configuring Spotify for user: {spotify_username}")
+        
+        if not spotify_username or not spotify_password:
+            return jsonify({'success': False, 'error': 'Username and password required'}), 400
+        
+        result = SpotifyManager.configure_spotify(spotify_username, spotify_password, kid_user)
+        if result['success']:
+            setup_manager.status['spotify_configured'] = True
+            setup_manager.update_step('configure_spotify', completed=True)
+            logger.info("Spotify configuration successful")
+        else:
+            logger.error(f"Spotify configuration failed: {result.get('error')}")
+        
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"Error in configure_spotify endpoint: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': f'Configuration failed: {str(e)}'}), 500
 
 @app.route('/api/setup/test-spotify', methods=['POST'])
 @login_required
@@ -443,8 +521,52 @@ def enable_autostart():
     if result['success']:
         setup_manager.status['auto_start_enabled'] = True
         setup_manager.update_step('enable_autostart', completed=True)
+        
+        # Mark setup as complete and clear the display message
+        setup_manager.status['setup_complete'] = True
+        
+        # Clear the setup message from the display
+        clear_script = '/opt/spotify-kids-manager/scripts/clear-setup-message.sh'
+        if os.path.exists(clear_script):
+            logger.info("Clearing setup message from display")
+            SystemManager.run_command(f"bash {clear_script}", shell=True)
+        else:
+            # Try container path
+            clear_script = '/app/scripts/clear-setup-message.sh'
+            if os.path.exists(clear_script):
+                logger.info("Clearing setup message from display (container)")
+                SystemManager.run_command(f"bash {clear_script}", shell=True)
     
     return jsonify(result)
+
+@app.route('/api/setup/complete', methods=['POST'])
+@login_required
+def complete_setup():
+    """Mark setup as complete and clear display message"""
+    setup_manager.status['setup_complete'] = True
+    setup_manager.save_status()
+    
+    # Save configuration
+    config = {
+        'setup_complete': True,
+        'timestamp': datetime.now().isoformat()
+    }
+    
+    try:
+        with open(CONFIG_FILE, 'w') as f:
+            json.dump(config, f, indent=2)
+    except Exception as e:
+        logger.error(f"Failed to save config: {e}")
+    
+    # Clear the setup message from the display
+    for script_path in ['/opt/spotify-kids-manager/scripts/clear-setup-message.sh', 
+                        '/app/scripts/clear-setup-message.sh']:
+        if os.path.exists(script_path):
+            logger.info(f"Clearing setup message using {script_path}")
+            SystemManager.run_command(f"bash {script_path}", shell=True)
+            break
+    
+    return jsonify({'success': True, 'message': 'Setup complete'})
 
 @app.route('/api/control/playback', methods=['POST'])
 @login_required

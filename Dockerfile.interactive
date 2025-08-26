@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y \
     libasound2-dev libssl-dev \
     bluez bluez-tools bluetooth \
     libglib2.0-dev libdbus-1-dev \
+    qrencode \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -23,6 +24,10 @@ RUN pip install --no-cache-dir flask flask-cors
 # Copy backend application
 COPY backend/simple_app.py /app/backend/app.py
 RUN chmod +x /app/backend/app.py
+
+# Copy scripts
+COPY scripts/*.sh /app/scripts/
+RUN chmod +x /app/scripts/*.sh
 
 # Install Spotifyd with architecture detection and fallback
 RUN ARCH=$(dpkg --print-architecture) && \

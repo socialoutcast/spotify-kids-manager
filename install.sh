@@ -130,6 +130,9 @@ cd $INSTALL_DIR
 echo "[5/9] Downloading application files..."
 git clone https://github.com/socialoutcast/spotify-kids-manager.git .
 
+# Ensure scripts directory has proper permissions
+chmod +x scripts/*.sh 2>/dev/null || true
+
 # Build Docker image
 echo "[6/9] Building Docker image (this may take a while)..."
 docker-compose build
@@ -231,6 +234,56 @@ fi
 
 # Get IP address
 IP_ADDRESS=$(hostname -I | cut -d' ' -f1)
+
+# Display setup message on console/TTY
+echo ""
+echo "Displaying setup instructions on device screen..."
+
+# Check if we have a display script
+if [ -f "${INSTALL_DIR}/scripts/display-setup-message.sh" ]; then
+    # Display on all TTYs if possible
+    for tty in /dev/tty1 /dev/tty2 /dev/tty3; do
+        if [ -w "$tty" ]; then
+            ${INSTALL_DIR}/scripts/display-setup-message.sh > "$tty" 2>&1 &
+        fi
+    done
+    
+    # Also run on current terminal
+    ${INSTALL_DIR}/scripts/display-setup-message.sh
+    
+    # Create a systemd service to show message on boot until setup is complete
+    cat > /etc/systemd/system/spotify-setup-display.service << EOF
+[Unit]
+Description=Display Spotify Kids Manager Setup Instructions
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/bin/bash ${INSTALL_DIR}/scripts/display-setup-message.sh --wait
+StandardOutput=tty
+StandardInput=tty
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+RemainAfterExit=yes
+User=root
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    
+    systemctl daemon-reload
+    systemctl enable spotify-setup-display.service 2>/dev/null || true
+    systemctl start spotify-setup-display.service 2>/dev/null || true
+else
+    # Fallback if script not found
+    echo ""
+    echo "================================================"
+    echo "    PLEASE CONTINUE SETUP BY VISITING:         "
+    echo "    http://${IP_ADDRESS}:8080                  "
+    echo "================================================"
+fi
 
 # Final instructions
 echo ""
