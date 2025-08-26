@@ -62,7 +62,7 @@ A complete, self-contained Docker solution for setting up a locked-down Spotify 
 #### Network Requirements  
 - Internet connection for streaming
 - Local network access for parent controls
-- Port 80 available (for web interface)
+- Port 8080 available (for web interface)
 
 ### Parent Device Requirements
 - Any device with a web browser:
@@ -100,9 +100,9 @@ This will:
 
 1. **Access Web Interface**
    ```
-   http://YOUR_PI_IP_ADDRESS
+   http://YOUR_PI_IP_ADDRESS:8080
    ```
-   Example: `http://192.168.1.100`
+   Example: `http://192.168.1.100:8080`
 
 2. **Login with default credentials**
    - Username: `admin`  
@@ -222,7 +222,7 @@ sudo systemctl start spotify-kids-manager
 
 ## 📱 Parent Dashboard
 
-Access from any device at: `http://YOUR_PI_IP_ADDRESS`
+Access from any device at: `http://YOUR_PI_IP_ADDRESS:8080`
 
 ### Features
 - **Real-time Controls**: Play/pause, skip, volume

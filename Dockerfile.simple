@@ -182,7 +182,7 @@ RUN mkdir -p /app/data /app/logs /app/config /app/scripts
 # Scripts will be added later if needed
 # RUN touch /app/scripts/.gitkeep
 
-EXPOSE 80 443
+EXPOSE 8080 443
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
     CMD curl -f http://localhost/health || exit 1

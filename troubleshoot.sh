@@ -33,38 +33,38 @@ else
 fi
 
 echo ""
-echo "3. Checking port 80..."
-if netstat -tuln | grep -q ":80 "; then
-    echo "   ✓ Port 80 is listening"
-    netstat -tuln | grep ":80 "
+echo "3. Checking port 8080..."
+if netstat -tuln | grep -q ":8080 "; then
+    echo "   ✓ Port 8080 is listening"
+    netstat -tuln | grep ":8080 "
 else
-    echo "   ✗ Port 80 is not listening"
+    echo "   ✗ Port 8080 is not listening"
     echo "   Checking inside container..."
-    docker exec spotify-kids-manager netstat -tuln | grep ":80 " || echo "   Port 80 not listening in container"
+    docker exec spotify-kids-manager netstat -tuln | grep ":8080 " || echo "   Port 8080 not listening in container"
 fi
 
 echo ""
 echo "4. Checking firewall..."
 if command -v ufw &> /dev/null; then
     echo "   UFW Status:"
-    ufw status | grep 80 || echo "   ✗ Port 80 not allowed in UFW"
+    ufw status | grep 8080 || echo "   ✗ Port 8080 not allowed in UFW"
     echo ""
-    echo "   Fix: sudo ufw allow 80/tcp"
+    echo "   Fix: sudo ufw allow 8080/tcp"
 elif command -v firewall-cmd &> /dev/null; then
     echo "   Firewalld Status:"
-    firewall-cmd --list-ports | grep 80 || echo "   ✗ Port 80 not allowed in firewalld"
+    firewall-cmd --list-ports | grep 8080 || echo "   ✗ Port 8080 not allowed in firewalld"
     echo ""
-    echo "   Fix: sudo firewall-cmd --permanent --add-port=80/tcp && sudo firewall-cmd --reload"
+    echo "   Fix: sudo firewall-cmd --permanent --add-port=8080/tcp && sudo firewall-cmd --reload"
 fi
 
 # Check iptables
 echo ""
 echo "5. Checking iptables..."
-if iptables -L INPUT -n | grep -q "dpt:80"; then
-    echo "   ✓ Port 80 rule exists in iptables"
+if iptables -L INPUT -n | grep -q "dpt:8080"; then
+    echo "   ✓ Port 8080 rule exists in iptables"
 else
-    echo "   ✗ No iptables rule for port 80"
-    echo "   Fix: sudo iptables -I INPUT -p tcp --dport 80 -j ACCEPT"
+    echo "   ✗ No iptables rule for port 8080"
+    echo "   Fix: sudo iptables -I INPUT -p tcp --dport 8080 -j ACCEPT"
 fi
 
 echo ""
@@ -89,8 +89,8 @@ echo "   Hostname: $(hostname)"
 
 echo ""
 echo "9. Quick fixes to try:"
-echo "   a) Allow port 80 in firewall:"
-echo "      sudo ufw allow 80/tcp"
+echo "   a) Allow port 8080 in firewall:"
+echo "      sudo ufw allow 8080/tcp"
 echo "      sudo ufw reload"
 echo ""
 echo "   b) Restart the container:"
@@ -102,7 +102,7 @@ echo "   c) Check container is using host network:"
 echo "      docker inspect spotify-kids-manager | grep NetworkMode"
 echo ""
 echo "   d) Manually add iptables rule:"
-echo "      sudo iptables -I INPUT -p tcp --dport 80 -j ACCEPT"
+echo "      sudo iptables -I INPUT -p tcp --dport 8080 -j ACCEPT"
 echo "      sudo iptables -I INPUT -p tcp --dport 22 -j ACCEPT"
 echo ""
 echo "================================================"

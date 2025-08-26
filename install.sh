@@ -137,13 +137,13 @@ echo "[9/9] Configuring firewall and network..."
 # Check if ufw is installed and active
 if command -v ufw &> /dev/null; then
     echo "Configuring UFW firewall..."
-    ufw allow 80/tcp comment 'Spotify Kids Manager Web' || true
+    ufw allow 8080/tcp comment 'Spotify Kids Manager Web' || true
     ufw allow 22/tcp comment 'SSH' || true
     ufw --force enable || true
     echo "✓ Firewall configured"
 elif command -v firewall-cmd &> /dev/null; then
     echo "Configuring firewalld..."
-    firewall-cmd --permanent --add-port=80/tcp || true
+    firewall-cmd --permanent --add-port=8080/tcp || true
     firewall-cmd --permanent --add-port=22/tcp || true
     firewall-cmd --reload || true
     echo "✓ Firewall configured"
@@ -153,8 +153,8 @@ fi
 
 # Check if iptables needs direct configuration
 if command -v iptables &> /dev/null; then
-    # Ensure port 80 is not blocked
-    iptables -I INPUT -p tcp --dport 80 -j ACCEPT 2>/dev/null || true
+    # Ensure port 8080 is not blocked
+    iptables -I INPUT -p tcp --dport 8080 -j ACCEPT 2>/dev/null || true
     iptables -I INPUT -p tcp --dport 22 -j ACCEPT 2>/dev/null || true
     echo "✓ iptables rules added"
 fi
@@ -163,13 +163,13 @@ fi
 systemctl daemon-reload
 systemctl enable ${SERVICE_NAME}.service
 
-# Check if port 80 is listening
+# Check if port 8080 is listening
 echo ""
 echo "Checking service status..."
-if netstat -tuln | grep -q ":80 "; then
-    echo "✓ Web service is listening on port 80"
+if netstat -tuln | grep -q ":8080 "; then
+    echo "✓ Web service is listening on port 8080"
 else
-    echo "⚠ Port 80 may not be accessible yet"
+    echo "⚠ Port 8080 may not be accessible yet"
     echo "  Container status:"
     docker ps | grep spotify-kids-manager || echo "  Container not running"
 fi
@@ -186,7 +186,7 @@ echo ""
 echo "Spotify Kids Manager is now running!"
 echo ""
 echo "Access the web interface at:"
-echo "  http://${IP_ADDRESS}"
+echo "  http://${IP_ADDRESS}:8080"
 echo ""
 echo "Default login credentials:"
 echo "  Username: admin"

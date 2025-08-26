@@ -67,7 +67,7 @@ RUN mkdir -p /app/data /app/logs /app/config /app/scripts
 RUN chmod +x /app/scripts/*.sh || true
 
 # Expose ports
-EXPOSE 80 443
+EXPOSE 8080 443
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
