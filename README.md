@@ -249,6 +249,22 @@ Access from any device at: `http://YOUR_PI_IP_ADDRESS:8080`
 
 ### Common Issues
 
+#### Docker Permission Denied
+If you see "permission denied" when running docker commands:
+```bash
+# Option 1: Start a new shell with docker group (immediate fix)
+newgrp docker
+
+# Option 2: Run the fix script
+./fix-docker-permissions.sh
+
+# Option 3: Use wrapper commands (created during install)
+docker-user ps
+docker-user logs spotify-kids-manager
+
+# Option 4: Log out and log back in (permanent fix)
+```
+
 #### Cannot Access Web Interface
 ```bash
 # Check service status

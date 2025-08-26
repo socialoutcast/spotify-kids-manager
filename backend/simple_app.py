@@ -566,7 +566,8 @@ def save_settings(settings):
 
 def check_system():
     """Check system status"""
-    docker_running = subprocess.run(['pgrep', 'dockerd'], capture_output=True).returncode == 0
+    # Since we're running inside Docker, check if we're in a container instead
+    docker_running = os.path.exists('/.dockerenv') or os.path.exists('/run/.containerenv')
     audio_working = subprocess.run(['which', 'aplay'], capture_output=True).returncode == 0
     return docker_running, audio_working
 

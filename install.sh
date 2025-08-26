@@ -72,20 +72,41 @@ if [ "$REAL_USER" != "root" ] && [ -n "$REAL_USER" ]; then
     usermod -aG docker "$REAL_USER"
     echo "✓ User '$REAL_USER' added to docker group"
     
-    # Apply group changes immediately for the current session
-    # This allows docker commands to work without logout
-    echo "Applying group changes for immediate use..."
-    
-    # Create a temporary sudoers entry for docker commands if needed
-    if [ -d /etc/sudoers.d ]; then
-        echo "$REAL_USER ALL=(ALL) NOPASSWD: /usr/bin/docker, /usr/bin/docker-compose" > /etc/sudoers.d/spotify-kids-docker-temp
-        chmod 0440 /etc/sudoers.d/spotify-kids-docker-temp
+    # Set proper permissions on docker socket
+    echo "Setting Docker socket permissions..."
+    if [ -S /var/run/docker.sock ]; then
+        chgrp docker /var/run/docker.sock
+        chmod g+rw /var/run/docker.sock
+        echo "✓ Docker socket permissions updated"
     fi
     
+    # Create a wrapper script for immediate docker access
+    echo "Creating docker wrapper for immediate access..."
+    cat > /usr/local/bin/docker-user << 'EOF'
+#!/bin/bash
+# Temporary wrapper to run docker with group permissions
+sg docker -c "docker $*"
+EOF
+    chmod +x /usr/local/bin/docker-user
+    
+    # Also create docker-compose wrapper
+    cat > /usr/local/bin/docker-compose-user << 'EOF'
+#!/bin/bash
+# Temporary wrapper to run docker-compose with group permissions
+sg docker -c "docker-compose $*"
+EOF
+    chmod +x /usr/local/bin/docker-compose-user
+    
     echo ""
-    echo "NOTE: User '$REAL_USER' can now use Docker commands."
-    echo "      The changes will be fully applied after next login."
-    echo "      For this session, docker commands will work via this script."
+    echo "IMPORTANT: Docker group changes require a new session to take effect."
+    echo ""
+    echo "You have 3 options to use Docker commands:"
+    echo "  1. Log out and log back in (recommended)"
+    echo "  2. Run: newgrp docker (starts a new shell with docker group)"
+    echo "  3. Use wrapper commands: docker-user and docker-compose-user"
+    echo ""
+    echo "Example: docker-user ps"
+    echo "         docker-compose-user -f ${INSTALL_DIR}/docker-compose.yml logs"
 else
     echo "✓ Running as root, no group changes needed"
 fi
@@ -242,12 +263,22 @@ echo "  Restart: sudo systemctl restart ${SERVICE_NAME}"
 echo "  Status:  sudo systemctl status ${SERVICE_NAME}"
 echo "  Logs:    sudo journalctl -u ${SERVICE_NAME} -f"
 echo ""
-echo "Docker commands (no sudo needed for $REAL_USER):"
-echo "  View logs:    docker-compose -f ${INSTALL_DIR}/docker-compose.yml logs"
-echo "  Restart:      docker-compose -f ${INSTALL_DIR}/docker-compose.yml restart"
-echo "  Stop:         docker-compose -f ${INSTALL_DIR}/docker-compose.yml down"
-echo "  Start:        docker-compose -f ${INSTALL_DIR}/docker-compose.yml up -d"
-echo "  Container:    docker ps | grep spotify-kids-manager"
+echo "Docker commands:"
+if [ "$REAL_USER" != "root" ] && [ -n "$REAL_USER" ]; then
+    echo "  IMPORTANT: Use one of these methods first:"
+    echo "    Option 1: newgrp docker    (opens new shell with docker access)"
+    echo "    Option 2: Log out and back in (permanent fix)"
+    echo ""
+    echo "  Or use wrapper commands (work immediately):"
+    echo "    View logs:    docker-user logs spotify-kids-manager"
+    echo "    Container:    docker-user ps"
+    echo "    Restart:      docker-compose-user -f ${INSTALL_DIR}/docker-compose.yml restart"
+    echo ""
+    echo "  After logout/login, normal commands will work:"
+fi
+echo "    docker logs spotify-kids-manager"
+echo "    docker ps | grep spotify-kids-manager"
+echo "    docker-compose -f ${INSTALL_DIR}/docker-compose.yml restart"
 echo ""
 echo "If the web interface is not accessible:"
 echo "  1. Check container: docker ps"

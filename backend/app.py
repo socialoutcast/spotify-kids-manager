@@ -361,8 +361,11 @@ def initialize_setup():
     setup_manager.update_step('system_check')
     
     # Run system checks
+    # Since we're running inside Docker, check if we're in a container instead
+    is_in_container = os.path.exists('/.dockerenv') or os.path.exists('/run/.containerenv')
+    
     checks = {
-        'docker': SystemManager.run_command(['docker', '--version'])['success'],
+        'docker': is_in_container,  # We're running in Docker if this file exists
         'network': SystemManager.run_command(['ping', '-c', '1', '8.8.8.8'])['success'],
         'audio': SystemManager.run_command(['aplay', '-l'])['success'],
         'spotifyd': os.path.exists('/usr/local/bin/spotifyd')
