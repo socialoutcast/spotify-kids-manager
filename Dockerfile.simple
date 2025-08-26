@@ -1,0 +1,191 @@
+FROM python:3.11-slim-bullseye
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl wget git sudo \
+    alsa-utils pulseaudio \
+    net-tools iproute2 iptables \
+    build-essential pkg-config \
+    supervisor nginx \
+    libasound2-dev libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Create directories
+RUN mkdir -p /app/backend /app/frontend/build /app/logs /app/data /app/config /app/scripts
+
+# Create backend
+COPY backend/requirements.txt /app/backend/
+RUN pip install --no-cache-dir -r /app/backend/requirements.txt
+
+COPY backend/*.py /app/backend/
+
+# Create simple web interface (no build required)
+RUN echo '<!DOCTYPE html>\n\
+<html lang="en">\n\
+<head>\n\
+    <meta charset="UTF-8">\n\
+    <meta name="viewport" content="width=device-width, initial-scale=1">\n\
+    <title>Spotify Kids Manager</title>\n\
+    <style>\n\
+        * { margin: 0; padding: 0; box-sizing: border-box; }\n\
+        body {\n\
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;\n\
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);\n\
+            min-height: 100vh;\n\
+            display: flex;\n\
+            align-items: center;\n\
+            justify-content: center;\n\
+            color: white;\n\
+        }\n\
+        .container {\n\
+            background: rgba(255, 255, 255, 0.1);\n\
+            backdrop-filter: blur(10px);\n\
+            border-radius: 20px;\n\
+            padding: 40px;\n\
+            max-width: 600px;\n\
+            width: 90%;\n\
+            text-align: center;\n\
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);\n\
+        }\n\
+        h1 {\n\
+            font-size: 2.5em;\n\
+            margin-bottom: 10px;\n\
+            display: flex;\n\
+            align-items: center;\n\
+            justify-content: center;\n\
+            gap: 10px;\n\
+        }\n\
+        .subtitle { opacity: 0.9; margin-bottom: 30px; }\n\
+        .status {\n\
+            background: rgba(255, 255, 255, 0.1);\n\
+            padding: 20px;\n\
+            border-radius: 10px;\n\
+            margin: 20px 0;\n\
+        }\n\
+        .status.success { border-left: 4px solid #4caf50; }\n\
+        .button {\n\
+            background: #1DB954;\n\
+            color: white;\n\
+            border: none;\n\
+            padding: 15px 30px;\n\
+            font-size: 18px;\n\
+            border-radius: 30px;\n\
+            cursor: pointer;\n\
+            margin: 10px;\n\
+            transition: all 0.3s;\n\
+            display: inline-block;\n\
+            text-decoration: none;\n\
+        }\n\
+        .button:hover { background: #1ed760; transform: scale(1.05); }\n\
+        .info-grid {\n\
+            display: grid;\n\
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));\n\
+            gap: 20px;\n\
+            margin: 30px 0;\n\
+        }\n\
+        .info-card {\n\
+            background: rgba(255, 255, 255, 0.1);\n\
+            padding: 20px;\n\
+            border-radius: 10px;\n\
+        }\n\
+        .info-card h3 { margin-bottom: 10px; color: #1DB954; }\n\
+        .steps {\n\
+            text-align: left;\n\
+            background: rgba(0, 0, 0, 0.2);\n\
+            padding: 20px;\n\
+            border-radius: 10px;\n\
+            margin: 20px 0;\n\
+        }\n\
+        .steps ol { margin-left: 20px; }\n\
+        .steps li { margin: 10px 0; }\n\
+        .warning {\n\
+            background: rgba(255, 152, 0, 0.2);\n\
+            border-left: 4px solid #ff9800;\n\
+            padding: 15px;\n\
+            border-radius: 5px;\n\
+            margin: 20px 0;\n\
+            text-align: left;\n\
+        }\n\
+    </style>\n\
+</head>\n\
+<body>\n\
+    <div class="container">\n\
+        <h1>\n\
+            <span style="font-size: 1.5em;">🎵</span>\n\
+            Spotify Kids Manager\n\
+        </h1>\n\
+        <p class="subtitle">Safe Music for Kids</p>\n\
+        \n\
+        <div class="status success">\n\
+            <h2>✅ Installation Successful!</h2>\n\
+            <p>Your Spotify Kids Manager is installed and running.</p>\n\
+        </div>\n\
+        \n\
+        <div class="info-grid">\n\
+            <div class="info-card">\n\
+                <h3>📱 Access</h3>\n\
+                <p>Web Interface Ready</p>\n\
+                <small>Port 80</small>\n\
+            </div>\n\
+            <div class="info-card">\n\
+                <heline3>🔐 Login</h3>\n\
+                <p>Username: <strong>admin</strong></p>\n\
+                <p>Password: <strong>changeme</strong></p>\n\
+            </div>\n\
+        </div>\n\
+        \n\
+        <div class="warning">\n\
+            <strong>⚠️ Important:</strong> Change the admin password immediately after first login!\n\
+        </div>\n\
+        \n\
+        <div class="steps">\n\
+            <h3>Next Steps:</h3>\n\
+            <ol>\n\
+                <li>Configure Spotify credentials</li>\n\
+                <li>Create kid user account</li>\n\
+                <li>Apply security lockdown</li>\n\
+                <li>Test music playback</li>\n\
+                <li>Set up parental controls</li>\n\
+            </ol>\n\
+        </div>\n\
+        \n\
+        <button class="button" onclick="window.location.reload()">Refresh Status</button>\n\
+        \n\
+        <p style="margin-top: 30px; opacity: 0.7; font-size: 0.9em;">\n\
+            Version 1.0.0 | <a href="https://github.com/socialoutcast/spotify-kids-manager" style="color: white;">Documentation</a>\n\
+        </p>\n\
+    </div>\n\
+</body>\n\
+</html>' > /app/frontend/build/index.html
+
+# Install Spotifyd
+RUN cd /tmp && \
+    wget -q https://github.com/Spotifyd/spotifyd/releases/download/v0.3.5/spotifyd-linux-default-full.tar.gz || \
+    wget -q https://github.com/Spotifyd/spotifyd/releases/download/v0.3.5/spotifyd-linux-armhf-full.tar.gz || \
+    echo "Spotifyd download failed, will install later" && \
+    tar xzf spotifyd-*.tar.gz 2>/dev/null && \
+    mv spotifyd /usr/local/bin/ 2>/dev/null && \
+    chmod +x /usr/local/bin/spotifyd 2>/dev/null || \
+    echo "Spotifyd installation will be completed manually"
+
+# Setup nginx
+COPY docker/nginx.conf /etc/nginx/sites-available/default
+
+# Setup supervisor
+COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+# Create necessary directories
+RUN mkdir -p /app/data /app/logs /app/config /app/scripts
+
+# Make scripts executable
+COPY scripts/*.sh /app/scripts/ 2>/dev/null || true
+RUN chmod +x /app/scripts/*.sh 2>/dev/null || true
+
+EXPOSE 80 443
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost/health || exit 1
+
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

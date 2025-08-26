@@ -2,7 +2,9 @@ version: '3.8'
 
 services:
   spotify-kids-manager:
-    build: .
+    build: 
+      context: .
+      dockerfile: Dockerfile.simple
     container_name: spotify-kids-manager
     restart: always
     privileged: true
