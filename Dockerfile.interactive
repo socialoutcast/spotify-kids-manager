@@ -19,11 +19,12 @@ WORKDIR /app
 RUN mkdir -p /app/backend /app/frontend /app/logs /app/data /app/config /app/scripts
 
 # Install Python dependencies
-RUN pip install --no-cache-dir flask flask-cors
+COPY backend/requirements.txt /app/backend/
+RUN pip install --no-cache-dir -r /app/backend/requirements.txt
 
 # Copy backend application
-COPY backend/simple_app.py /app/backend/app.py
-RUN chmod +x /app/backend/app.py
+COPY backend/*.py /app/backend/
+RUN chmod +x /app/backend/*.py
 
 # Copy scripts
 COPY scripts/*.sh /app/scripts/
@@ -100,7 +101,7 @@ stderr_logfile=/app/logs/nginx_error.log \n\
 command=python /app/backend/app.py \n\
 autostart=true \n\
 autorestart=true \n\
-environment=FLASK_APP=app.py,FLASK_ENV=production \n\
+environment=FLASK_APP=app.py,FLASK_ENV=production,PYTHONUNBUFFERED=1 \n\
 stdout_logfile=/app/logs/flask.log \n\
 stderr_logfile=/app/logs/flask_error.log' > /etc/supervisor/conf.d/supervisord.conf
 

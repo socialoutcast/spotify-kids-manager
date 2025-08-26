@@ -23,24 +23,58 @@ fi
 # Clean up any failed previous installation
 echo "[1/9] Checking for previous installation..."
 if [ -d "$INSTALL_DIR" ]; then
-    echo "Found existing installation. Cleaning up..."
+    echo "Found existing installation. Performing complete cleanup..."
     
     # Stop any running containers
     if [ -d "$INSTALL_DIR/spotify-kids-manager" ]; then
         cd "$INSTALL_DIR/spotify-kids-manager"
-        docker-compose down 2>/dev/null || true
+        docker-compose down -v --remove-orphans 2>/dev/null || true
     elif [ -f "$INSTALL_DIR/docker-compose.yml" ]; then
         cd "$INSTALL_DIR"
-        docker-compose down 2>/dev/null || true
+        docker-compose down -v --remove-orphans 2>/dev/null || true
     fi
     
-    # Stop the service if it exists
+    # Remove any Docker containers, images and volumes related to spotify-kids-manager
+    echo "Removing Docker containers, images and volumes..."
+    docker stop spotify-kids-manager 2>/dev/null || true
+    docker rm -f spotify-kids-manager 2>/dev/null || true
+    docker rmi -f spotify-kids-manager:latest 2>/dev/null || true
+    docker rmi -f socialoutcast/spotify-kids-manager:latest 2>/dev/null || true
+    docker rmi -f $(docker images | grep -E "spotify-kids|spotify_kids" | awk '{print $3}' | uniq) 2>/dev/null || true
+    docker volume rm $(docker volume ls -q | grep -E "spotify-kids|spotify_kids") 2>/dev/null || true
+    
+    # Stop and remove all related services
+    echo "Removing system services..."
     systemctl stop ${SERVICE_NAME} 2>/dev/null || true
     systemctl disable ${SERVICE_NAME} 2>/dev/null || true
+    systemctl stop spotify-setup-display.service 2>/dev/null || true
+    systemctl disable spotify-setup-display.service 2>/dev/null || true
     
-    # Remove the old installation
+    # Remove service files
+    rm -f /etc/systemd/system/${SERVICE_NAME}.service
+    rm -f /etc/systemd/system/spotify-setup-display.service
+    
+    # Remove wrapper scripts
+    rm -f /usr/local/bin/docker-user
+    rm -f /usr/local/bin/docker-compose-user
+    
+    # Clear any TTY messages
+    for tty in /dev/tty1 /dev/tty2 /dev/tty3; do
+        if [ -w "$tty" ]; then
+            clear > "$tty" 2>/dev/null
+        fi
+    done
+    
+    # Remove the old installation directory completely
     rm -rf ${INSTALL_DIR}
-    echo "✓ Previous installation cleaned up"
+    
+    # Clean Docker system (optional but ensures clean state)
+    docker system prune -f 2>/dev/null || true
+    
+    # Reload systemd
+    systemctl daemon-reload
+    
+    echo "✓ Previous installation completely removed"
 fi
 
 # Get the current user who invoked sudo (if applicable)
@@ -241,41 +275,60 @@ echo "Displaying setup instructions on device screen..."
 
 # Check if we have a display script
 if [ -f "${INSTALL_DIR}/scripts/display-setup-message.sh" ]; then
-    # Display on all TTYs if possible
-    for tty in /dev/tty1 /dev/tty2 /dev/tty3; do
-        if [ -w "$tty" ]; then
-            ${INSTALL_DIR}/scripts/display-setup-message.sh > "$tty" 2>&1 &
-        fi
-    done
+    # First, ensure the script is executable
+    chmod +x ${INSTALL_DIR}/scripts/display-setup-message.sh
     
-    # Also run on current terminal
+    # Display on TTY1 (main console) with proper redirection
+    if [ -e /dev/tty1 ]; then
+        echo "Displaying message on TTY1..."
+        # Use chvt to switch to TTY1 if possible
+        chvt 1 2>/dev/null || true
+        
+        # Clear and display message
+        ${INSTALL_DIR}/scripts/display-setup-message.sh > /dev/tty1 2>&1
+        
+        # Also send to console
+        ${INSTALL_DIR}/scripts/display-setup-message.sh > /dev/console 2>&1 &
+    fi
+    
+    # Also display on current terminal for SSH users
     ${INSTALL_DIR}/scripts/display-setup-message.sh
     
-    # Create a systemd service to show message on boot until setup is complete
+    # Create a more robust systemd service
     cat > /etc/systemd/system/spotify-setup-display.service << EOF
 [Unit]
 Description=Display Spotify Kids Manager Setup Instructions
-After=network-online.target
+After=multi-user.target network-online.target
 Wants=network-online.target
 
 [Service]
-Type=simple
-ExecStart=/bin/bash ${INSTALL_DIR}/scripts/display-setup-message.sh --wait
+Type=idle
+ExecStartPre=/bin/sleep 5
+ExecStart=/bin/bash -c '${INSTALL_DIR}/scripts/display-setup-message.sh --wait'
 StandardOutput=tty
-StandardInput=tty
+StandardError=tty
 TTYPath=/dev/tty1
 TTYReset=yes
 TTYVHangup=yes
 RemainAfterExit=yes
 User=root
+Restart=no
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=getty.target
 EOF
     
     systemctl daemon-reload
     systemctl enable spotify-setup-display.service 2>/dev/null || true
-    systemctl start spotify-setup-display.service 2>/dev/null || true
+    
+    # Also create a getty override to display on login
+    mkdir -p /etc/systemd/system/getty@tty1.service.d/
+    cat > /etc/systemd/system/getty@tty1.service.d/spotify-setup.conf << EOF
+[Service]
+ExecStartPre=/bin/bash -c 'if [ ! -f /app/data/setup_status.json ] || ! grep -q "setup_complete.*true" /app/data/setup_status.json 2>/dev/null; then ${INSTALL_DIR}/scripts/display-setup-message.sh > /dev/tty1 2>&1; fi'
+EOF
+    
+    systemctl daemon-reload
 else
     # Fallback if script not found
     echo ""

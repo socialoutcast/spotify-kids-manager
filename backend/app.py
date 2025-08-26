@@ -20,17 +20,45 @@ from datetime import datetime, timedelta
 import secrets
 import shutil
 from functools import wraps
-from update_manager import UpdateManager
-from bluetooth_manager import BluetoothManager
+try:
+    from update_manager import UpdateManager
+    update_manager = UpdateManager()
+except ImportError:
+    logging.warning("UpdateManager not available, running without update features")
+    update_manager = None
 
-# Setup logging
-logging.basicConfig(level=logging.INFO)
+try:
+    from bluetooth_manager import BluetoothManager
+    bluetooth_manager = BluetoothManager()
+except ImportError:
+    logging.warning("BluetoothManager not available, running without Bluetooth features")
+    bluetooth_manager = None
+
+# Setup logging with more detail
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('/app/logs/app.log'),
+        logging.StreamHandler()
+    ]
+)
 logger = logging.getLogger(__name__)
 
 # Initialize Flask app
+# Check if frontend build exists, use a fallback if not
+import os
+if os.path.exists('/app/frontend/build'):
+    static_folder = '/app/frontend/build'
+elif os.path.exists('../frontend/build'):
+    static_folder = '../frontend/build'
+else:
+    static_folder = None
+    logger.warning("Frontend build folder not found, API-only mode")
+
 app = Flask(__name__, 
-    static_folder='../frontend/build',
-    static_url_path='/'
+    static_folder=static_folder,
+    static_url_path='/' if static_folder else None
 )
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', secrets.token_hex(32))
 CORS(app)
@@ -80,8 +108,7 @@ class SetupManager:
         socketio.emit('setup_status', self.status)
 
 setup_manager = SetupManager()
-update_manager = UpdateManager()
-bluetooth_manager = BluetoothManager()
+# update_manager and bluetooth_manager are initialized at the top of the file
 
 # Authentication decorator
 def login_required(f):
@@ -767,11 +794,29 @@ def handle_status_request():
         emit('setup_status', setup_manager.status)
 
 if __name__ == '__main__':
+    logger.info("Starting Spotify Kids Manager Backend...")
+    
+    # Ensure required directories exist
+    os.makedirs(DATA_DIR, exist_ok=True)
+    os.makedirs('/app/logs', exist_ok=True)
+    os.makedirs('/app/config', exist_ok=True)
+    
     # Start update scheduler
-    update_manager.start_scheduler()
+    if update_manager:
+        try:
+            update_manager.start_scheduler()
+        except Exception as e:
+            logger.error(f"Failed to start update scheduler: {e}")
     
     try:
+        logger.info("Starting Flask app on port 5000...")
         socketio.run(app, host='0.0.0.0', port=5000, debug=False)
+    except Exception as e:
+        logger.error(f"Failed to start Flask app: {e}", exc_info=True)
     finally:
         # Stop scheduler on shutdown
-        update_manager.stop_scheduler()
+        if update_manager:
+            try:
+                update_manager.stop_scheduler()
+            except:
+                pass
