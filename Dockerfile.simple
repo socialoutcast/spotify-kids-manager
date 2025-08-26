@@ -179,9 +179,8 @@ COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 # Create necessary directories
 RUN mkdir -p /app/data /app/logs /app/config /app/scripts
 
-# Make scripts executable
-COPY scripts/*.sh /app/scripts/ 2>/dev/null || true
-RUN chmod +x /app/scripts/*.sh 2>/dev/null || true
+# Scripts will be added later if needed
+# RUN touch /app/scripts/.gitkeep
 
 EXPOSE 80 443
 
