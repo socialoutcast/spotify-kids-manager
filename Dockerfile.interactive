@@ -1,13 +1,15 @@
 FROM python:3.11-slim-bullseye
 
-# Install system dependencies
+# Install system dependencies including Bluetooth support
 RUN apt-get update && apt-get install -y \
     curl wget git sudo \
-    alsa-utils pulseaudio \
+    alsa-utils pulseaudio pulseaudio-module-bluetooth \
     net-tools iproute2 procps \
     build-essential pkg-config \
     supervisor nginx \
     libasound2-dev libssl-dev \
+    bluez bluez-tools bluetooth \
+    libglib2.0-dev libdbus-1-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

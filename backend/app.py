@@ -21,6 +21,7 @@ import secrets
 import shutil
 from functools import wraps
 from update_manager import UpdateManager
+from bluetooth_manager import BluetoothManager
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -80,6 +81,7 @@ class SetupManager:
 
 setup_manager = SetupManager()
 update_manager = UpdateManager()
+bluetooth_manager = BluetoothManager()
 
 # Authentication decorator
 def login_required(f):
@@ -550,6 +552,81 @@ def update_history():
     limit = request.args.get('limit', 10, type=int)
     history = update_manager.get_update_history(limit)
     return jsonify(history)
+
+# Bluetooth Management Routes
+@app.route('/api/bluetooth/adapter')
+@login_required
+def bluetooth_adapter_info():
+    """Get Bluetooth adapter information"""
+    info = bluetooth_manager.get_adapter_info()
+    return jsonify(info)
+
+@app.route('/api/bluetooth/scan', methods=['POST'])
+@login_required
+def bluetooth_scan():
+    """Scan for Bluetooth devices"""
+    data = request.json or {}
+    duration = data.get('duration', 10)
+    devices = bluetooth_manager.scan_devices(duration)
+    return jsonify(devices)
+
+@app.route('/api/bluetooth/paired')
+@login_required
+def bluetooth_paired_devices():
+    """Get list of paired Bluetooth devices"""
+    devices = bluetooth_manager.get_paired_devices()
+    return jsonify(devices)
+
+@app.route('/api/bluetooth/connected')
+@login_required
+def bluetooth_connected_devices():
+    """Get list of connected Bluetooth devices"""
+    devices = bluetooth_manager.get_connected_devices()
+    return jsonify(devices)
+
+@app.route('/api/bluetooth/pair/<mac_address>', methods=['POST'])
+@login_required
+def bluetooth_pair(mac_address):
+    """Pair with a Bluetooth device"""
+    result = bluetooth_manager.pair_device(mac_address)
+    return jsonify(result)
+
+@app.route('/api/bluetooth/connect/<mac_address>', methods=['POST'])
+@login_required
+def bluetooth_connect(mac_address):
+    """Connect to a Bluetooth device"""
+    result = bluetooth_manager.connect_device(mac_address)
+    return jsonify(result)
+
+@app.route('/api/bluetooth/disconnect/<mac_address>', methods=['POST'])
+@login_required
+def bluetooth_disconnect(mac_address):
+    """Disconnect from a Bluetooth device"""
+    result = bluetooth_manager.disconnect_device(mac_address)
+    return jsonify(result)
+
+@app.route('/api/bluetooth/remove/<mac_address>', methods=['DELETE'])
+@login_required
+def bluetooth_remove(mac_address):
+    """Remove (unpair) a Bluetooth device"""
+    result = bluetooth_manager.remove_device(mac_address)
+    return jsonify(result)
+
+@app.route('/api/bluetooth/discoverable/on', methods=['POST'])
+@login_required
+def bluetooth_enable_discovery():
+    """Enable Bluetooth discovery mode"""
+    data = request.json or {}
+    duration = data.get('duration', 180)
+    result = bluetooth_manager.enable_discovery(duration)
+    return jsonify(result)
+
+@app.route('/api/bluetooth/discoverable/off', methods=['POST'])
+@login_required
+def bluetooth_disable_discovery():
+    """Disable Bluetooth discovery mode"""
+    result = bluetooth_manager.disable_discovery()
+    return jsonify(result)
 
 # WebSocket events for real-time updates
 @socketio.on('connect')

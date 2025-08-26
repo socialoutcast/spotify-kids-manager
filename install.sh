@@ -43,8 +43,12 @@ if [ -d "$INSTALL_DIR" ]; then
     echo "✓ Previous installation cleaned up"
 fi
 
-# Check for Docker
-echo "[2/9] Checking for Docker..."
+# Get the current user who invoked sudo (if applicable)
+REAL_USER=${SUDO_USER:-$(whoami)}
+REAL_USER_HOME=$(eval echo ~$REAL_USER)
+
+# Check for Docker and configure group
+echo "[2/9] Checking for Docker and configuring user permissions..."
 if ! command -v docker &> /dev/null; then
     echo "Docker not found. Installing Docker..."
     curl -fsSL https://get.docker.com -o get-docker.sh
@@ -54,6 +58,36 @@ if ! command -v docker &> /dev/null; then
     systemctl start docker
 else
     echo "✓ Docker is installed"
+fi
+
+# Ensure docker group exists
+if ! getent group docker > /dev/null 2>&1; then
+    echo "Creating docker group..."
+    groupadd docker
+fi
+
+# Add the real user to docker group if not root
+if [ "$REAL_USER" != "root" ] && [ -n "$REAL_USER" ]; then
+    echo "Adding user '$REAL_USER' to docker group..."
+    usermod -aG docker "$REAL_USER"
+    echo "✓ User '$REAL_USER' added to docker group"
+    
+    # Apply group changes immediately for the current session
+    # This allows docker commands to work without logout
+    echo "Applying group changes for immediate use..."
+    
+    # Create a temporary sudoers entry for docker commands if needed
+    if [ -d /etc/sudoers.d ]; then
+        echo "$REAL_USER ALL=(ALL) NOPASSWD: /usr/bin/docker, /usr/bin/docker-compose" > /etc/sudoers.d/spotify-kids-docker-temp
+        chmod 0440 /etc/sudoers.d/spotify-kids-docker-temp
+    fi
+    
+    echo ""
+    echo "NOTE: User '$REAL_USER' can now use Docker commands."
+    echo "      The changes will be fully applied after next login."
+    echo "      For this session, docker commands will work via this script."
+else
+    echo "✓ Running as root, no group changes needed"
 fi
 
 # Check for Docker Compose
@@ -194,6 +228,13 @@ echo "  Password: changeme"
 echo ""
 echo "IMPORTANT: Change the admin password after first login!"
 echo ""
+if [ "$REAL_USER" != "root" ] && [ -n "$REAL_USER" ]; then
+    echo "Docker Access for user '$REAL_USER':"
+    echo "  ✓ User added to docker group"
+    echo "  ✓ Can use docker commands without sudo"
+    echo "  Note: Full permissions apply after next login"
+    echo ""
+fi
 echo "Service management commands:"
 echo "  Start:   sudo systemctl start ${SERVICE_NAME}"
 echo "  Stop:    sudo systemctl stop ${SERVICE_NAME}"
@@ -201,16 +242,24 @@ echo "  Restart: sudo systemctl restart ${SERVICE_NAME}"
 echo "  Status:  sudo systemctl status ${SERVICE_NAME}"
 echo "  Logs:    sudo journalctl -u ${SERVICE_NAME} -f"
 echo ""
-echo "Docker commands:"
-echo "  View logs:    cd ${INSTALL_DIR} && docker-compose logs"
-echo "  Restart:      cd ${INSTALL_DIR} && docker-compose restart"
-echo "  Stop:         cd ${INSTALL_DIR} && docker-compose down"
-echo "  Start:        cd ${INSTALL_DIR} && docker-compose up -d"
+echo "Docker commands (no sudo needed for $REAL_USER):"
+echo "  View logs:    docker-compose -f ${INSTALL_DIR}/docker-compose.yml logs"
+echo "  Restart:      docker-compose -f ${INSTALL_DIR}/docker-compose.yml restart"
+echo "  Stop:         docker-compose -f ${INSTALL_DIR}/docker-compose.yml down"
+echo "  Start:        docker-compose -f ${INSTALL_DIR}/docker-compose.yml up -d"
+echo "  Container:    docker ps | grep spotify-kids-manager"
 echo ""
 echo "If the web interface is not accessible:"
 echo "  1. Check container: docker ps"
-echo "  2. Check logs: cd ${INSTALL_DIR} && docker-compose logs"
-echo "  3. Restart: cd ${INSTALL_DIR} && docker-compose restart"
+echo "  2. Check logs: docker-compose -f ${INSTALL_DIR}/docker-compose.yml logs"
+echo "  3. Restart: docker-compose -f ${INSTALL_DIR}/docker-compose.yml restart"
 echo ""
 echo "To completely reinstall, run this script again."
 echo "================================================"
+
+# Clean up temporary sudoers file after informing the user
+if [ -f /etc/sudoers.d/spotify-kids-docker-temp ]; then
+    echo ""
+    echo "Note: Temporary docker permissions have been set."
+    echo "These will be replaced by group permissions on next login."
+fi

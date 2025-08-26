@@ -23,6 +23,8 @@ A complete, self-contained Docker solution for setting up a locked-down Spotify 
 - 📊 **Usage Monitoring** - Track listening habits
 - 🚨 **Instant Blocking** - Stop music immediately when needed
 - 🔄 **Automatic Updates** - Security patches applied automatically
+- 🎧 **Bluetooth Audio** - Connect wireless speakers and headphones
+- 🔊 **Device Management** - Pair, connect, and manage Bluetooth devices
 
 ## 📋 Prerequisites
 
@@ -40,8 +42,9 @@ A complete, self-contained Docker solution for setting up a locked-down Spotify 
 - **RAM**: 2GB or more
 - **Storage**: 16GB+ SD card (Class 10)
 - **Network**: Stable WiFi connection
-- **Audio**: Quality speakers or sound system
+- **Audio**: Quality speakers, Bluetooth headphones, or sound system
 - **Power**: Official Raspberry Pi power supply
+- **Bluetooth**: Built-in or USB Bluetooth adapter (for wireless audio)
 
 ### Software Requirements
 
@@ -90,11 +93,15 @@ curl -fsSL https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/
 
 This will:
 1. Install Docker and dependencies
-2. Download and build the application
-3. Configure auto-start service
-4. Launch the web interface
+2. Add your user to the Docker group (no sudo needed for docker commands)
+3. Download and build the application
+4. Configure auto-start service
+5. Launch the web interface
+6. Set up Bluetooth audio support
 
 **Installation time**: 10-15 minutes on Pi 3/4, 15-20 minutes on older models
+
+**Note**: The installer automatically configures Docker permissions so you can run Docker commands without sudo after installation.
 
 ### First-Time Setup
 
@@ -231,6 +238,12 @@ Access from any device at: `http://YOUR_PI_IP_ADDRESS:8080`
 - **Usage Stats**: Track listening time and favorites
 - **System Updates**: Automatic security patches
 - **Quick Actions**: Common tasks at your fingertips
+- **Bluetooth Manager**: 
+  - Scan for available Bluetooth devices
+  - Pair and connect to speakers/headphones
+  - Manage paired devices
+  - Set audio output preferences
+  - Make device discoverable for easy pairing
 
 ## 🔧 Troubleshooting
 
@@ -264,7 +277,18 @@ amixer set Master 75%
 
 # List audio devices
 aplay -l
+
+# For Bluetooth audio issues
+bluetoothctl devices  # List paired devices
+bluetoothctl connect XX:XX:XX:XX:XX:XX  # Connect to device
 ```
+
+#### Bluetooth Connection Issues
+- Ensure Bluetooth service is running: `sudo systemctl status bluetooth`
+- Make device discoverable via web interface
+- Try removing and re-pairing the device
+- Check if audio profile is selected for Bluetooth devices
+- Restart Bluetooth service: `sudo systemctl restart bluetooth`
 
 ## 📊 System Requirements Summary
 
@@ -285,14 +309,18 @@ aplay -l
 
 ### Quick Commands
 ```bash
-# View logs
-sudo docker logs spotify-kids-manager
+# View logs (no sudo needed after installation)
+docker logs spotify-kids-manager
 
 # Enter container
-sudo docker exec -it spotify-kids-manager bash
+docker exec -it spotify-kids-manager bash
 
 # Check system health
-curl http://localhost/health
+curl http://localhost:8080/health
+
+# Bluetooth management
+docker exec spotify-kids-manager bluetoothctl devices  # List devices
+docker exec spotify-kids-manager bluetoothctl info XX:XX:XX:XX:XX:XX  # Device info
 ```
 
 ## 🤝 Contributing
@@ -317,6 +345,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 2. **Change default password** immediately after installation
 3. **For kids under 13**, consider using Spotify Kids app where available
 4. **This is for home use** - Not intended for commercial deployment
+5. **Docker permissions** - Installation adds user to docker group for easier management
+6. **Bluetooth audio** - Supports most Bluetooth speakers and headphones (A2DP profile)
 
 ## 🚦 Project Status
 
