@@ -86,8 +86,35 @@ StandardError=journal
 WantedBy=multi-user.target
 EOF
 
+# Configure firewall
+echo "[7/8] Configuring firewall..."
+# Check if ufw is installed and active
+if command -v ufw &> /dev/null; then
+    echo "Configuring UFW firewall..."
+    ufw allow 80/tcp comment 'Spotify Kids Manager Web' || true
+    ufw allow 22/tcp comment 'SSH' || true
+    ufw --force enable || true
+    echo "✓ Firewall configured"
+elif command -v firewall-cmd &> /dev/null; then
+    echo "Configuring firewalld..."
+    firewall-cmd --permanent --add-port=80/tcp || true
+    firewall-cmd --permanent --add-port=22/tcp || true
+    firewall-cmd --reload || true
+    echo "✓ Firewall configured"
+else
+    echo "No firewall detected, skipping firewall configuration"
+fi
+
+# Check if iptables needs direct configuration
+if command -v iptables &> /dev/null; then
+    # Ensure port 80 is not blocked
+    iptables -I INPUT -p tcp --dport 80 -j ACCEPT 2>/dev/null || true
+    iptables -I INPUT -p tcp --dport 22 -j ACCEPT 2>/dev/null || true
+    echo "✓ iptables rules added"
+fi
+
 # Enable and start the service
-echo "[7/7] Starting Spotify Kids Manager..."
+echo "[8/8] Starting Spotify Kids Manager..."
 systemctl daemon-reload
 systemctl enable ${SERVICE_NAME}.service
 systemctl start ${SERVICE_NAME}.service
@@ -96,6 +123,19 @@ systemctl start ${SERVICE_NAME}.service
 echo ""
 echo "Waiting for service to start..."
 sleep 10
+
+# Check if port 80 is listening
+echo "Checking service status..."
+if netstat -tuln | grep -q ":80 "; then
+    echo "✓ Web service is listening on port 80"
+else
+    echo "⚠ Warning: Port 80 may not be accessible"
+    echo "  Checking Docker container..."
+    docker ps
+    echo ""
+    echo "  Checking container logs..."
+    docker logs ${SERVICE_NAME} --tail 20
+fi
 
 # Get IP address
 IP_ADDRESS=$(hostname -I | cut -d' ' -f1)
