@@ -1,269 +1,331 @@
 # 🎵 Spotify Kids Manager
 
-A complete, self-contained Docker solution for setting up a locked-down Spotify player for kids on Raspberry Pi or any Linux device.
+A complete, self-contained Docker solution for setting up a locked-down Spotify player for kids on Raspberry Pi or any Linux device. Transform any device into a secure, child-safe music player with web-based parental controls.
 
-## Features
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?logo=docker&logoColor=white)
+![Raspberry Pi](https://img.shields.io/badge/-RaspberryPi-C51A4A?logo=Raspberry-Pi)
+![Spotify](https://img.shields.io/badge/Spotify-1DB954?logo=spotify&logoColor=white)
 
-### 🚀 One-Click Installation
-- Fully automated setup via web interface
-- Docker-based for consistency and portability
-- Auto-starts on device boot
-- No technical knowledge required
+## 🌟 Features
 
-### 🔒 Complete Security Lockdown
-- Dedicated restricted user account
-- No keyboard/mouse access needed
-- Network configuration locked
-- WiFi settings unchangeable
-- System commands disabled
-- Auto-login with no shell access
+### For Kids
+- 🎵 Simple music playback - no distractions
+- 🚫 No access to videos or YouTube
+- 🔒 Cannot exit or modify the player
+- ⌨️ Works without keyboard/mouse
+- 🎯 Kid-safe interface only
 
-### 🎮 Parental Controls
-- Web-based control panel
-- PIN-protected admin access
-- Play/pause/skip controls from phone
-- Volume control
-- Playback scheduling
-- Spotify blocking on demand
-- Usage statistics
+### For Parents  
+- 📱 **Web Control Panel** - Control from any phone/tablet
+- 🔐 **Complete Security** - Multi-layer protection system
+- ⏰ **Scheduling** - Set allowed music hours
+- 📊 **Usage Monitoring** - Track listening habits
+- 🚨 **Instant Blocking** - Stop music immediately when needed
+- 🔄 **Automatic Updates** - Security patches applied automatically
 
-### 👶 Kid-Safe
-- No video content access
-- No YouTube or browser
-- Terminal-only interface
-- Cannot be closed or modified
-- Explicit content filtering
+## 📋 Prerequisites
 
-## Quick Start
+### Hardware Requirements
 
-### Prerequisites
-- Raspberry Pi (any model) or Linux computer
-- Internet connection
-- Spotify Premium account (for kids)
+#### Minimum Requirements
+- **Device**: Raspberry Pi 2/3/4/Zero W OR any Linux computer
+- **RAM**: 1GB minimum
+- **Storage**: 8GB SD card/disk minimum  
+- **Network**: Ethernet or WiFi connection
+- **Audio**: HDMI, 3.5mm jack, or USB audio output
 
-### Installation
+#### Recommended Setup
+- **Device**: Raspberry Pi 3B+ or newer
+- **RAM**: 2GB or more
+- **Storage**: 16GB+ SD card (Class 10)
+- **Network**: Stable WiFi connection
+- **Audio**: Quality speakers or sound system
+- **Power**: Official Raspberry Pi power supply
 
-1. **Download and run the installer:**
+### Software Requirements
+
+#### Operating System (choose one)
+- **Raspberry Pi OS** (Bullseye or newer) - Recommended
+- **Ubuntu Server** 20.04 LTS or newer
+- **Debian** 11 or newer
+- **DietPi** (for minimal resource usage)
+
+#### Spotify Account
+- ✅ **Spotify Premium Required** (Individual or Family)
+  - Free accounts will NOT work (API limitation)
+  - Family plan recommended for separate kid accounts
+- 📝 You'll need:
+  - Spotify username (NOT email - see [Finding Your Username](#finding-your-spotify-username))
+  - Spotify password
+
+#### Network Requirements  
+- Internet connection for streaming
+- Local network access for parent controls
+- Port 80 available (for web interface)
+
+### Parent Device Requirements
+- Any device with a web browser:
+  - Smartphone (iOS/Android)
+  - Tablet
+  - Computer
+  - Smart TV browser
+
+## 🚀 Quick Start
+
+### Prerequisites Checklist
+Before starting, ensure you have:
+- [ ] Raspberry Pi with OS installed and network connected
+- [ ] Spotify Premium account
+- [ ] Know your Pi's IP address
+- [ ] SSH access to your Pi (or keyboard/monitor)
+
+### One-Line Installation
+
+SSH into your Raspberry Pi and run:
+
 ```bash
-curl -fsSL https://raw.githubusercontent.com/yourusername/spotify-kids-manager/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/main/install.sh | sudo bash
 ```
 
-2. **Access the web interface:**
-   - Open browser: `http://[device-ip-address]`
-   - Default login: `admin` / `changeme`
+This will:
+1. Install Docker and dependencies
+2. Download and build the application
+3. Configure auto-start service
+4. Launch the web interface
 
-3. **Follow the setup wizard:**
+**Installation time**: 10-15 minutes on Pi 3/4, 15-20 minutes on older models
+
+### First-Time Setup
+
+1. **Access Web Interface**
+   ```
+   http://YOUR_PI_IP_ADDRESS
+   ```
+   Example: `http://192.168.1.100`
+
+2. **Login with default credentials**
+   - Username: `admin`  
+   - Password: `changeme`
+   - ⚠️ **CHANGE THESE IMMEDIATELY!**
+
+3. **Follow Setup Wizard**
    - System checks
    - Create kid user account
-   - Configure Spotify credentials
-   - Apply security lockdown
+   - Configure Spotify
+   - Apply security settings
    - Enable auto-start
 
-## Web Interface
+## 📖 Finding Your Spotify Username
 
-### Setup Wizard
-The intuitive setup wizard guides you through:
-1. **System Check** - Verifies all requirements
-2. **User Creation** - Sets up restricted kid account
-3. **Spotify Config** - Enters child's Spotify credentials
-4. **Security** - Applies lockdown measures
-5. **Auto-Start** - Enables boot-time startup
+Your Spotify username is **NOT your email address**! To find it:
 
-### Dashboard
-After setup, access the dashboard to:
-- View current playback status
-- Control playback (play/pause/skip)
-- Adjust volume
-- View usage statistics
-- Manage schedules
+1. Go to [spotify.com](https://www.spotify.com)
+2. Log into your account
+3. Click your profile icon → **Account Overview**
+4. Find **"Username"** field
+   - Format: Usually numbers like `1234567890` or a custom username
+   - NOT your email address!
 
-### Parental Controls
-Advanced controls include:
-- **Playback Scheduling** - Set allowed music hours
-- **Spotify Blocking** - Temporarily disable access
-- **Usage Monitoring** - Track listening habits
-- **Remote Management** - Control from any device
+## 🛠️ Manual Installation
 
-## Security Features
+For users who prefer step-by-step installation:
 
-### User Restrictions
-- Custom restricted shell (no commands work)
-- No sudo privileges
-- No file system access
-- No network modification ability
+### Step 1: Prepare Your Device
 
-### System Lockdown
-- Network config files immutable (`chattr +i`)
-- TTY switching disabled
-- Magic SysRq disabled
-- All system commands return "Permission denied"
-
-### Service Protection
-- Auto-restarts if stopped
-- Cannot be killed by user
-- Monitored by systemd
-- Health checks every 30 seconds
-
-## Configuration
-
-### Environment Variables
-Set in `docker-compose.yml`:
-```yaml
-ADMIN_USER=admin          # Admin username
-ADMIN_PASSWORD=changeme   # Admin password (CHANGE THIS!)
-SECRET_KEY=your-secret    # Flask secret key
-```
-
-### Spotify Configuration
-Located in `/app/config/spotifyd.conf`:
-- Username (not email)
-- Password
-- Audio quality settings
-- Device name
-
-### Network Restrictions
-Firewall rules automatically applied:
-- Blocks router admin panels
-- Allows only Spotify traffic
-- Prevents network scanning
-
-## Management
-
-### Service Commands
 ```bash
-# Status
-sudo systemctl status spotify-kids-manager
+# Update system
+sudo apt update && sudo apt upgrade -y
 
-# Restart
-sudo systemctl restart spotify-kids-manager
-
-# View logs
-sudo journalctl -u spotify-kids-manager -f
-
-# Stop service
-sudo systemctl stop spotify-kids-manager
+# Install prerequisites
+sudo apt install -y curl git wget
 ```
 
-### Emergency Access
-If needed to regain control:
-1. SSH as admin user (not kid user)
-2. Run: `sudo systemctl stop spotify-kids-manager`
-3. Unlock files: `sudo chattr -i /path/to/file`
+### Step 2: Install Docker
 
-### Complete Removal
 ```bash
-sudo systemctl stop spotify-kids-manager
-sudo systemctl disable spotify-kids-manager
-sudo rm -rf /opt/spotify-kids-manager
-sudo rm /etc/systemd/system/spotify-kids-manager.service
-sudo userdel -r kidmusic  # Or whatever username was created
+# Install Docker
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+rm get-docker.sh
+
+# Install Docker Compose
+sudo apt install -y docker-compose
 ```
 
-## Spotify Setup
+### Step 3: Install Spotify Kids Manager
 
-### Creating a Kid-Safe Account
-1. Create a new Spotify account for your child
-2. Consider Spotify Kids or Family plan
-3. Enable explicit content filter:
-   - Account Overview → Privacy Settings
-   - Turn on "Block explicit content"
-
-### Finding Your Username
-Your Spotify username is NOT your email:
-1. Log into spotify.com
-2. Click profile → Account Overview
-3. Find "Username" (usually numbers or custom name)
-
-## Troubleshooting
-
-### Can't Connect to Spotify
-- Verify Premium subscription active
-- Check username (not email) and password
-- Ensure internet connection working
-- View logs: `sudo docker-compose logs`
-
-### No Sound
-- Check volume in web interface
-- Verify audio output: `aplay -l`
-- Check ALSA mixer: `alsamixer`
-
-### Web Interface Not Loading
-- Check service running: `sudo systemctl status spotify-kids-manager`
-- Verify port 80 not blocked
-- Check Docker running: `sudo docker ps`
-
-### Kid Can Access System
-- Verify security applied in setup
-- Check user restrictions: `sudo -u kidmusic whoami`
-- Ensure files locked: `lsattr /etc/wpa_supplicant/wpa_supplicant.conf`
-
-## Architecture
-
-### Components
-- **Backend**: Flask + Python for API and management
-- **Frontend**: React with Material-UI
-- **Audio**: Spotifyd for playback
-- **Web Server**: Nginx reverse proxy
-- **Process Manager**: Supervisord
-- **Container**: Docker with host networking
-
-### File Structure
-```
-/opt/spotify-kids-manager/
-├── backend/           # Flask API
-├── frontend/          # React UI
-├── docker/           # Docker configs
-├── scripts/          # Setup scripts
-├── config/           # App configuration
-└── data/            # Persistent data
-```
-
-## Development
-
-### Building from Source
 ```bash
-git clone https://github.com/yourusername/spotify-kids-manager.git
-cd spotify-kids-manager
-docker-compose build
-docker-compose up
+# Create directory
+sudo mkdir -p /opt/spotify-kids-manager
+cd /opt/spotify-kids-manager
+
+# Clone repository
+sudo git clone https://github.com/socialoutcast/spotify-kids-manager.git .
+
+# Build and start
+sudo docker-compose build
+sudo docker-compose up -d
 ```
 
-### Running Tests
+### Step 4: Enable Auto-Start
+
 ```bash
-# Backend tests
-docker-compose run backend pytest
+# Create systemd service
+sudo tee /etc/systemd/system/spotify-kids-manager.service << 'EOF'
+[Unit]
+Description=Spotify Kids Manager
+After=docker.service
+Requires=docker.service
 
-# Frontend tests
-docker-compose run frontend npm test
+[Service]
+Type=simple
+Restart=always
+WorkingDirectory=/opt/spotify-kids-manager
+ExecStart=/usr/bin/docker-compose up
+ExecStop=/usr/bin/docker-compose down
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Enable service
+sudo systemctl daemon-reload
+sudo systemctl enable spotify-kids-manager
+sudo systemctl start spotify-kids-manager
 ```
 
-## Support
+## 🔒 Security Features
+
+### Multi-Layer Protection
+- **User Level**: Restricted shell, no sudo access
+- **Network Level**: WiFi settings locked, router access blocked
+- **System Level**: Commands disabled, files immutable
+- **Service Level**: Auto-restart, unkillable process
+- **Container Level**: Docker isolation, limited privileges
+
+### What Kids CANNOT Do
+- ❌ Exit the music player
+- ❌ Access terminal or settings
+- ❌ Change WiFi configuration
+- ❌ Browse internet or watch videos
+- ❌ Install or modify software
+- ❌ Access other accounts
+
+### What Parents CAN Do
+- ✅ Control playback remotely
+- ✅ Block Spotify instantly
+- ✅ Set time limits and schedules
+- ✅ Monitor usage statistics
+- ✅ Apply security updates
+- ✅ Manage all settings via web
+
+## 📱 Parent Dashboard
+
+Access from any device at: `http://YOUR_PI_IP_ADDRESS`
+
+### Features
+- **Real-time Controls**: Play/pause, skip, volume
+- **Instant Blocking**: Stop music immediately
+- **Scheduling**: Set allowed hours for each day
+- **Usage Stats**: Track listening time and favorites
+- **System Updates**: Automatic security patches
+- **Quick Actions**: Common tasks at your fingertips
+
+## 🔧 Troubleshooting
 
 ### Common Issues
-See [Troubleshooting](#troubleshooting) section above.
 
-### Getting Help
-- Create an issue on GitHub
-- Check existing issues for solutions
-- Include logs when reporting problems
+#### Cannot Access Web Interface
+```bash
+# Check service status
+sudo systemctl status spotify-kids-manager
 
-## License
+# Restart service
+sudo systemctl restart spotify-kids-manager
 
-MIT License - See LICENSE file for details.
+# Check IP address
+hostname -I
+```
 
-## Credits
+#### Spotify Won't Connect
+- Verify Premium subscription is active
+- Check username is correct (not email!)
+- Ensure internet connection works
+- Try resetting Spotify password
 
-Built with:
-- [Spotifyd](https://github.com/Spotifyd/spotifyd) - Spotify daemon
+#### No Sound Output
+```bash
+# Test speakers
+speaker-test -c 2
+
+# Check volume
+amixer set Master 75%
+
+# List audio devices
+aplay -l
+```
+
+## 📊 System Requirements Summary
+
+| Component | Minimum | Recommended |
+|-----------|---------|-------------|
+| **Device** | Raspberry Pi 2 | Raspberry Pi 3B+ or 4 |
+| **RAM** | 1GB | 2GB+ |
+| **Storage** | 8GB SD Card | 16GB+ SD Card |
+| **Network** | Any connection | Stable WiFi/Ethernet |
+| **Spotify** | Premium Required | Family Plan |
+| **OS** | Raspbian Buster | Raspbian Bullseye |
+
+## 🆘 Getting Help
+
+### Documentation
+- [Complete Setup Guide](COMPLETE-SETUP-GUIDE.md) - Detailed instructions
+- [GitHub Issues](https://github.com/socialoutcast/spotify-kids-manager/issues) - Report problems
+
+### Quick Commands
+```bash
+# View logs
+sudo docker logs spotify-kids-manager
+
+# Enter container
+sudo docker exec -it spotify-kids-manager bash
+
+# Check system health
+curl http://localhost/health
+```
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- [Spotifyd](https://github.com/Spotifyd/spotifyd) - Lightweight Spotify daemon
+- [Docker](https://www.docker.com/) - Containerization
 - [Flask](https://flask.palletsprojects.com/) - Backend framework
 - [React](https://reactjs.org/) - Frontend framework
 - [Material-UI](https://mui.com/) - UI components
-- [Docker](https://www.docker.com/) - Containerization
 
-## Security Notice
+## ⚠️ Important Notes
 
-This system is designed for home use with children. While it implements multiple security layers, it should not be considered bulletproof against a determined attacker with physical access. Always use in conjunction with appropriate supervision.
+1. **Spotify Premium is REQUIRED** - Free accounts will not work
+2. **Change default password** immediately after installation
+3. **For kids under 13**, consider using Spotify Kids app where available
+4. **This is for home use** - Not intended for commercial deployment
+
+## 🚦 Project Status
+
+![Version](https://img.shields.io/badge/version-1.0.0-green.svg)
+![Maintenance](https://img.shields.io/badge/maintained-yes-green.svg)
+![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)
 
 ---
 
-**⚠️ Important:** Change the default admin password immediately after installation!
+**Made with ❤️ for parents who want safe music for their kids**
+
+*If this project helps you, please consider giving it a ⭐ on GitHub!*

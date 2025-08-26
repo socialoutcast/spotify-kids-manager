@@ -55,7 +55,7 @@ if [ -d "spotify-kids-manager" ]; then
     cd spotify-kids-manager
     git pull
 else
-    git clone https://github.com/yourusername/spotify-kids-manager.git
+    git clone https://github.com/socialoutcast/spotify-kids-manager.git
     cd spotify-kids-manager
 fi
 
