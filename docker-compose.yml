@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  spotify-kids-manager:
+    build: .
+    container_name: spotify-kids-manager
+    restart: always
+    privileged: true
+    network_mode: host
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /etc:/host/etc:rw
+      - /home:/host/home:rw
+      - /var/run/dbus:/var/run/dbus:rw
+      - ./data:/app/data
+      - ./config:/app/config
+    environment:
+      - FLASK_APP=app.py
+      - FLASK_ENV=production
+      - SECRET_KEY=${SECRET_KEY:-change-this-secret-key-in-production}
+      - ADMIN_USER=${ADMIN_USER:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-changeme}
+      - HOST_OS=raspbian
+    ports:
+      - "80:80"
+      - "443:443"
+    devices:
+      - /dev/snd:/dev/snd
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+      - DAC_OVERRIDE
+    labels:
+      - "com.spotify-kids.description=Spotify Kids Management System"
+      - "com.spotify-kids.version=1.0.0"
