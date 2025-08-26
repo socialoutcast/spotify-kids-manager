@@ -23,9 +23,6 @@ services:
       - ADMIN_USER=${ADMIN_USER:-admin}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-changeme}
       - HOST_OS=raspbian
-    ports:
-      - "80:80"
-      - "443:443"
     devices:
       - /dev/snd:/dev/snd
     cap_add:
