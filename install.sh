@@ -269,68 +269,69 @@ fi
 # Get IP address
 IP_ADDRESS=$(hostname -I | cut -d' ' -f1)
 
-# Display setup message on console/TTY
-echo ""
-echo "Displaying setup instructions on device screen..."
+# Install packages for display if needed
+echo "Checking display requirements..."
+if ! command -v chromium-browser &> /dev/null && ! command -v chromium &> /dev/null; then
+    echo "Installing lightweight browser for display..."
+    apt-get update &> /dev/null
+    # Try to install a lightweight browser
+    apt-get install -y chromium-browser 2>/dev/null || \
+    apt-get install -y chromium 2>/dev/null || \
+    apt-get install -y midori 2>/dev/null || \
+    echo "No browser installed, will use console display"
+fi
 
-# Check if we have a display script
-if [ -f "${INSTALL_DIR}/scripts/display-setup-message.sh" ]; then
-    # First, ensure the script is executable
-    chmod +x ${INSTALL_DIR}/scripts/display-setup-message.sh
+# Display setup message
+echo ""
+echo "Setting up display for setup instructions..."
+
+# Check if we have the new HTML display script
+if [ -f "${INSTALL_DIR}/scripts/show-setup-display.sh" ]; then
+    chmod +x ${INSTALL_DIR}/scripts/show-setup-display.sh
+    chmod +x ${INSTALL_DIR}/scripts/display-setup-message.sh 2>/dev/null || true
     
-    # Display on TTY1 (main console) with proper redirection
-    if [ -e /dev/tty1 ]; then
-        echo "Displaying message on TTY1..."
-        # Use chvt to switch to TTY1 if possible
-        chvt 1 2>/dev/null || true
-        
-        # Clear and display message
-        ${INSTALL_DIR}/scripts/display-setup-message.sh > /dev/tty1 2>&1
-        
-        # Also send to console
-        ${INSTALL_DIR}/scripts/display-setup-message.sh > /dev/console 2>&1 &
-    fi
+    # Launch the display
+    echo "Launching setup display..."
+    ${INSTALL_DIR}/scripts/show-setup-display.sh &
     
-    # Also display on current terminal for SSH users
-    ${INSTALL_DIR}/scripts/display-setup-message.sh
-    
-    # Create a more robust systemd service
+    # Create systemd service for display on boot
     cat > /etc/systemd/system/spotify-setup-display.service << EOF
 [Unit]
 Description=Display Spotify Kids Manager Setup Instructions
-After=multi-user.target network-online.target
+After=graphical.target multi-user.target network-online.target
 Wants=network-online.target
 
 [Service]
-Type=idle
-ExecStartPre=/bin/sleep 5
-ExecStart=/bin/bash -c '${INSTALL_DIR}/scripts/display-setup-message.sh --wait'
-StandardOutput=tty
-StandardError=tty
-TTYPath=/dev/tty1
-TTYReset=yes
-TTYVHangup=yes
-RemainAfterExit=yes
-User=root
+Type=simple
+ExecStartPre=/bin/sleep 10
+ExecStart=/bin/bash ${INSTALL_DIR}/scripts/show-setup-display.sh --wait
 Restart=no
+User=root
+Environment="HOME=/root"
+StandardOutput=journal
+StandardError=journal
 
 [Install]
-WantedBy=getty.target
+WantedBy=default.target
 EOF
     
     systemctl daemon-reload
     systemctl enable spotify-setup-display.service 2>/dev/null || true
     
-    # Also create a getty override to display on login
-    mkdir -p /etc/systemd/system/getty@tty1.service.d/
-    cat > /etc/systemd/system/getty@tty1.service.d/spotify-setup.conf << EOF
-[Service]
-ExecStartPre=/bin/bash -c 'if [ ! -f /app/data/setup_status.json ] || ! grep -q "setup_complete.*true" /app/data/setup_status.json 2>/dev/null; then ${INSTALL_DIR}/scripts/display-setup-message.sh > /dev/tty1 2>&1; fi'
-EOF
+elif [ -f "${INSTALL_DIR}/scripts/display-setup-message.sh" ]; then
+    # Fallback to console display
+    chmod +x ${INSTALL_DIR}/scripts/display-setup-message.sh
     
-    systemctl daemon-reload
+    if [ -e /dev/tty1 ] && [ ! -n "$SSH_CONNECTION" ]; then
+        echo "Displaying message on console..."
+        ${INSTALL_DIR}/scripts/display-setup-message.sh > /dev/tty1 2>&1 &
+    fi
+    
+    # Also display for SSH users
+    ${INSTALL_DIR}/scripts/display-setup-message.sh
+    
 else
-    # Fallback if script not found
+    # Final fallback
     echo ""
     echo "================================================"
     echo "    PLEASE CONTINUE SETUP BY VISITING:         "

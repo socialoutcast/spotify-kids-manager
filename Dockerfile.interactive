@@ -16,7 +16,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Create directories
-RUN mkdir -p /app/backend /app/frontend /app/logs /app/data /app/config /app/scripts
+RUN mkdir -p /app/backend /app/frontend /app/logs /app/data /app/config /app/scripts /app/backend/templates
 
 # Install Python dependencies
 COPY backend/requirements.txt /app/backend/
@@ -26,8 +26,29 @@ RUN pip install --no-cache-dir -r /app/backend/requirements.txt
 COPY backend/*.py /app/backend/
 RUN chmod +x /app/backend/*.py
 
-# Copy scripts
+# Copy templates
+COPY backend/templates/*.html /app/backend/templates/ 2>/dev/null || true
+
+# Copy and build frontend
+# Install Node.js for building frontend
+RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
+    apt-get install -y nodejs && \
+    npm install -g npm@latest
+
+# Copy frontend source
+COPY frontend/package*.json /app/frontend/
+WORKDIR /app/frontend
+RUN npm ci || npm install
+
+COPY frontend/ /app/frontend/
+RUN npm run build || echo "Frontend build failed, continuing..."
+
+# Return to app directory
+WORKDIR /app
+
+# Copy scripts and HTML files
 COPY scripts/*.sh /app/scripts/
+COPY scripts/*.html /app/scripts/ 2>/dev/null || true
 RUN chmod +x /app/scripts/*.sh
 
 # Install Spotifyd with architecture detection and fallback
@@ -94,13 +115,17 @@ pidfile=/app/supervisord.pid \n\
 command=nginx -g "daemon off;" \n\
 autostart=true \n\
 autorestart=true \n\
+priority=1 \n\
 stdout_logfile=/app/logs/nginx.log \n\
 stderr_logfile=/app/logs/nginx_error.log \n\
 \n\
 [program:flask] \n\
-command=python /app/backend/app.py \n\
+command=/bin/bash /app/scripts/start-flask.sh \n\
 autostart=true \n\
 autorestart=true \n\
+priority=2 \n\
+startretries=3 \n\
+startsecs=5 \n\
 environment=FLASK_APP=app.py,FLASK_ENV=production,PYTHONUNBUFFERED=1 \n\
 stdout_logfile=/app/logs/flask.log \n\
 stderr_logfile=/app/logs/flask_error.log' > /etc/supervisor/conf.d/supervisord.conf

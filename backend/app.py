@@ -35,14 +35,22 @@ except ImportError:
     bluetooth_manager = None
 
 # Setup logging with more detail
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('/app/logs/app.log'),
-        logging.StreamHandler()
-    ]
-)
+try:
+    os.makedirs('/app/logs', exist_ok=True)
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler('/app/logs/app.log'),
+            logging.StreamHandler()
+        ]
+    )
+except Exception as e:
+    # Fallback to console only if log dir is not accessible
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
 logger = logging.getLogger(__name__)
 
 # Initialize Flask app
@@ -58,7 +66,8 @@ else:
 
 app = Flask(__name__, 
     static_folder=static_folder,
-    static_url_path='/' if static_folder else None
+    static_url_path='/' if static_folder else None,
+    template_folder='templates'
 )
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', secrets.token_hex(32))
 CORS(app)
@@ -414,8 +423,12 @@ device_type = "speaker"
 # API Routes
 @app.route('/')
 def index():
-    """Serve the React frontend"""
-    return app.send_static_file('index.html')
+    """Serve the React frontend or fallback page"""
+    if static_folder and os.path.exists(os.path.join(static_folder, 'index.html')):
+        return app.send_static_file('index.html')
+    else:
+        # Serve fallback template if frontend build is not available
+        return render_template('index.html')
 
 @app.route('/health')
 def health():
@@ -808,11 +821,22 @@ if __name__ == '__main__':
         except Exception as e:
             logger.error(f"Failed to start update scheduler: {e}")
     
+    # Add startup delay to ensure nginx is ready
+    time.sleep(2)
+    
     try:
         logger.info("Starting Flask app on port 5000...")
+        logger.info(f"Static folder: {static_folder}")
+        logger.info(f"Data directory: {DATA_DIR}")
+        logger.info(f"Environment: FLASK_APP={os.getenv('FLASK_APP')}, FLASK_ENV={os.getenv('FLASK_ENV')}")
+        
+        # Run Flask with socketio
         socketio.run(app, host='0.0.0.0', port=5000, debug=False)
     except Exception as e:
         logger.error(f"Failed to start Flask app: {e}", exc_info=True)
+        # Keep the process alive for debugging
+        while True:
+            time.sleep(60)
     finally:
         # Stop scheduler on shutdown
         if update_manager:
