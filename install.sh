@@ -65,8 +65,20 @@ docker-compose build
 
 # Start the container immediately
 echo "[6/7] Starting Docker container..."
+cd ${INSTALL_DIR}/spotify-kids-manager
+docker-compose down 2>/dev/null || true
 docker-compose up -d
-sleep 5
+sleep 10
+
+# Verify container is running
+if docker ps | grep -q spotify-kids-manager; then
+    echo "✓ Container started successfully"
+else
+    echo "⚠ Container failed to start, attempting again..."
+    docker-compose logs --tail 20
+    docker-compose up -d
+    sleep 5
+fi
 
 # Create systemd service
 echo "[7/7] Creating systemd service..."
