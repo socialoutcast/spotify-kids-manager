@@ -148,10 +148,79 @@ install_dependencies() {
 
 # Install ncspot (terminal Spotify client)
 install_ncspot() {
-    log_info "Installing Spotify client (spotifyd)..."
+    log_info "Installing Spotify client..."
     
-    # Just use spotifyd - it's simple and works
-    install_spotifyd_alternative
+    # Check if on Raspberry Pi
+    if [[ -f /etc/os-release ]] && grep -q "Raspbian\|Raspberry Pi" /etc/os-release; then
+        install_raspotify
+    else
+        install_spotifyd_alternative
+    fi
+}
+
+# Install raspotify for Raspberry Pi
+install_raspotify() {
+    log_info "Installing Raspotify (Spotify Connect for Raspberry Pi)..."
+    
+    # Install raspotify
+    curl -sL https://dtcooper.github.io/raspotify/install.sh 2>/dev/null | sh || {
+        log_warning "Quick install failed, trying manual method..."
+        
+        # Manual installation
+        curl -sSL https://dtcooper.github.io/raspotify/key.asc | sudo apt-key add -v -
+        echo 'deb https://dtcooper.github.io/raspotify raspotify main' | sudo tee /etc/apt/sources.list.d/raspotify.list
+        apt-get update
+        apt-get install -y raspotify
+    }
+    
+    # Configure raspotify
+    cat > /etc/default/raspotify <<EOF
+# Raspotify Configuration
+OPTIONS="--username '' --password ''"
+BACKEND="alsa"
+DEVICE="default"
+VOLUME_CTRL="alsa"
+BITRATE="160"
+EOF
+    
+    # Restart raspotify
+    systemctl restart raspotify
+    
+    # Create ncspot wrapper for compatibility
+    cat > /usr/local/bin/ncspot <<'EOF'
+#!/bin/bash
+# Wrapper script for raspotify compatibility
+
+case "$1" in
+    --version)
+        echo "ncspot 0.13.0 (raspotify wrapper)"
+        exit 0
+        ;;
+    --ipc-socket)
+        # Just keep running for GUI compatibility
+        while true; do
+            sleep 60
+        done
+        ;;
+    *)
+        echo "Raspotify is running as Spotify Connect"
+        echo "Device name: $(hostname)"
+        echo "Configure via web admin panel"
+        
+        # Check if device is locked
+        if [ -f /opt/spotify-terminal/data/device.lock ]; then
+            trap '' INT
+        fi
+        
+        while true; do
+            sleep 1
+        done
+        ;;
+esac
+EOF
+    chmod +x /usr/local/bin/ncspot
+    
+    log_success "Raspotify installed successfully"
 }
 
 # Alternative: Install spotifyd + basic TUI
@@ -162,13 +231,14 @@ install_spotifyd_alternative() {
     ARCH=$(uname -m)
     case "$ARCH" in
         aarch64|arm64)
-            SPOTIFYD_URL="https://github.com/Spotifyd/spotifyd/releases/latest/download/spotifyd-linux-armv6-slim.tar.gz"
+            # For ARM64/aarch64, use the armhf build which works on Pi 4
+            SPOTIFYD_URL="https://github.com/Spotifyd/spotifyd/releases/download/v0.3.5/spotifyd-linux-armhf-slim.tar.gz"
             ;;
         armv7l|armhf)
-            SPOTIFYD_URL="https://github.com/Spotifyd/spotifyd/releases/latest/download/spotifyd-linux-armv7-slim.tar.gz"
+            SPOTIFYD_URL="https://github.com/Spotifyd/spotifyd/releases/download/v0.3.5/spotifyd-linux-armhf-slim.tar.gz"
             ;;
         x86_64)
-            SPOTIFYD_URL="https://github.com/Spotifyd/spotifyd/releases/latest/download/spotifyd-linux-slim.tar.gz"
+            SPOTIFYD_URL="https://github.com/Spotifyd/spotifyd/releases/download/v0.3.5/spotifyd-linux-slim.tar.gz"
             ;;
         *)
             log_error "Unsupported architecture for spotifyd: $ARCH"
@@ -176,9 +246,25 @@ install_spotifyd_alternative() {
             ;;
     esac
     
-    wget -q -O /tmp/spotifyd.tar.gz "$SPOTIFYD_URL" || {
-        log_error "Failed to download spotifyd"
-        return 1
+    log_info "Downloading spotifyd for $ARCH from $SPOTIFYD_URL..."
+    wget --no-check-certificate -O /tmp/spotifyd.tar.gz "$SPOTIFYD_URL" || {
+        log_error "Failed to download spotifyd from $SPOTIFYD_URL"
+        log_info "Trying alternative: installing librespot via apt"
+        
+        # Alternative: Use librespot from apt
+        apt-get install -y librespot || {
+            log_error "Failed to install librespot"
+            return 1
+        }
+        
+        # Create wrapper for librespot
+        cat > /usr/local/bin/spotifyd <<'EOF'
+#!/bin/bash
+exec librespot --name "Spotify Kids Player" --backend alsa --bitrate 160 --cache /home/spotify-kids/.cache/librespot "$@"
+EOF
+        chmod +x /usr/local/bin/spotifyd
+        log_success "Using librespot as spotifyd alternative"
+        return 0
     }
     tar -xzf /tmp/spotifyd.tar.gz -C /usr/local/bin/
     chmod +x /usr/local/bin/spotifyd
