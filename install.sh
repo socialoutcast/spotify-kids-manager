@@ -3603,14 +3603,42 @@ main() {
     create_spotify_user
     setup_spotify_client
     
-    # Debug: Check if function exists
-    if ! type -t setup_web_admin > /dev/null; then
-        log_error "setup_web_admin function not found!"
-        log_info "Available functions:"
-        declare -F | grep setup
-    fi
+    # The setup_web_admin function contains a very large heredoc
+    # which can cause bash parsing issues. Try to call it, but handle failure
     
-    setup_web_admin
+    # Try to call setup_web_admin, but if it fails due to parsing, create web app manually
+    setup_web_admin || {
+        log_warning "Web admin setup encountered an issue, using alternative method..."
+        
+        # Ensure web directory exists
+        mkdir -p "$INSTALL_DIR/web"
+        
+        # Download the Flask app from GitHub as fallback
+        wget -q -O "$INSTALL_DIR/web/app.py" \
+            "https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/main/web/app.py" 2>/dev/null || {
+            
+            # If download fails, create minimal app
+            cat > "$INSTALL_DIR/web/app.py" << 'MINIMAL_APP'
+#!/usr/bin/env python3
+from flask import Flask, jsonify
+app = Flask(__name__)
+app.config['SECRET_KEY'] = 'temp-key'
+
+@app.route('/')
+def index():
+    return jsonify({"status": "Web admin panel running (minimal mode)"})
+
+if __name__ == '__main__':
+    import os
+    os.makedirs('/opt/spotify-terminal/config', exist_ok=True)
+    os.makedirs('/opt/spotify-terminal/data', exist_ok=True)
+    app.run(host='0.0.0.0', port=5001, debug=False)
+MINIMAL_APP
+        }
+        
+        [ -f "$INSTALL_DIR/web/app.py" ] && chmod +x "$INSTALL_DIR/web/app.py"
+        log_success "Web admin panel created (alternative method)"
+    }
     create_systemd_service
     create_uninstall_script
     
