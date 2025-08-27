@@ -1649,16 +1649,7 @@ main() {
         echo "    COMPLETE SYSTEM RESET"
         echo "============================================"
         echo ""
-        log_warning "This will completely remove and reinstall everything!"
-        echo ""
-        echo -e "${YELLOW}Type 'yes' to continue or anything else to cancel:${NC}"
-        read -p "Continue with reset? " -r
-        echo ""
-        if [[ ! $REPLY == "yes" ]]; then
-            log_info "Reset cancelled (you typed: '$REPLY')"
-            log_info "To reset, type exactly: yes"
-            exit 0
-        fi
+        log_warning "Removing everything and reinstalling..."
         
         check_root
         log_info "Performing complete reset..."
