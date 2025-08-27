@@ -163,14 +163,13 @@ install_raspotify() {
     log_info "Installing Raspotify (Spotify Connect for Raspberry Pi)..."
     
     # Install raspotify
-    curl -sL https://dtcooper.github.io/raspotify/install.sh 2>/dev/null | sh || {
-        log_warning "Quick install failed, trying manual method..."
-        
-        # Manual installation
-        curl -sSL https://dtcooper.github.io/raspotify/key.asc | sudo apt-key add -v -
-        echo 'deb https://dtcooper.github.io/raspotify raspotify main' | sudo tee /etc/apt/sources.list.d/raspotify.list
-        apt-get update
-        apt-get install -y raspotify
+    log_info "Adding raspotify repository..."
+    curl -sSL https://dtcooper.github.io/raspotify/key.asc | apt-key add - 2>/dev/null
+    echo 'deb https://dtcooper.github.io/raspotify raspotify main' | tee /etc/apt/sources.list.d/raspotify.list
+    apt-get update
+    apt-get install -y raspotify || {
+        log_error "Failed to install raspotify"
+        return 1
     }
     
     # Configure raspotify
@@ -197,6 +196,10 @@ case "$1" in
         exit 0
         ;;
     --ipc-socket)
+        # Start raspotify if not running
+        if ! systemctl is-active --quiet raspotify; then
+            systemctl start raspotify 2>/dev/null || true
+        fi
         # Just keep running for GUI compatibility
         while true; do
             sleep 60
@@ -311,9 +314,19 @@ case "$1" in
         esac
         ;;
     --ipc-socket)
-        # Run spotifyd in background if not running
-        if ! pgrep -x spotifyd > /dev/null; then
-            /usr/local/bin/spotifyd &
+        # Check which backend is available and start it
+        if command -v raspotify > /dev/null || systemctl list-units --all | grep -q raspotify; then
+            # Use raspotify
+            if ! systemctl is-active --quiet raspotify; then
+                systemctl start raspotify 2>/dev/null || true
+            fi
+        elif [ -x /usr/local/bin/spotifyd ]; then
+            # Use spotifyd
+            if ! pgrep -x spotifyd > /dev/null; then
+                /usr/local/bin/spotifyd &
+            fi
+        else
+            echo "No Spotify backend found" >&2
         fi
         # Keep running for GUI compatibility
         while true; do
