@@ -107,7 +107,6 @@ install_dependencies() {
         pkg-config \
         xinput-calibrator \
         libinput-tools \
-        florence \
         matchbox-keyboard \
         xinit \
         xserver-xorg \
@@ -115,7 +114,11 @@ install_dependencies() {
         openbox \
         unclutter \
         xterm \
-        xinput
+        xinput \
+        python3-gi \
+        python3-gi-cairo \
+        gir1.2-gtk-3.0 \
+        python3-pydbus
     
     # Additional packages for GUI Spotify client (for touchscreen)
     apt-get install -y \
@@ -486,53 +489,302 @@ unclutter -idle 0.1 &
 # Start minimal window manager
 openbox &
 
-# Check if we should use Spotify Web Player or native client
-if command -v spotify > /dev/null 2>&1; then
-    # Use official Spotify client if available
-    echo "Starting official Spotify client..." >> /tmp/spotify-touch.log
-    exec spotify --force-device-scale-factor=1.5
-elif command -v chromium-browser > /dev/null 2>&1; then
-    # Use Chromium in kiosk mode with Spotify Web Player
-    echo "Starting Spotify Web Player in kiosk mode..." >> /tmp/spotify-touch.log
-    
-    # Create a locked-down Chromium profile
-    CHROME_PROFILE="/home/spotify-kids/.config/chromium-kiosk"
-    mkdir -p "$CHROME_PROFILE"
-    
-    # Check if device is locked
-    if [ -f /opt/spotify-terminal/data/device.lock ]; then
-        EXTRA_FLAGS="--app-auto-launched --disable-session-crashed-bubble"
-    else
-        EXTRA_FLAGS=""
-    fi
-    
-    # Start Chromium in kiosk mode with Spotify Web Player
-    exec chromium-browser \
-        --kiosk \
-        --no-first-run \
-        --disable-translate \
-        --disable-infobars \
-        --disable-suggestions-service \
-        --disable-save-password-bubble \
-        --incognito \
-        --disable-pinch \
-        --overscroll-history-navigation=0 \
-        --disable-features=TouchpadOverscrollHistoryNavigation \
-        --disable-web-security \
-        --disable-features=TranslateUI \
-        --disable-features=TouchpadOverscrollHistoryNavigation \
-        --check-for-update-interval=31536000 \
-        --user-data-dir="$CHROME_PROFILE" \
-        $EXTRA_FLAGS \
-        "https://open.spotify.com"
-else
-    # Fallback to terminal client in X
-    echo "Falling back to terminal client..." >> /tmp/spotify-touch.log
-    exec xterm -fullscreen -fa 'Monospace' -fs 14 -bg black -fg green -e /opt/spotify-terminal/scripts/spotify-client.sh
-fi
+# Start on-screen keyboard daemon
+matchbox-keyboard --daemon &
+KEYBOARD_PID=$!
+echo "Started on-screen keyboard (PID: $KEYBOARD_PID)" >> /tmp/spotify-touch.log
+
+# Start ncspot in a terminal with touch support
+echo "Starting ncspot with touch interface..." >> /tmp/spotify-touch.log
+
+# Create a simple touch wrapper for ncspot using Python and GTK
+python3 /opt/spotify-terminal/scripts/spotify-touch-gui.py &
+
+# Wait for GUI
+wait
 EOF
     
     chmod +x "$INSTALL_DIR/scripts/start-touchscreen.sh"
+    
+    # Create Python touch GUI for ncspot
+    cat > "$INSTALL_DIR/scripts/spotify-touch-gui.py" <<'EOF'
+#!/usr/bin/env python3
+
+import gi
+gi.require_version('Gtk', '3.0')
+from gi.repository import Gtk, Gdk, GLib
+import subprocess
+import os
+import signal
+import sys
+import threading
+import time
+
+class SpotifyTouchGUI(Gtk.Window):
+    def __init__(self):
+        super().__init__(title="Spotify Kids Manager")
+        self.fullscreen()
+        self.connect("destroy", self.on_quit)
+        
+        # Start ncspot in background
+        self.ncspot_process = None
+        self.start_ncspot()
+        
+        # Create UI
+        self.setup_ui()
+        
+        # Check device lock status
+        self.locked = os.path.exists("/opt/spotify-terminal/data/device.lock")
+        
+    def setup_ui(self):
+        # Main container
+        main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.add(main_box)
+        
+        # Header with now playing info
+        header_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        header_box.set_size_request(-1, 150)
+        main_box.pack_start(header_box, False, False, 0)
+        
+        self.now_playing_label = Gtk.Label()
+        self.now_playing_label.set_markup("<span size='x-large' weight='bold'>Loading...</span>")
+        header_box.pack_start(self.now_playing_label, True, True, 10)
+        
+        # Control buttons (large for touch)
+        control_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        control_box.set_size_request(-1, 200)
+        control_box.set_spacing(20)
+        control_box.set_margin_left(20)
+        control_box.set_margin_right(20)
+        main_box.pack_start(control_box, False, False, 20)
+        
+        # Previous button
+        prev_btn = Gtk.Button()
+        prev_btn.set_label("⏮")
+        prev_btn.get_style_context().add_class("control-button")
+        prev_btn.connect("clicked", lambda x: self.send_ncspot_command("previous"))
+        control_box.pack_start(prev_btn, True, True, 0)
+        
+        # Play/Pause button
+        self.play_btn = Gtk.Button()
+        self.play_btn.set_label("⏸")
+        self.play_btn.get_style_context().add_class("control-button")
+        self.play_btn.connect("clicked", lambda x: self.send_ncspot_command("playpause"))
+        control_box.pack_start(self.play_btn, True, True, 0)
+        
+        # Next button
+        next_btn = Gtk.Button()
+        next_btn.set_label("⏭")
+        next_btn.get_style_context().add_class("control-button")
+        next_btn.connect("clicked", lambda x: self.send_ncspot_command("next"))
+        control_box.pack_start(next_btn, True, True, 0)
+        
+        # Volume control
+        volume_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        volume_box.set_size_request(-1, 100)
+        volume_box.set_margin_left(20)
+        volume_box.set_margin_right(20)
+        main_box.pack_start(volume_box, False, False, 10)
+        
+        volume_label = Gtk.Label("Volume: ")
+        volume_box.pack_start(volume_label, False, False, 10)
+        
+        self.volume_scale = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL)
+        self.volume_scale.set_range(0, 100)
+        self.volume_scale.set_value(50)
+        self.volume_scale.set_draw_value(True)
+        self.volume_scale.connect("value-changed", self.on_volume_changed)
+        volume_box.pack_start(self.volume_scale, True, True, 10)
+        
+        # Search section
+        search_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        search_box.set_size_request(-1, 80)
+        search_box.set_margin_left(20)
+        search_box.set_margin_right(20)
+        main_box.pack_start(search_box, False, False, 10)
+        
+        self.search_entry = Gtk.Entry()
+        self.search_entry.set_placeholder_text("Search for music...")
+        self.search_entry.connect("activate", self.on_search)
+        self.search_entry.connect("focus-in-event", self.show_keyboard)
+        search_box.pack_start(self.search_entry, True, True, 10)
+        
+        search_btn = Gtk.Button(label="Search")
+        search_btn.connect("clicked", lambda x: self.on_search(None))
+        search_box.pack_start(search_btn, False, False, 10)
+        
+        # Results/playlists area with scrolling
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        main_box.pack_start(scrolled, True, True, 10)
+        
+        self.results_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.results_box.set_spacing(10)
+        scrolled.add(self.results_box)
+        
+        # Exit button (only show if not locked)
+        if not self.locked:
+            exit_btn = Gtk.Button(label="Exit")
+            exit_btn.connect("clicked", self.on_quit)
+            main_box.pack_start(exit_btn, False, False, 10)
+        
+        # Apply CSS for touch-friendly styling
+        css_provider = Gtk.CssProvider()
+        css_provider.load_from_data(b"""
+            .control-button {
+                font-size: 48px;
+                min-height: 150px;
+                min-width: 150px;
+                background: #1db954;
+                color: white;
+                border-radius: 10px;
+            }
+            .control-button:hover {
+                background: #1ed760;
+            }
+            GtkEntry {
+                font-size: 24px;
+                min-height: 60px;
+                padding: 10px;
+            }
+            GtkButton {
+                font-size: 20px;
+                min-height: 60px;
+                padding: 10px;
+            }
+            GtkLabel {
+                font-size: 18px;
+            }
+        """)
+        Gtk.StyleContext.add_provider_for_screen(
+            Gdk.Screen.get_default(),
+            css_provider,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
+        
+    def start_ncspot(self):
+        """Start ncspot in background with IPC enabled"""
+        try:
+            # Kill any existing ncspot instances
+            subprocess.run(["pkill", "-f", "ncspot"], capture_output=True)
+            time.sleep(1)
+            
+            # Start ncspot with IPC socket
+            self.ncspot_process = subprocess.Popen(
+                ["ncspot", "--ipc-socket", "/tmp/ncspot.sock"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+            
+            # Give it time to start
+            time.sleep(3)
+            
+            # Start status update thread
+            self.update_thread = threading.Thread(target=self.update_status_loop, daemon=True)
+            self.update_thread.start()
+            
+        except Exception as e:
+            print(f"Failed to start ncspot: {e}")
+            
+    def send_ncspot_command(self, command):
+        """Send command to ncspot via IPC"""
+        try:
+            subprocess.run(
+                ["ncspot", "send", command, "--socket", "/tmp/ncspot.sock"],
+                capture_output=True,
+                timeout=2
+            )
+        except Exception as e:
+            print(f"Failed to send command: {e}")
+            
+    def on_volume_changed(self, scale):
+        """Handle volume changes"""
+        volume = int(scale.get_value())
+        try:
+            subprocess.run(["amixer", "set", "Master", f"{volume}%"], capture_output=True)
+        except:
+            pass
+            
+    def show_keyboard(self, widget, event):
+        """Show on-screen keyboard when text field is focused"""
+        try:
+            subprocess.Popen(["matchbox-keyboard"])
+        except:
+            pass
+        return False
+        
+    def on_search(self, widget):
+        """Handle search"""
+        query = self.search_entry.get_text().strip()
+        if not query:
+            return
+            
+        # Clear previous results
+        for child in self.results_box.get_children():
+            self.results_box.remove(child)
+            
+        # Send search to ncspot
+        self.send_ncspot_command(f"search {query}")
+        
+        # Note: In a real implementation, we'd parse ncspot's output
+        # For now, show a message
+        label = Gtk.Label(f"Searching for: {query}")
+        self.results_box.pack_start(label, False, False, 5)
+        self.results_box.show_all()
+        
+    def update_status_loop(self):
+        """Update now playing info periodically"""
+        while True:
+            try:
+                # Try to get status from ncspot
+                result = subprocess.run(
+                    ["ncspot", "send", "status", "--socket", "/tmp/ncspot.sock"],
+                    capture_output=True,
+                    text=True,
+                    timeout=2
+                )
+                
+                if result.returncode == 0:
+                    # Parse and update UI
+                    GLib.idle_add(self.update_now_playing, result.stdout)
+                    
+            except:
+                pass
+                
+            time.sleep(2)
+            
+    def update_now_playing(self, status):
+        """Update the now playing label"""
+        # This would parse the actual ncspot status
+        # For now, just show something
+        self.now_playing_label.set_markup("<span size='x-large' weight='bold'>Spotify Music Player</span>")
+        
+    def on_quit(self, widget=None):
+        """Clean shutdown"""
+        if self.ncspot_process:
+            self.ncspot_process.terminate()
+            try:
+                self.ncspot_process.wait(timeout=5)
+            except:
+                self.ncspot_process.kill()
+        Gtk.main_quit()
+        
+def main():
+    # Handle signals
+    signal.signal(signal.SIGINT, lambda x, y: Gtk.main_quit())
+    
+    # Create and show window
+    window = SpotifyTouchGUI()
+    window.show_all()
+    
+    # Start GTK main loop
+    Gtk.main()
+    
+if __name__ == "__main__":
+    main()
+EOF
+    
+    chmod +x "$INSTALL_DIR/scripts/spotify-touch-gui.py"
     
     # Keep multi-user.target as default (no GUI unless touchscreen detected)
     log_info "Setting system to multi-user mode..."
