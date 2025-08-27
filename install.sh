@@ -150,77 +150,87 @@ install_dependencies() {
 install_ncspot() {
     log_info "Installing ncspot (this may take a few minutes)..."
     
-    # Check if ncspot is already installed
+    # Check if ncspot is already installed AND working
     if command -v ncspot &> /dev/null; then
-        log_success "ncspot is already installed"
-        return 0
+        # Test if ncspot actually runs (check for GLIBC error)
+        if ncspot --version 2>&1 | grep -q "GLIBC"; then
+            log_warning "ncspot installed but has GLIBC version mismatch, rebuilding..."
+            rm -f /usr/local/bin/ncspot
+            rm -f /usr/bin/ncspot
+        else
+            log_success "ncspot is already installed and working"
+            return 0
+        fi
     fi
     
-    # Try to install from cargo
-    if command -v cargo &> /dev/null; then
-        log_info "Building ncspot from source with cargo..."
+    # First try: Download a Pi-compatible binary if available
+    ARCH=$(uname -m)
+    if [[ "$ARCH" == "aarch64" ]] || [[ "$ARCH" == "arm64" ]]; then
+        log_info "Trying to download Pi-compatible ncspot binary..."
         
-        # Install using cargo (for the spotify-kids user)
-        sudo -u "$SPOTIFY_USER" cargo install ncspot --no-default-features --features alsa_backend 2>/dev/null || \
-        cargo install ncspot --no-default-features --features alsa_backend || {
-            log_warning "Cargo installation failed, trying alternative..."
+        # Try to get a binary compiled for older GLIBC
+        # Using a version known to work with Debian Bookworm
+        NCSPOT_URL="https://github.com/hrkfdn/ncspot/releases/download/v0.12.0/ncspot-v0.12.0-linux-aarch64.tar.gz"
+        
+        if wget -q --spider "$NCSPOT_URL" 2>/dev/null; then
+            wget -q -O /tmp/ncspot.tar.gz "$NCSPOT_URL"
+            tar -xzf /tmp/ncspot.tar.gz -C /tmp/
             
-            # Alternative: Install pre-built binary
-            log_info "Downloading pre-built ncspot binary..."
-            
-            # Detect architecture
-            ARCH=$(uname -m)
-            case "$ARCH" in
-                aarch64|arm64)
-                    NCSPOT_ARCH="aarch64"
-                    ;;
-                armv7l|armhf)
-                    NCSPOT_ARCH="armv7"
-                    ;;
-                x86_64)
-                    NCSPOT_ARCH="x86_64"
-                    ;;
-                *)
-                    log_error "Unsupported architecture: $ARCH"
-                    log_info "Using alternative: spotify-tui"
-                    apt-get install -y spotify-tui 2>/dev/null || true
-                    return 1
-                    ;;
-            esac
-            
-            # Download from GitHub releases (if available)
-            NCSPOT_VERSION="0.13.4"
-            NCSPOT_URL="https://github.com/hrkfdn/ncspot/releases/download/v${NCSPOT_VERSION}/ncspot-v${NCSPOT_VERSION}-linux-${NCSPOT_ARCH}.tar.gz"
-            
-            if wget -q --spider "$NCSPOT_URL" 2>/dev/null; then
-                wget -q -O /tmp/ncspot.tar.gz "$NCSPOT_URL"
-                tar -xzf /tmp/ncspot.tar.gz -C /usr/local/bin/
+            # Test if this binary works
+            if /tmp/ncspot --version 2>&1 | grep -q "ncspot"; then
+                mv /tmp/ncspot /usr/local/bin/
                 chmod +x /usr/local/bin/ncspot
-                rm /tmp/ncspot.tar.gz
-                log_success "ncspot installed from pre-built binary"
+                rm -f /tmp/ncspot.tar.gz
+                log_success "ncspot installed from compatible binary"
+                return 0
             else
-                log_warning "Pre-built binary not available"
-                
-                # Last resort: build from source
-                log_info "Building ncspot from source..."
-                cd /tmp
-                git clone https://github.com/hrkfdn/ncspot.git
-                cd ncspot
-                cargo build --release --no-default-features --features alsa_backend
-                cp target/release/ncspot /usr/local/bin/
-                chmod +x /usr/local/bin/ncspot
-                cd /
-                rm -rf /tmp/ncspot
-                log_success "ncspot built from source"
+                log_warning "Downloaded binary has compatibility issues"
+                rm -f /tmp/ncspot /tmp/ncspot.tar.gz
             fi
-        }
-    else
-        log_error "Cargo not available, cannot install ncspot"
-        log_info "Using alternative: installing spotifyd instead"
-        
-        # Install spotifyd as alternative
-        install_spotifyd_alternative
+        fi
     fi
+    
+    # Second try: Build from source on Raspberry Pi
+    if command -v cargo &> /dev/null; then
+        log_info "Building ncspot from source (this will take 10-15 minutes on Pi)..."
+        
+        # Set build optimizations for Raspberry Pi
+        export CARGO_BUILD_TARGET_DIR="/tmp/cargo-build"
+        export RUSTFLAGS="-C target-cpu=native"
+        
+        # Build ncspot from source
+        cd /tmp
+        rm -rf ncspot-build
+        git clone https://github.com/hrkfdn/ncspot.git ncspot-build
+        cd ncspot-build
+        
+        # Build with minimal features for faster compile
+        cargo build --release --no-default-features --features alsa_backend,cursive/termion-backend || {
+            log_warning "Full build failed, trying minimal build..."
+            cargo build --release --no-default-features --features alsa_backend
+        }
+        
+        # Install the binary
+        if [ -f target/release/ncspot ]; then
+            cp target/release/ncspot /usr/local/bin/
+            chmod +x /usr/local/bin/ncspot
+            log_success "ncspot built and installed from source"
+            
+            # Clean up build directory
+            cd /
+            rm -rf /tmp/ncspot-build
+            rm -rf /tmp/cargo-build
+            return 0
+        else
+            log_error "Failed to build ncspot from source"
+        fi
+    else
+        log_error "Cargo not available, trying alternative installation method"
+    fi
+    
+    # Fallback: Use spotifyd with a simple web interface
+    log_info "Installing spotifyd as alternative..."
+    install_spotifyd_alternative
 }
 
 # Alternative: Install spotifyd + basic TUI
