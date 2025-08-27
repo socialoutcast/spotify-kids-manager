@@ -117,6 +117,16 @@ install_dependencies() {
         xterm \
         xinput
     
+    # Additional packages for GUI Spotify client (for touchscreen)
+    apt-get install -y \
+        qt5-default \
+        qtmultimedia5-dev \
+        libqt5svg5-dev \
+        cmake \
+        spotify-client \
+        chromium-browser \
+        2>/dev/null || true
+    
     # Python packages for web admin
     pip3 install --break-system-packages \
         flask \
@@ -476,11 +486,50 @@ unclutter -idle 0.1 &
 # Start minimal window manager
 openbox &
 
-# Start on-screen keyboard in background
-matchbox-keyboard -d &
-
-# Start terminal with ncspot in fullscreen
-exec xterm -fullscreen -fa 'Monospace' -fs 14 -bg black -fg green -e /opt/spotify-terminal/scripts/spotify-client.sh
+# Check if we should use Spotify Web Player or native client
+if command -v spotify > /dev/null 2>&1; then
+    # Use official Spotify client if available
+    echo "Starting official Spotify client..." >> /tmp/spotify-touch.log
+    exec spotify --force-device-scale-factor=1.5
+elif command -v chromium-browser > /dev/null 2>&1; then
+    # Use Chromium in kiosk mode with Spotify Web Player
+    echo "Starting Spotify Web Player in kiosk mode..." >> /tmp/spotify-touch.log
+    
+    # Create a locked-down Chromium profile
+    CHROME_PROFILE="/home/spotify-kids/.config/chromium-kiosk"
+    mkdir -p "$CHROME_PROFILE"
+    
+    # Check if device is locked
+    if [ -f /opt/spotify-terminal/data/device.lock ]; then
+        EXTRA_FLAGS="--app-auto-launched --disable-session-crashed-bubble"
+    else
+        EXTRA_FLAGS=""
+    fi
+    
+    # Start Chromium in kiosk mode with Spotify Web Player
+    exec chromium-browser \
+        --kiosk \
+        --no-first-run \
+        --disable-translate \
+        --disable-infobars \
+        --disable-suggestions-service \
+        --disable-save-password-bubble \
+        --incognito \
+        --disable-pinch \
+        --overscroll-history-navigation=0 \
+        --disable-features=TouchpadOverscrollHistoryNavigation \
+        --disable-web-security \
+        --disable-features=TranslateUI \
+        --disable-features=TouchpadOverscrollHistoryNavigation \
+        --check-for-update-interval=31536000 \
+        --user-data-dir="$CHROME_PROFILE" \
+        $EXTRA_FLAGS \
+        "https://open.spotify.com"
+else
+    # Fallback to terminal client in X
+    echo "Falling back to terminal client..." >> /tmp/spotify-touch.log
+    exec xterm -fullscreen -fa 'Monospace' -fs 14 -bg black -fg green -e /opt/spotify-terminal/scripts/spotify-client.sh
+fi
 EOF
     
     chmod +x "$INSTALL_DIR/scripts/start-touchscreen.sh"
