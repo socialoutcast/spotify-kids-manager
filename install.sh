@@ -685,6 +685,21 @@ HTML_TEMPLATE = '''
         </div>
         {% else %}
         <div class="grid">
+            <!-- User Management -->
+            <div class="card" style="grid-column: span 2;">
+                <h2>User Management</h2>
+                <div style="margin-bottom: 20px;">
+                    <h3 style="font-size: 16px; margin-bottom: 10px;">Create New User</h3>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="text" id="newUsername" placeholder="Enter username" style="flex: 1; padding: 8px;">
+                        <button class="btn success" onclick="createUser()">Create User</button>
+                    </div>
+                </div>
+                
+                <h3 style="font-size: 16px; margin-bottom: 10px;">Existing Users</h3>
+                <div id="usersList">Loading users...</div>
+            </div>
+            
             <!-- Device Control -->
             <div class="card">
                 <h2>Device Control</h2>
@@ -724,6 +739,12 @@ HTML_TEMPLATE = '''
                     <p>Loading...</p>
                 </div>
                 <form id="spotifyForm">
+                    <div class="form-group">
+                        <label>Configure Spotify for User</label>
+                        <select id="targetUser" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                            <option value="spotify-kids">spotify-kids (default)</option>
+                        </select>
+                    </div>
                     <div class="form-group">
                         <label>Spotify Username</label>
                         <input type="text" id="spotifyUsername" placeholder="Your Spotify username (not email)" required>
@@ -766,6 +787,7 @@ HTML_TEMPLATE = '''
                 </div>
                 <button class="btn danger" onclick="restartService()">Restart Service</button>
                 <button class="btn" onclick="viewLogs()">View Logs</button>
+                <button class="btn danger" onclick="rebootSystem()">Reboot System</button>
             </div>
         </div>
         
@@ -856,6 +878,93 @@ HTML_TEMPLATE = '''
             }
         }
         
+        // User management functions
+        async function loadUsers() {
+            const response = await fetch('/api/users');
+            const users = await response.json();
+            
+            const usersList = document.getElementById('usersList');
+            const targetSelect = document.getElementById('targetUser');
+            
+            // Clear and rebuild target user select
+            targetSelect.innerHTML = '';
+            
+            usersList.innerHTML = users.map(user => `
+                <div class="device-item">
+                    <div>
+                        <strong>${user.username}</strong>
+                        ${user.auto_login ? '<span style="color: green; margin-left: 10px;">✓ Auto-login</span>' : ''}
+                        ${user.spotify_configured ? '<span style="color: green; margin-left: 10px;">♪ Spotify</span>' : ''}
+                    </div>
+                    <div>
+                        ${!user.auto_login ? `<button class="btn" onclick="setAutoLogin('${user.username}')">Set Auto-login</button>` : ''}
+                        ${user.username !== 'spotify-kids' ? `<button class="btn danger" onclick="deleteUser('${user.username}')">Delete</button>` : ''}
+                    </div>
+                </div>
+            `).join('');
+            
+            // Populate target user select
+            users.forEach(user => {
+                const option = document.createElement('option');
+                option.value = user.username;
+                option.textContent = user.username + (user.spotify_configured ? ' (configured)' : '');
+                targetSelect.appendChild(option);
+            });
+        }
+        
+        async function createUser() {
+            const username = document.getElementById('newUsername').value.trim();
+            if (!username) {
+                showAlert('Please enter a username', 'error');
+                return;
+            }
+            
+            const response = await fetch('/api/users', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username})
+            });
+            
+            if (response.ok) {
+                showAlert(`User ${username} created successfully`);
+                document.getElementById('newUsername').value = '';
+                loadUsers();
+            } else {
+                const error = await response.json();
+                showAlert(error.error || 'Failed to create user', 'error');
+            }
+        }
+        
+        async function deleteUser(username) {
+            if (!confirm(`Delete user ${username}? This will remove all their data.`)) return;
+            
+            const response = await fetch(`/api/users/${username}`, {
+                method: 'DELETE'
+            });
+            
+            if (response.ok) {
+                showAlert(`User ${username} deleted`);
+                loadUsers();
+            } else {
+                const error = await response.json();
+                showAlert(error.error || 'Failed to delete user', 'error');
+            }
+        }
+        
+        async function setAutoLogin(username) {
+            const response = await fetch(`/api/users/${username}/autologin`, {
+                method: 'POST'
+            });
+            
+            if (response.ok) {
+                showAlert(`Auto-login set to ${username}. Reboot to apply.`);
+                loadUsers();
+            } else {
+                const error = await response.json();
+                showAlert(error.error || 'Failed to set auto-login', 'error');
+            }
+        }
+        
         // Load Spotify configuration
         async function loadSpotifyConfig() {
             const response = await fetch('/api/spotify/config');
@@ -881,11 +990,12 @@ HTML_TEMPLATE = '''
             e.preventDefault();
             const username = document.getElementById('spotifyUsername').value;
             const password = document.getElementById('spotifyPassword').value;
+            const target_user = document.getElementById('targetUser').value;
             
             const response = await fetch('/api/spotify/config', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({username, password})
+                body: JSON.stringify({username, password, target_user})
             });
             
             if (response.ok) {
@@ -931,6 +1041,14 @@ HTML_TEMPLATE = '''
             showAlert('Service restarting...');
         }
         
+        async function rebootSystem() {
+            if (!confirm('Reboot the entire system? All users will be disconnected.')) return;
+            const response = await fetch('/api/system/reboot', {method: 'POST'});
+            if (response.ok) {
+                showAlert('System rebooting in 5 seconds...');
+            }
+        }
+        
         async function viewLogs() {
             const response = await fetch('/api/system/logs');
             const logs = await response.text();
@@ -969,6 +1087,10 @@ HTML_TEMPLATE = '''
         
         if (document.getElementById('spotifyStatus')) {
             loadSpotifyConfig();
+        }
+        
+        if (document.getElementById('usersList')) {
+            loadUsers();
         }
     </script>
 </body>
@@ -1164,15 +1286,188 @@ def get_spotify_config():
     
     return jsonify(spotify_config)
 
+@app.route('/api/users', methods=['GET'])
+@login_required
+def get_users():
+    # Get all non-root users that can be used for Spotify
+    users = []
+    try:
+        with open('/etc/passwd', 'r') as f:
+            for line in f:
+                parts = line.strip().split(':')
+                if len(parts) >= 7:
+                    username = parts[0]
+                    uid = int(parts[2])
+                    home = parts[5]
+                    shell = parts[6]
+                    # Get users with UID >= 1000 (regular users) and valid shells
+                    if uid >= 1000 and uid < 65534 and '/home/' in home and 'nologin' not in shell:
+                        # Check if this user has Spotify configured
+                        spotify_configured = False
+                        if os.path.exists(f"{home}/.config/ncspot/config.toml") or \
+                           os.path.exists(f"{home}/.config/spotifyd/spotifyd.conf"):
+                            spotify_configured = True
+                        
+                        # Check if this is the auto-login user
+                        auto_login = False
+                        getty_override = "/etc/systemd/system/getty@tty1.service.d/override.conf"
+                        if os.path.exists(getty_override):
+                            with open(getty_override, 'r') as f:
+                                if f'--autologin {username}' in f.read():
+                                    auto_login = True
+                        
+                        users.append({
+                            'username': username,
+                            'uid': uid,
+                            'home': home,
+                            'spotify_configured': spotify_configured,
+                            'auto_login': auto_login
+                        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
+    return jsonify(users)
+
+@app.route('/api/users', methods=['POST'])
+@login_required
+def create_user():
+    data = request.json
+    username = data.get('username', '').strip()
+    
+    if not username:
+        return jsonify({"error": "Username required"}), 400
+    
+    # Validate username (alphanumeric and underscore only)
+    if not username.replace('_', '').isalnum():
+        return jsonify({"error": "Invalid username. Use only letters, numbers, and underscores"}), 400
+    
+    # Check if user already exists
+    result = subprocess.run(['id', username], capture_output=True)
+    if result.returncode == 0:
+        return jsonify({"error": f"User {username} already exists"}), 400
+    
+    # Create user without sudo access
+    try:
+        # Create user with home directory, bash shell, and audio/video/bluetooth groups
+        subprocess.run([
+            'useradd', '-m', 
+            '-s', '/bin/bash',
+            '-G', 'audio,video,bluetooth',
+            username
+        ], check=True)
+        
+        # Set up user directories
+        home_dir = f"/home/{username}"
+        subprocess.run(['mkdir', '-p', f"{home_dir}/.config"], check=True)
+        subprocess.run(['mkdir', '-p', f"{home_dir}/.cache"], check=True)
+        subprocess.run(['mkdir', '-p', f"{home_dir}/.cache/ncspot"], check=True)
+        subprocess.run(['mkdir', '-p', f"{home_dir}/.cache/spotifyd"], check=True)
+        
+        # Set ownership
+        subprocess.run(['chown', '-R', f'{username}:{username}', home_dir], check=True)
+        
+        # Create bash profile for auto-start
+        bash_profile = f"{home_dir}/.bash_profile"
+        with open(bash_profile, 'w') as f:
+            f.write('''# Auto-start Spotify client on login
+if [[ "$(tty)" == "/dev/tty1" ]]; then
+    # Start X session with Spotify client
+    startx /opt/spotify-terminal/scripts/start-x.sh
+fi
+''')
+        subprocess.run(['chown', f'{username}:{username}', bash_profile], check=True)
+        
+        return jsonify({
+            "success": True, 
+            "message": f"User {username} created successfully",
+            "username": username
+        })
+        
+    except subprocess.CalledProcessError as e:
+        return jsonify({"error": f"Failed to create user: {str(e)}"}), 500
+
+@app.route('/api/users/<username>', methods=['DELETE'])
+@login_required
+def delete_user(username):
+    # Don't allow deleting the default spotify-kids user
+    if username == "spotify-kids":
+        return jsonify({"error": "Cannot delete the default spotify-kids user"}), 400
+    
+    # Check if user exists
+    result = subprocess.run(['id', username], capture_output=True)
+    if result.returncode != 0:
+        return jsonify({"error": f"User {username} does not exist"}), 404
+    
+    try:
+        # Remove from auto-login if configured
+        getty_override = "/etc/systemd/system/getty@tty1.service.d/override.conf"
+        if os.path.exists(getty_override):
+            with open(getty_override, 'r') as f:
+                content = f.read()
+            if f'--autologin {username}' in content:
+                # Reset to default spotify-kids user
+                set_autologin_user("spotify-kids")
+        
+        # Kill any processes owned by the user
+        subprocess.run(['pkill', '-u', username], capture_output=True)
+        
+        # Delete the user and their home directory
+        subprocess.run(['userdel', '-r', username], check=True)
+        
+        return jsonify({"success": True, "message": f"User {username} deleted"})
+        
+    except subprocess.CalledProcessError as e:
+        return jsonify({"error": f"Failed to delete user: {str(e)}"}), 500
+
+@app.route('/api/users/<username>/autologin', methods=['POST'])
+@login_required
+def set_user_autologin(username):
+    # Check if user exists
+    result = subprocess.run(['id', username], capture_output=True)
+    if result.returncode != 0:
+        return jsonify({"error": f"User {username} does not exist"}), 404
+    
+    try:
+        set_autologin_user(username)
+        return jsonify({"success": True, "message": f"Auto-login set to {username}"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+def set_autologin_user(username):
+    """Helper function to set auto-login user"""
+    getty_override = "/etc/systemd/system/getty@tty1.service.d/override.conf"
+    os.makedirs(os.path.dirname(getty_override), exist_ok=True)
+    
+    with open(getty_override, 'w') as f:
+        f.write(f'''[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --autologin {username} --noclear %I \$TERM
+''')
+    
+    # Reload systemd
+    subprocess.run(['systemctl', 'daemon-reload'])
+    subprocess.run(['systemctl', 'restart', 'getty@tty1.service'])
+
 @app.route('/api/spotify/config', methods=['POST'])
 @login_required
 def set_spotify_config():
     data = request.json
     username = data.get('username', '').strip()
     password = data.get('password', '').strip()
+    target_user = data.get('target_user', 'spotify-kids').strip()  # Which user to configure
     
     if not username or not password:
         return jsonify({"error": "Username and password required"}), 400
+    
+    # Check if target user exists
+    result = subprocess.run(['id', target_user], capture_output=True)
+    if result.returncode != 0:
+        return jsonify({"error": f"User {target_user} does not exist"}), 404
+    
+    # Get user's home directory
+    home_dir = f"/home/{target_user}"
+    if not os.path.exists(home_dir):
+        return jsonify({"error": f"Home directory for {target_user} not found"}), 500
     
     # Detect which backend we're using
     backend = "ncspot"
@@ -1180,8 +1475,8 @@ def set_spotify_config():
         backend = "spotifyd"
     
     if backend == "ncspot":
-        # Configure ncspot
-        config_dir = "/home/spotify-kids/.config/ncspot"
+        # Configure ncspot for target user
+        config_dir = f"{home_dir}/.config/ncspot"
         config_file = f"{config_dir}/config.toml"
         
         os.makedirs(config_dir, exist_ok=True)
@@ -1215,7 +1510,7 @@ enable_cache = true
 
 [cache]
 enabled = true
-path = "/home/spotify-kids/.cache/ncspot"
+path = "{home_dir}/.cache/ncspot"
 size = 10000
 
 [keybindings]
@@ -1226,7 +1521,7 @@ size = 10000
             f.write(config_content)
         
         # Set proper ownership
-        subprocess.run(['chown', '-R', 'spotify-kids:spotify-kids', config_dir])
+        subprocess.run(['chown', '-R', f'{target_user}:{target_user}', config_dir])
         
         # Also create credentials cache file for ncspot
         creds_file = f"{config_dir}/credentials.json"
@@ -1240,11 +1535,11 @@ size = 10000
             json.dump(creds_content, f)
         
         subprocess.run(['chmod', '600', creds_file])
-        subprocess.run(['chown', 'spotify-kids:spotify-kids', creds_file])
+        subprocess.run(['chown', f'{target_user}:{target_user}', creds_file])
         
     else:
-        # Configure spotifyd
-        config_dir = "/home/spotify-kids/.config/spotifyd"
+        # Configure spotifyd for target user
+        config_dir = f"{home_dir}/.config/spotifyd"
         config_file = f"{config_dir}/spotifyd.conf"
         
         os.makedirs(config_dir, exist_ok=True)
@@ -1256,7 +1551,7 @@ password = {password}
 backend = alsa
 device_name = Spotify Kids Player
 bitrate = 320
-cache_path = /home/spotify-kids/.cache/spotifyd
+cache_path = {home_dir}/.cache/spotifyd
 max_cache_size = 10000000000
 cache = true
 volume_normalisation = true
@@ -1267,7 +1562,7 @@ normalisation_pregain = -10
             f.write(config_content)
         
         # Set proper ownership
-        subprocess.run(['chown', '-R', 'spotify-kids:spotify-kids', config_dir])
+        subprocess.run(['chown', '-R', f'{target_user}:{target_user}', config_dir])
         subprocess.run(['chmod', '600', config_file])
         
         # Restart spotifyd if running
@@ -1279,10 +1574,17 @@ normalisation_pregain = -10
     config['spotify_username'] = username
     save_config(config)
     
-    # Restart the spotify user session to apply changes
-    subprocess.run(['pkill', '-u', 'spotify-kids'], capture_output=True)
+    # Restart the target user's session to apply changes
+    subprocess.run(['pkill', '-u', target_user], capture_output=True)
     
-    return jsonify({"success": True, "message": f"Spotify configured for {username}", "backend": backend})
+    return jsonify({"success": True, "message": f"Spotify configured for {target_user} with username {username}", "backend": backend, "user": target_user})
+
+@app.route('/api/system/reboot', methods=['POST'])
+@login_required
+def reboot_system():
+    # Schedule a reboot in 5 seconds to allow response to be sent
+    subprocess.Popen(['sleep', '5', '&&', 'reboot'], shell=True)
+    return jsonify({"success": True, "message": "System will reboot in 5 seconds"})
 
 if __name__ == '__main__':
     os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
