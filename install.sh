@@ -2149,6 +2149,7 @@ def get_spotify_config():
     # Get current Spotify configuration
     config_file = "/home/spotify-kids/.config/ncspot/config.toml"
     spotifyd_config = "/home/spotify-kids/.config/spotifyd/spotifyd.conf"
+    raspotify_config = "/etc/default/raspotify"
     
     spotify_config = {
         "configured": False,
@@ -2156,8 +2157,23 @@ def get_spotify_config():
         "backend": "ncspot"
     }
     
-    # Check ncspot config
-    if os.path.exists(config_file):
+    # Check raspotify first (system-wide config)
+    if os.path.exists(raspotify_config):
+        spotify_config['backend'] = 'raspotify'
+        try:
+            with open(raspotify_config, 'r') as f:
+                content = f.read()
+                # Extract username from OPTIONS="--username 'user' --password 'pass'"
+                import re
+                match = re.search(r"--username\s+['\"]([^'\"]+)['\"]", content)
+                if match:
+                    spotify_config['username'] = match.group(1)
+                    spotify_config['configured'] = True
+        except:
+            pass
+    
+    # Check ncspot config if not raspotify
+    if not spotify_config['configured'] and os.path.exists(config_file):
         try:
             with open(config_file, 'r') as f:
                 content = f.read()
@@ -2171,7 +2187,7 @@ def get_spotify_config():
             pass
     
     # Check if using spotifyd
-    if os.path.exists(spotifyd_config):
+    if not spotify_config['configured'] and os.path.exists(spotifyd_config):
         spotify_config['backend'] = 'spotifyd'
         try:
             with open(spotifyd_config, 'r') as f:
@@ -2228,8 +2244,24 @@ def get_users():
                                 with open(spotifyd_config_path, 'r') as f:
                                     for line in f:
                                         if line.strip().startswith('username'):
-                                            spotify_username = line.split('=')[1].strip()
+                                            spotify_username = line.split('=')[1].strip().strip('"')
                                             break
+                            except:
+                                pass
+                        
+                        # Check raspotify config
+                        if not spotify_username and os.path.exists('/etc/default/raspotify'):
+                            try:
+                                with open('/etc/default/raspotify', 'r') as f:
+                                    for line in f:
+                                        if 'OPTIONS=' in line and '--username' in line:
+                                            # Extract username from OPTIONS="--username 'user' --password 'pass'"
+                                            import re
+                                            match = re.search(r"--username\s+['\"]([^'\"]+)['\"]", line)
+                                            if match:
+                                                spotify_username = match.group(1)
+                                                spotify_configured = True
+                                                break
                             except:
                                 pass
                         
@@ -2485,7 +2517,9 @@ def set_spotify_config():
     
     # Detect which backend we're using
     backend = "ncspot"
-    if os.path.exists("/usr/local/bin/spotifyd"):
+    if os.path.exists("/etc/default/raspotify"):
+        backend = "raspotify"
+    elif os.path.exists("/usr/local/bin/spotifyd"):
         backend = "spotifyd"
     
     if backend == "ncspot":
@@ -2550,6 +2584,27 @@ size = 10000
         
         subprocess.run(['chmod', '600', creds_file])
         subprocess.run(['chown', f'{target_user}:{target_user}', creds_file])
+        
+    elif backend == "raspotify":
+        # Configure raspotify system-wide (it doesn't use per-user config)
+        raspotify_config = "/etc/default/raspotify"
+        
+        # Create raspotify config with credentials
+        config_content = f'''# Raspotify configuration
+OPTIONS="--username '{username}' --password '{password}' --backend alsa --device-name 'Spotify Kids Player' --bitrate 320"
+BACKEND="alsa"
+VOLUME_NORMALISATION="true"
+NORMALISATION_PREGAIN="-10"
+'''
+        
+        with open(raspotify_config, 'w') as f:
+            f.write(config_content)
+        
+        # Set proper permissions
+        subprocess.run(['chmod', '644', raspotify_config])
+        
+        # Restart raspotify service
+        subprocess.run(['systemctl', 'restart', 'raspotify'], capture_output=True)
         
     else:
         # Configure spotifyd for target user
