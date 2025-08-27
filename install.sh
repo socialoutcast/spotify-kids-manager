@@ -2278,32 +2278,78 @@ EOF
 
 # Function to uninstall everything (used when re-running installer)
 uninstall_all() {
-    log_info "Removing existing installation..."
+    log_info "Removing ALL traces of installation..."
     
     # Stop services
     systemctl stop "$SERVICE_NAME" 2>/dev/null
     systemctl disable "$SERVICE_NAME" 2>/dev/null
+    systemctl stop nginx 2>/dev/null
+    
+    # Kill all related processes
+    pkill -f "app.py" 2>/dev/null || true
+    pkill -f "ncspot" 2>/dev/null || true
+    pkill -f "spotify-touch-gui" 2>/dev/null || true
+    pkill -f "matchbox-keyboard" 2>/dev/null || true
+    pkill -u "$SPOTIFY_USER" 2>/dev/null || true
+    
+    # Find and remove ALL users created by our system
+    log_info "Removing all created users..."
+    
+    # Remove the main spotify-kids user
+    if id "$SPOTIFY_USER" &>/dev/null; then
+        log_info "Removing user: $SPOTIFY_USER"
+        pkill -u "$SPOTIFY_USER" 2>/dev/null || true
+        userdel -rf "$SPOTIFY_USER" 2>/dev/null || true
+    fi
+    
+    # Find and remove any other users created via the admin panel
+    for user_home in /home/*; do
+        username=$(basename "$user_home")
+        # Skip system users and root
+        if [[ "$username" != "pi" ]] && [[ "$username" != "root" ]] && [[ "$username" != "$SUDO_USER" ]]; then
+            # Check if user has our Spotify setup files
+            if [[ -f "$user_home/.bash_profile" ]] && grep -q "spotify-client.sh" "$user_home/.bash_profile" 2>/dev/null; then
+                log_info "Removing user created by admin panel: $username"
+                pkill -u "$username" 2>/dev/null || true
+                userdel -rf "$username" 2>/dev/null || true
+            fi
+        fi
+    done
     
     # Remove systemd files
     rm -f "/etc/systemd/system/$SERVICE_NAME.service"
-    rm -rf /etc/systemd/system/getty@tty1.service.d/
+    
+    # Remove auto-login configurations for all ttys
+    for i in {1..6}; do
+        rm -rf "/etc/systemd/system/getty@tty$i.service.d/"
+    done
     
     # Remove nginx config
     rm -f /etc/nginx/sites-enabled/spotify-admin
     rm -f /etc/nginx/sites-available/spotify-admin
     
-    # Remove user
-    pkill -u "$SPOTIFY_USER" 2>/dev/null
-    userdel -r "$SPOTIFY_USER" 2>/dev/null
-    
-    # Remove installation directory
+    # Remove all installation directories
     rm -rf "$INSTALL_DIR"
+    rm -rf /opt/spotify-terminal
+    
+    # Remove ncspot configs for all users
+    rm -rf /home/*/.config/ncspot
+    rm -rf /home/*/.cache/ncspot
+    rm -rf /home/*/.cache/spotifyd
+    rm -rf /root/.config/ncspot
+    rm -rf /root/.cache/ncspot
+    
+    # Clean up Python packages (optional - commented out to avoid removing system packages)
+    # pip3 uninstall -y flask flask-cors flask-socketio werkzeug dbus-python pulsectl 2>/dev/null || true
+    
+    # Reset default runlevel back to graphical if it was changed
+    systemctl set-default graphical.target 2>/dev/null || true
     
     # Reload systemd
     systemctl daemon-reload
     systemctl restart nginx 2>/dev/null
     
-    log_success "Existing installation removed"
+    log_success "ALL traces of installation removed"
 }
 
 # Main installation flow
@@ -2413,15 +2459,50 @@ main() {
         # Kill all related processes
         pkill -f "app.py" 2>/dev/null || true
         pkill -f "ncspot" 2>/dev/null || true
+        pkill -f "spotify-touch-gui" 2>/dev/null || true
+        pkill -f "matchbox-keyboard" 2>/dev/null || true
         pkill -u "$SPOTIFY_USER" 2>/dev/null || true
         
-        # Remove everything
+        # Find and remove ALL users created by our system
+        log_info "Removing all created users..."
+        
+        # Remove the main spotify-kids user
+        if id "$SPOTIFY_USER" &>/dev/null; then
+            log_info "Removing user: $SPOTIFY_USER"
+            pkill -u "$SPOTIFY_USER" 2>/dev/null || true
+            userdel -rf "$SPOTIFY_USER" 2>/dev/null || true
+        fi
+        
+        # Find and remove any other users created via the admin panel
+        # These users would have been created without sudo and with specific groups
+        for user_home in /home/*; do
+            username=$(basename "$user_home")
+            # Skip system users and root
+            if [[ "$username" != "pi" ]] && [[ "$username" != "root" ]] && [[ "$username" != "$SUDO_USER" ]]; then
+                # Check if user has our Spotify setup files
+                if [[ -f "$user_home/.bash_profile" ]] && grep -q "spotify-client.sh" "$user_home/.bash_profile" 2>/dev/null; then
+                    log_info "Removing user created by admin panel: $username"
+                    pkill -u "$username" 2>/dev/null || true
+                    userdel -rf "$username" 2>/dev/null || true
+                fi
+            fi
+        done
+        
+        # Remove all config files and data
+        log_info "Removing all configuration and data..."
         rm -rf "$INSTALL_DIR"
+        rm -rf /opt/spotify-terminal
         rm -f "/etc/systemd/system/$SERVICE_NAME.service"
         rm -rf /etc/systemd/system/getty@tty1.service.d/
         rm -f /etc/nginx/sites-enabled/spotify-admin
         rm -f /etc/nginx/sites-available/spotify-admin
-        userdel -rf "$SPOTIFY_USER" 2>/dev/null || true
+        
+        # Remove ncspot configs for all users
+        rm -rf /home/*/.config/ncspot
+        rm -rf /home/*/.cache/ncspot
+        rm -rf /home/*/.cache/spotifyd
+        rm -rf /root/.config/ncspot
+        rm -rf /root/.cache/ncspot
         
         # Clean up Python packages
         pip3 uninstall -y flask flask-cors flask-socketio werkzeug dbus-python pulsectl 2>/dev/null || true
@@ -2430,6 +2511,14 @@ main() {
         apt-get remove --purge -y nginx nginx-common 2>/dev/null || true
         apt-get autoremove -y 2>/dev/null || true
         rm -rf /etc/nginx
+        
+        # Remove auto-login configurations for all ttys
+        for i in {1..6}; do
+            rm -rf "/etc/systemd/system/getty@tty$i.service.d/"
+        done
+        
+        # Reset default runlevel back to graphical if it was changed
+        systemctl set-default graphical.target 2>/dev/null || true
         
         # Reload systemd
         systemctl daemon-reload
