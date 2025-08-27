@@ -543,15 +543,15 @@ class SpotifyTouchGUI(Gtk.Window):
         self.fullscreen()
         self.connect("destroy", self.on_quit)
         
+        # Check device lock status FIRST
+        self.locked = os.path.exists("/opt/spotify-terminal/data/device.lock")
+        
         # Start ncspot in background
         self.ncspot_process = None
         self.start_ncspot()
         
-        # Create UI
+        # Create UI (after locked is set)
         self.setup_ui()
-        
-        # Check device lock status
-        self.locked = os.path.exists("/opt/spotify-terminal/data/device.lock")
         
     def setup_ui(self):
         # Main container
@@ -571,8 +571,8 @@ class SpotifyTouchGUI(Gtk.Window):
         control_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
         control_box.set_size_request(-1, 200)
         control_box.set_spacing(20)
-        control_box.set_margin_left(20)
-        control_box.set_margin_right(20)
+        control_box.set_margin_start(20)
+        control_box.set_margin_end(20)
         main_box.pack_start(control_box, False, False, 20)
         
         # Previous button
@@ -599,11 +599,11 @@ class SpotifyTouchGUI(Gtk.Window):
         # Volume control
         volume_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
         volume_box.set_size_request(-1, 100)
-        volume_box.set_margin_left(20)
-        volume_box.set_margin_right(20)
+        volume_box.set_margin_start(20)
+        volume_box.set_margin_end(20)
         main_box.pack_start(volume_box, False, False, 10)
         
-        volume_label = Gtk.Label("Volume: ")
+        volume_label = Gtk.Label(label="Volume: ")
         volume_box.pack_start(volume_label, False, False, 10)
         
         self.volume_scale = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL)
@@ -616,8 +616,8 @@ class SpotifyTouchGUI(Gtk.Window):
         # Search section
         search_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
         search_box.set_size_request(-1, 80)
-        search_box.set_margin_left(20)
-        search_box.set_margin_right(20)
+        search_box.set_margin_start(20)
+        search_box.set_margin_end(20)
         main_box.pack_start(search_box, False, False, 10)
         
         self.search_entry = Gtk.Entry()
@@ -745,7 +745,7 @@ class SpotifyTouchGUI(Gtk.Window):
         
         # Note: In a real implementation, we'd parse ncspot's output
         # For now, show a message
-        label = Gtk.Label(f"Searching for: {query}")
+        label = Gtk.Label(label=f"Searching for: {query}")
         self.results_box.pack_start(label, False, False, 5)
         self.results_box.show_all()
         
