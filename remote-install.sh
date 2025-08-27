@@ -31,12 +31,6 @@ fi
 
 # Parse command line arguments
 INSTALL_MODE="install"
-FORCE_YES=""
-
-# Check for force flag
-if [[ "$1" == "--force" ]] || [[ "$2" == "--force" ]]; then
-    FORCE_YES="--force"
-fi
 
 if [[ "$1" == "--reset" ]] || [[ "$1" == "-r" ]] || [[ "$1" == "reset" ]]; then
     INSTALL_MODE="reset"
@@ -64,11 +58,8 @@ elif [[ "$1" == "--help" ]] || [[ "$1" == "-h" ]] || [[ "$1" == "help" ]]; then
     echo "  # Normal install:"
     echo "  curl -fsSL [URL] | sudo bash"
     echo ""
-    echo "  # Reset and reinstall (will prompt for confirmation):"
+    echo "  # Reset and reinstall:"
     echo "  curl -fsSL [URL] | sudo bash -s -- reset"
-    echo ""
-    echo "  # Force reset without prompting:"
-    echo "  curl -fsSL [URL] | sudo bash -s -- reset --force"
     echo ""
     echo "  # Diagnose issues:"
     echo "  curl -fsSL [URL] | sudo bash -s -- diagnose"
@@ -126,11 +117,7 @@ chmod +x install.sh repair.sh 2>/dev/null || true
 case "$INSTALL_MODE" in
     "reset")
         log_info "Running reset..."
-        if [[ "$FORCE_YES" == "--force" ]]; then
-            yes | ./install.sh --reset
-        else
-            ./install.sh --reset
-        fi
+        ./install.sh --reset
         ;;
     "diagnose")
         log_info "Running diagnostics..."

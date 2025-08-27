@@ -30,7 +30,7 @@ curl -fsSL https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/
 
 ### Complete Reset (Fix 502 Errors)
 
-If you're getting 502 errors or need to completely reset:
+If you're getting 502 errors or need to completely reset (no prompts, just resets):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/main/remote-install.sh | sudo bash -s -- reset
