@@ -436,21 +436,38 @@ EOF
     cat > "/home/$SPOTIFY_USER/.bash_profile" <<EOF
 #!/bin/bash
 # Auto-start Spotify client on login
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] User $SPOTIFY_USER logged in on $(tty)" >> /opt/spotify-terminal/data/login.log
 if [[ "\$(tty)" == "/dev/tty1" ]]; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting Spotify Kids Manager for user $SPOTIFY_USER..." >> /opt/spotify-terminal/data/login.log
     echo "Starting Spotify Kids Manager..." > /tmp/spotify-startup.log
     export HOME=/home/$SPOTIFY_USER
     export USER=$SPOTIFY_USER
     
+    # Log environment
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] HOME=$HOME, USER=$USER, TTY=$(tty)" >> /opt/spotify-terminal/data/login.log
+    
     # Check for touchscreen
     if ls /dev/input/by-path/*event* 2>/dev/null | xargs -I{} udevadm info --query=property --name={} | grep -q "ID_INPUT_TOUCHSCREEN=1"; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Touchscreen detected, starting GUI mode" >> /opt/spotify-terminal/data/login.log
         echo "Touchscreen detected, starting with GUI support..." >> /tmp/spotify-startup.log
         # Start minimal X with touchscreen support
         exec startx /opt/spotify-terminal/scripts/start-touchscreen.sh -- -nocursor 2>> /tmp/spotify-startup.log
     else
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] No touchscreen, starting terminal mode" >> /opt/spotify-terminal/data/login.log
         echo "No touchscreen, starting in terminal mode..." >> /tmp/spotify-startup.log
-        # Start in pure terminal mode
-        exec /opt/spotify-terminal/scripts/spotify-client.sh 2>> /tmp/spotify-startup.log
+        # Check if spotify-client.sh exists
+        if [ -f /opt/spotify-terminal/scripts/spotify-client.sh ]; then
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting spotify-client.sh" >> /opt/spotify-terminal/data/login.log
+            exec /opt/spotify-terminal/scripts/spotify-client.sh 2>> /tmp/spotify-startup.log
+        else
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: spotify-client.sh not found!" >> /opt/spotify-terminal/data/login.log
+            echo "ERROR: Spotify client script not found at /opt/spotify-terminal/scripts/spotify-client.sh" >> /tmp/spotify-startup.log
+            echo "Please check installation. Press any key to continue..."
+            read -n 1
+        fi
     fi
+else
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] User on $(tty) - not tty1, skipping auto-start" >> /opt/spotify-terminal/data/login.log
 fi
 EOF
     
@@ -1150,7 +1167,8 @@ HTML_TEMPLATE = '''
                     <p>Loading...</p>
                 </div>
                 <button class="btn danger" onclick="restartService()">Restart Service</button>
-                <button class="btn" onclick="viewLogs()">View Logs</button>
+                <button class="btn" onclick="viewLogs()">View Service Logs</button>
+                <button class="btn" onclick="viewLoginLogs()">View Login Logs</button>
                 <button class="btn danger" onclick="rebootSystem()">Reboot System</button>
                 <button class="btn danger" onclick="shutdownSystem()">Shutdown</button>
             </div>
@@ -1428,6 +1446,35 @@ HTML_TEMPLATE = '''
             alert(logs);
         }
         
+        async function viewLoginLogs() {
+            const response = await fetch('/api/system/login-logs');
+            const data = await response.json();
+            
+            let logDisplay = "=== LOGIN LOGS ===\\n";
+            
+            if (data.last_login) {
+                logDisplay += "\\nLast Login: " + data.last_login + "\\n";
+            }
+            
+            logDisplay += "\\nSpotify Client Status: " + data.status + "\\n";
+            
+            if (data.login_log) {
+                logDisplay += "\\n=== Login History ===\\n" + data.login_log;
+            }
+            
+            if (data.startup_log) {
+                logDisplay += "\\n\\n=== Last Startup Log ===\\n" + data.startup_log;
+            }
+            
+            if (data.client_log) {
+                logDisplay += "\\n\\n=== Client Log ===\\n" + data.client_log;
+            }
+            
+            // Create a modal or use a better display method
+            const logWindow = window.open('', 'Login Logs', 'width=800,height=600');
+            logWindow.document.write('<pre>' + logDisplay + '</pre>');
+        }
+        
         async function logout() {
             await fetch('/api/logout', {method: 'POST'});
             window.location.reload();
@@ -1603,6 +1650,61 @@ def system_logs():
                          capture_output=True, text=True).stdout
     return logs
 
+@app.route('/api/system/login-logs')
+@login_required
+def login_logs():
+    """Get login logs for Spotify users"""
+    logs = {
+        "login_log": "",
+        "startup_log": "",
+        "client_log": "",
+        "last_login": None,
+        "status": "unknown"
+    }
+    
+    # Read login log
+    try:
+        if os.path.exists('/opt/spotify-terminal/data/login.log'):
+            with open('/opt/spotify-terminal/data/login.log', 'r') as f:
+                logs["login_log"] = f.read()
+                # Get last login time
+                lines = logs["login_log"].strip().split('\\n')
+                if lines:
+                    for line in reversed(lines):
+                        if 'logged in' in line:
+                            logs["last_login"] = line
+                            break
+    except:
+        pass
+    
+    # Read startup log
+    try:
+        if os.path.exists('/tmp/spotify-startup.log'):
+            with open('/tmp/spotify-startup.log', 'r') as f:
+                logs["startup_log"] = f.read()
+    except:
+        pass
+    
+    # Read client log
+    try:
+        if os.path.exists('/opt/spotify-terminal/data/client.log'):
+            with open('/opt/spotify-terminal/data/client.log', 'r') as f:
+                logs["client_log"] = f.read()
+    except:
+        pass
+    
+    # Check if ncspot is running
+    try:
+        result = subprocess.run(['pgrep', '-f', 'ncspot'], capture_output=True)
+        if result.returncode == 0:
+            logs["status"] = "running"
+        else:
+            logs["status"] = "not_running"
+    except:
+        pass
+    
+    return jsonify(logs)
+
 @app.route('/api/system/restart', methods=['POST'])
 @login_required
 def restart_service():
@@ -1744,17 +1846,32 @@ def create_user():
         with open(bash_profile, 'w') as f:
             f.write(f'''#!/bin/bash
 # Auto-start Spotify client on login (terminal mode)
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] User {username} logged in on $(tty)" >> /opt/spotify-terminal/data/login.log
 if [[ "$(tty)" == "/dev/tty1" ]]; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting Spotify Kids Manager for user {username}..." >> /opt/spotify-terminal/data/login.log
     echo "Starting Spotify Kids Manager in terminal mode..." > /tmp/spotify-startup.log
     export HOME={home_dir}
     export USER={username}
     export TERM=linux
     
+    # Log environment
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] HOME=$HOME, USER=$USER, TTY=$(tty)" >> /opt/spotify-terminal/data/login.log
+    
     # Clear the screen
     clear
     
-    # Start the Spotify client directly in terminal
-    exec /opt/spotify-terminal/scripts/spotify-client.sh 2>> /tmp/spotify-startup.log
+    # Check if spotify-client.sh exists
+    if [ -f /opt/spotify-terminal/scripts/spotify-client.sh ]; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting spotify-client.sh for user {username}" >> /opt/spotify-terminal/data/login.log
+        exec /opt/spotify-terminal/scripts/spotify-client.sh 2>> /tmp/spotify-startup.log
+    else
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: spotify-client.sh not found!" >> /opt/spotify-terminal/data/login.log
+        echo "ERROR: Spotify client script not found"
+        echo "Press any key to continue..."
+        read -n 1
+    fi
+else
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] User {username} on $(tty) - not tty1, skipping auto-start" >> /opt/spotify-terminal/data/login.log
 fi
 ''')
         
@@ -1763,17 +1880,32 @@ fi
         with open(profile, 'w') as f:
             f.write(f'''#!/bin/bash
 # Auto-start Spotify client on login (terminal mode)
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] User {username} logged in on $(tty)" >> /opt/spotify-terminal/data/login.log
 if [[ "$(tty)" == "/dev/tty1" ]]; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting Spotify Kids Manager for user {username}..." >> /opt/spotify-terminal/data/login.log
     echo "Starting Spotify Kids Manager in terminal mode..." > /tmp/spotify-startup.log
     export HOME={home_dir}
     export USER={username}
     export TERM=linux
     
+    # Log environment
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] HOME=$HOME, USER=$USER, TTY=$(tty)" >> /opt/spotify-terminal/data/login.log
+    
     # Clear the screen
     clear
     
-    # Start the Spotify client directly in terminal
-    exec /opt/spotify-terminal/scripts/spotify-client.sh 2>> /tmp/spotify-startup.log
+    # Check if spotify-client.sh exists
+    if [ -f /opt/spotify-terminal/scripts/spotify-client.sh ]; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting spotify-client.sh for user {username}" >> /opt/spotify-terminal/data/login.log
+        exec /opt/spotify-terminal/scripts/spotify-client.sh 2>> /tmp/spotify-startup.log
+    else
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: spotify-client.sh not found!" >> /opt/spotify-terminal/data/login.log
+        echo "ERROR: Spotify client script not found"
+        echo "Press any key to continue..."
+        read -n 1
+    fi
+else
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] User {username} on $(tty) - not tty1, skipping auto-start" >> /opt/spotify-terminal/data/login.log
 fi
 ''')
         
