@@ -984,6 +984,13 @@ HTML_TEMPLATE = '''
             justify-content: space-between;
             align-items: center;
         }
+        .device-item span {
+            font-size: 12px;
+            font-weight: 600;
+            padding: 2px 6px;
+            border-radius: 3px;
+            background: rgba(255,255,255,0.8);
+        }
         .toggle {
             position: relative;
             display: inline-block;
@@ -1077,7 +1084,10 @@ HTML_TEMPLATE = '''
                     </div>
                 </div>
                 
-                <h3 style="font-size: 16px; margin-bottom: 10px;">Existing Users</h3>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <h3 style="font-size: 16px; margin: 0;">Existing Users</h3>
+                    <button class="btn" onclick="loadUsers()" title="Refresh user status">↻ Refresh</button>
+                </div>
                 <div id="usersList">Loading users...</div>
             </div>
             
@@ -1277,7 +1287,9 @@ HTML_TEMPLATE = '''
                     <div>
                         <strong>${user.username}</strong>
                         ${user.auto_login ? '<span style="color: green; margin-left: 10px;">✓ Auto-login</span>' : ''}
-                        ${user.spotify_configured ? '<span style="color: green; margin-left: 10px;">♪ Spotify</span>' : ''}
+                        ${user.is_logged_in ? '<span style="color: #1db954; margin-left: 10px;">● Active</span>' : ''}
+                        ${user.spotify_username ? `<span style="color: #1db954; margin-left: 10px;">♪ ${user.spotify_username}</span>` : 
+                          (user.spotify_configured ? '<span style="color: orange; margin-left: 10px;">♪ Not logged in</span>' : '')}
                     </div>
                     <div>
                         ${!user.auto_login ? `<button class="btn" onclick="setAutoLogin('${user.username}')">Set Auto-login</button>` : ''}
@@ -1779,9 +1791,45 @@ def get_users():
                     if uid >= 1000 and uid < 65534 and '/home/' in home and 'nologin' not in shell:
                         # Check if this user has Spotify configured
                         spotify_configured = False
-                        if os.path.exists(f"{home}/.config/ncspot/config.toml") or \
-                           os.path.exists(f"{home}/.config/spotifyd/spotifyd.conf"):
+                        spotify_username = None
+                        
+                        # Check ncspot config for Spotify username
+                        ncspot_config_path = f"{home}/.config/ncspot/config.toml"
+                        if os.path.exists(ncspot_config_path):
                             spotify_configured = True
+                            try:
+                                with open(ncspot_config_path, 'r') as f:
+                                    for line in f:
+                                        if line.strip().startswith('username'):
+                                            # Extract username from line like: username = "myuser"
+                                            spotify_username = line.split('=')[1].strip().strip('"').strip("'")
+                                            break
+                            except:
+                                pass
+                        
+                        # Check spotifyd config as fallback
+                        spotifyd_config_path = f"{home}/.config/spotifyd/spotifyd.conf"
+                        if not spotify_username and os.path.exists(spotifyd_config_path):
+                            spotify_configured = True
+                            try:
+                                with open(spotifyd_config_path, 'r') as f:
+                                    for line in f:
+                                        if line.strip().startswith('username'):
+                                            spotify_username = line.split('=')[1].strip()
+                                            break
+                            except:
+                                pass
+                        
+                        # Check if ncspot is currently running for this user
+                        is_logged_in = False
+                        try:
+                            # Check if ncspot process is running for this user
+                            result = subprocess.run(['pgrep', '-u', username, '-f', 'ncspot'], 
+                                                  capture_output=True)
+                            if result.returncode == 0:
+                                is_logged_in = True
+                        except:
+                            pass
                         
                         # Check if this is the auto-login user
                         auto_login = False
@@ -1796,6 +1844,8 @@ def get_users():
                             'uid': uid,
                             'home': home,
                             'spotify_configured': spotify_configured,
+                            'spotify_username': spotify_username,
+                            'is_logged_in': is_logged_in,
                             'auto_login': auto_login
                         })
     except Exception as e:
