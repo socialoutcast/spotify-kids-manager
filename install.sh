@@ -475,16 +475,24 @@ EOF
     cat > "$INSTALL_DIR/scripts/spotify-client.sh" <<'EOF'
 #!/bin/bash
 
-# Spotify Terminal Client Wrapper
+# Spotify Terminal Client Wrapper  
 # This script manages the ncspot client with parental controls
 
 LOCK_FILE="/opt/spotify-terminal/data/device.lock"
 CONFIG_FILE="/opt/spotify-terminal/config/client.conf"
 LOG_FILE="/opt/spotify-terminal/data/client.log"
+SPOTIFY_AUTH_LOG="/opt/spotify-terminal/data/spotify-auth.log"
 
-# Ensure log file is writable
+# Ensure log files are writable
 touch "$LOG_FILE" 2>/dev/null || true
 chmod 666 "$LOG_FILE" 2>/dev/null || true
+touch "$SPOTIFY_AUTH_LOG" 2>/dev/null || true
+chmod 666 "$SPOTIFY_AUTH_LOG" 2>/dev/null || true
+
+# Log function for Spotify auth
+log_spotify() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$SPOTIFY_AUTH_LOG"
+}
 
 # Source configuration
 [[ -f "$CONFIG_FILE" ]] && source "$CONFIG_FILE"
@@ -499,6 +507,8 @@ start_client() {
     # Set terminal settings for better display
     stty sane
     export TERM=linux
+    
+    log_spotify "Starting Spotify client for user: $USER (HOME=$HOME)"
     
     # Clear screen and reset cursor
     clear
@@ -520,6 +530,7 @@ start_client() {
     
     # Check if Spotify is disabled
     if [[ "$SPOTIFY_DISABLED" == "true" ]]; then
+        log_spotify "Spotify is disabled by administrator"
         echo "Spotify is currently disabled by administrator"
         echo "Please contact your parent to enable it"
         # Keep terminal alive but don't consume CPU
@@ -528,21 +539,122 @@ start_client() {
         done
     fi
     
+    # Check which backend is available and configured
+    log_spotify "Checking available Spotify backends..."
+    
+    # Check raspotify
+    if [ -f /etc/default/raspotify ] && systemctl list-units --all | grep -q raspotify; then
+        log_spotify "Found raspotify backend"
+        # Check if configured
+        if grep -q "OPTIONS=" /etc/default/raspotify 2>/dev/null; then
+            USERNAME=$(grep "OPTIONS=" /etc/default/raspotify | sed -n "s/.*--username ['\"]\([^'\"]*\)['\"]/\1/p")
+            if [ -n "$USERNAME" ]; then
+                log_spotify "Raspotify configured for user: $USERNAME"
+                # Start raspotify if not running
+                if ! systemctl is-active --quiet raspotify; then
+                    log_spotify "Starting raspotify service..."
+                    sudo systemctl start raspotify 2>&1 | tee -a "$SPOTIFY_AUTH_LOG"
+                    sleep 2
+                    if systemctl is-active --quiet raspotify; then
+                        log_spotify "Raspotify service started successfully"
+                    else
+                        log_spotify "ERROR: Failed to start raspotify service"
+                        journalctl -u raspotify -n 20 --no-pager >> "$SPOTIFY_AUTH_LOG" 2>&1
+                    fi
+                else
+                    log_spotify "Raspotify service already running"
+                fi
+            else
+                log_spotify "WARNING: Raspotify not configured (no username found)"
+            fi
+        else
+            log_spotify "WARNING: Raspotify config exists but no OPTIONS found"
+        fi
+    fi
+    
+    # Check spotifyd
+    if [ -x /usr/local/bin/spotifyd ]; then
+        log_spotify "Found spotifyd backend at /usr/local/bin/spotifyd"
+        SPOTIFYD_CONFIG="$HOME/.config/spotifyd/spotifyd.conf"
+        if [ -f "$SPOTIFYD_CONFIG" ]; then
+            USERNAME=$(grep "^username" "$SPOTIFYD_CONFIG" 2>/dev/null | cut -d= -f2 | tr -d ' ')
+            if [ -n "$USERNAME" ]; then
+                log_spotify "Spotifyd configured for user: $USERNAME"
+                # Start spotifyd if not running
+                if ! pgrep -x spotifyd > /dev/null; then
+                    log_spotify "Starting spotifyd daemon..."
+                    /usr/local/bin/spotifyd 2>&1 | head -20 >> "$SPOTIFY_AUTH_LOG" &
+                    SPOTIFYD_PID=$!
+                    sleep 3
+                    if kill -0 $SPOTIFYD_PID 2>/dev/null; then
+                        log_spotify "Spotifyd started with PID: $SPOTIFYD_PID"
+                    else
+                        log_spotify "ERROR: Spotifyd failed to start"
+                    fi
+                else
+                    log_spotify "Spotifyd already running"
+                fi
+            else
+                log_spotify "WARNING: Spotifyd config exists but no username found"
+            fi
+        else
+            log_spotify "WARNING: Spotifyd binary exists but no config at $SPOTIFYD_CONFIG"
+        fi
+    fi
+    
+    # Check ncspot config
+    NCSPOT_CONFIG="$HOME/.config/ncspot/config.toml"
+    if [ -f "$NCSPOT_CONFIG" ]; then
+        USERNAME=$(grep "^username" "$NCSPOT_CONFIG" 2>/dev/null | sed 's/.*= *"\(.*\)"/\1/')
+        if [ -n "$USERNAME" ]; then
+            log_spotify "ncspot configured for user: $USERNAME"
+        else
+            log_spotify "WARNING: ncspot config exists but no username found"
+        fi
+    else
+        log_spotify "WARNING: No ncspot config found at $NCSPOT_CONFIG"
+    fi
+    
     # Start the appropriate client
     if command -v ncspot &> /dev/null; then
+        log_spotify "Starting ncspot client..."
         # Use ncspot if available
         if is_locked; then
+            log_spotify "Device is locked - starting ncspot in restricted mode"
             # Locked mode - disable quit key
-            exec ncspot --config <(cat ~/.config/ncspot/config.toml | sed '/^"q"/d')
+            ncspot --config <(cat ~/.config/ncspot/config.toml | sed '/^"q"/d') 2>&1 | while IFS= read -r line; do
+                echo "$line"
+                # Log authentication errors
+                if echo "$line" | grep -iE "(auth|login|error|fail|401|403|invalid|credential|password)" > /dev/null; then
+                    log_spotify "ncspot: $line"
+                fi
+            done
         else
+            log_spotify "Device is unlocked - starting ncspot in normal mode"
             # Unlocked mode - normal operation
-            exec ncspot
+            ncspot 2>&1 | while IFS= read -r line; do
+                echo "$line"
+                # Log authentication errors
+                if echo "$line" | grep -iE "(auth|login|error|fail|401|403|invalid|credential|password)" > /dev/null; then
+                    log_spotify "ncspot: $line"
+                fi
+            done
         fi
     elif command -v spotifyd &> /dev/null; then
+        log_spotify "ncspot not found, checking for spotifyd..."
         # Use spotifyd with simple UI
-        spotifyd --no-daemon --backend alsa &
-        exec spotify-tui-simple
+        log_spotify "Starting spotifyd daemon..."
+        spotifyd --no-daemon --backend alsa 2>&1 | tee -a "$SPOTIFY_AUTH_LOG" &
+        if command -v spotify-tui-simple &> /dev/null; then
+            log_spotify "Starting spotify-tui-simple..."
+            exec spotify-tui-simple
+        else
+            log_spotify "ERROR: spotify-tui-simple not found"
+            echo "Spotifyd is running but no UI available"
+            sleep 10
+        fi
     else
+        log_spotify "ERROR: No Spotify client installed!"
         echo "No Spotify client installed!"
         echo "Please run the installer again"
         sleep 10
@@ -677,6 +789,8 @@ import signal
 import sys
 import threading
 import time
+import json
+import dbus
 
 class SpotifyTouchGUI(Gtk.Window):
     def __init__(self):
@@ -687,179 +801,454 @@ class SpotifyTouchGUI(Gtk.Window):
         # Check device lock status FIRST
         self.locked = os.path.exists("/opt/spotify-terminal/data/device.lock")
         
-        # Start ncspot in background
-        self.ncspot_process = None
-        self.start_ncspot()
+        # Initialize backend detection
+        self.backend = self.detect_backend()
         
-        # Create UI (after locked is set)
+        # Start backend service
+        self.start_backend()
+        
+        # Create UI
         self.setup_ui()
         
+        # Initialize Bluetooth
+        self.init_bluetooth()
+        
+        # Update status periodically
+        GLib.timeout_add(5000, self.update_status)
+        
+    def detect_backend(self):
+        """Detect which Spotify backend is available"""
+        if os.path.exists("/etc/default/raspotify"):
+            return "raspotify"
+        elif os.path.exists("/usr/local/bin/spotifyd"):
+            return "spotifyd"
+        elif subprocess.run(["which", "ncspot"], capture_output=True).returncode == 0:
+            return "ncspot"
+        return None
+        
+    def start_backend(self):
+        """Start the appropriate Spotify backend"""
+        try:
+            with open("/opt/spotify-terminal/data/spotify-auth.log", "a") as f:
+                f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Touch GUI starting backend: {self.backend}\n")
+            
+            if self.backend == "raspotify":
+                # Start raspotify service
+                subprocess.run(["sudo", "systemctl", "start", "raspotify"], capture_output=True)
+                time.sleep(2)
+            elif self.backend == "spotifyd":
+                # Start spotifyd daemon
+                subprocess.Popen(["/usr/local/bin/spotifyd", "--no-daemon"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                time.sleep(2)
+            elif self.backend == "ncspot":
+                # ncspot will be started when needed for commands
+                pass
+                
+        except Exception as e:
+            print(f"Error starting backend: {e}")
+            
     def setup_ui(self):
         # Main container
         main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         self.add(main_box)
         
-        # Header with now playing info
+        # Header
         header_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-        header_box.set_size_request(-1, 150)
+        header_box.set_size_request(-1, 100)
+        header_box.get_style_context().add_class("header")
         main_box.pack_start(header_box, False, False, 0)
         
-        self.now_playing_label = Gtk.Label()
-        self.now_playing_label.set_markup("<span size='x-large' weight='bold'>Loading...</span>")
-        header_box.pack_start(self.now_playing_label, True, True, 10)
+        # Title
+        title_label = Gtk.Label()
+        title_label.set_markup("<span size='xx-large' weight='bold'>🎵 Spotify Kids</span>")
+        header_box.pack_start(title_label, False, False, 20)
         
-        # Control buttons (large for touch)
-        control_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-        control_box.set_size_request(-1, 200)
-        control_box.set_spacing(20)
-        control_box.set_margin_start(20)
-        control_box.set_margin_end(20)
-        main_box.pack_start(control_box, False, False, 20)
+        # Status indicator
+        self.status_label = Gtk.Label()
+        self.update_status_label()
+        header_box.pack_end(self.status_label, False, False, 20)
         
-        # Previous button
-        prev_btn = Gtk.Button()
-        prev_btn.set_label("⏮")
+        # Tab bar
+        tab_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        tab_bar.set_size_request(-1, 80)
+        tab_bar.get_style_context().add_class("tab-bar")
+        main_box.pack_start(tab_bar, False, False, 0)
+        
+        # Tab buttons
+        tabs = [
+            ("🎵 Now Playing", self.show_now_playing),
+            ("📚 Playlists", self.show_playlists),
+            ("🔍 Search", self.show_search),
+            ("🎨 Albums", self.show_albums),
+            ("🎤 Artists", self.show_artists),
+            ("🔊 Bluetooth", self.show_bluetooth)
+        ]
+        
+        self.tab_buttons = []
+        for label, callback in tabs:
+            btn = Gtk.Button(label=label)
+            btn.connect("clicked", lambda x, cb=callback: self.switch_tab(cb))
+            btn.get_style_context().add_class("tab-button")
+            tab_bar.pack_start(btn, True, True, 2)
+            self.tab_buttons.append(btn)
+        
+        # Content area with stack for different views
+        self.content_stack = Gtk.Stack()
+        self.content_stack.set_transition_type(Gtk.StackTransitionType.SLIDE_LEFT_RIGHT)
+        main_box.pack_start(self.content_stack, True, True, 0)
+        
+        # Create different views
+        self.create_now_playing_view()
+        self.create_playlists_view()
+        self.create_search_view()
+        self.create_albums_view()
+        self.create_artists_view()
+        self.create_bluetooth_view()
+        
+        # Show now playing by default
+        self.show_now_playing()
+        
+        # Exit button (only if not locked)
+        if not self.locked:
+            exit_btn = Gtk.Button(label="Exit")
+            exit_btn.connect("clicked", self.on_quit)
+            exit_btn.get_style_context().add_class("exit-button")
+            main_box.pack_start(exit_btn, False, False, 10)
+        
+        # Apply CSS styling
+        self.apply_css()
+        
+    def create_now_playing_view(self):
+        """Create the now playing view"""
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        box.set_spacing(20)
+        
+        # Album art placeholder
+        art_frame = Gtk.Frame()
+        art_frame.set_size_request(400, 400)
+        art_frame.get_style_context().add_class("album-art")
+        self.album_art = Gtk.Image()
+        self.album_art.set_from_icon_name("media-optical", Gtk.IconSize.DIALOG)
+        art_frame.add(self.album_art)
+        
+        # Center the album art
+        art_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        art_box.pack_start(Gtk.Label(), True, True, 0)
+        art_box.pack_start(art_frame, False, False, 0)
+        art_box.pack_start(Gtk.Label(), True, True, 0)
+        box.pack_start(art_box, False, False, 20)
+        
+        # Track info
+        self.track_label = Gtk.Label()
+        self.track_label.set_markup("<span size='x-large' weight='bold'>No track playing</span>")
+        box.pack_start(self.track_label, False, False, 10)
+        
+        self.artist_label = Gtk.Label()
+        self.artist_label.set_markup("<span size='large'>Select something to play</span>")
+        box.pack_start(self.artist_label, False, False, 5)
+        
+        # Progress bar
+        self.progress_bar = Gtk.ProgressBar()
+        self.progress_bar.set_size_request(-1, 30)
+        box.pack_start(self.progress_bar, False, False, 20)
+        
+        # Control buttons
+        controls = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        controls.set_spacing(20)
+        controls.set_halign(Gtk.Align.CENTER)
+        
+        # Shuffle button
+        shuffle_btn = Gtk.Button(label="🔀")
+        shuffle_btn.connect("clicked", lambda x: self.send_command("shuffle"))
+        shuffle_btn.get_style_context().add_class("control-button")
+        controls.pack_start(shuffle_btn, False, False, 0)
+        
+        # Previous
+        prev_btn = Gtk.Button(label="⏮")
+        prev_btn.connect("clicked", lambda x: self.send_command("previous"))
         prev_btn.get_style_context().add_class("control-button")
-        prev_btn.connect("clicked", lambda x: self.send_ncspot_command("previous"))
-        control_box.pack_start(prev_btn, True, True, 0)
+        controls.pack_start(prev_btn, False, False, 0)
         
-        # Play/Pause button
-        self.play_btn = Gtk.Button()
-        self.play_btn.set_label("⏸")
-        self.play_btn.get_style_context().add_class("control-button")
-        self.play_btn.connect("clicked", lambda x: self.send_ncspot_command("playpause"))
-        control_box.pack_start(self.play_btn, True, True, 0)
+        # Play/Pause
+        self.play_btn = Gtk.Button(label="▶")
+        self.play_btn.connect("clicked", lambda x: self.send_command("playpause"))
+        self.play_btn.get_style_context().add_class("control-button-primary")
+        controls.pack_start(self.play_btn, False, False, 0)
         
-        # Next button
-        next_btn = Gtk.Button()
-        next_btn.set_label("⏭")
+        # Next
+        next_btn = Gtk.Button(label="⏭")
+        next_btn.connect("clicked", lambda x: self.send_command("next"))
         next_btn.get_style_context().add_class("control-button")
-        next_btn.connect("clicked", lambda x: self.send_ncspot_command("next"))
-        control_box.pack_start(next_btn, True, True, 0)
+        controls.pack_start(next_btn, False, False, 0)
+        
+        # Repeat button
+        repeat_btn = Gtk.Button(label="🔁")
+        repeat_btn.connect("clicked", lambda x: self.send_command("repeat"))
+        repeat_btn.get_style_context().add_class("control-button")
+        controls.pack_start(repeat_btn, False, False, 0)
+        
+        box.pack_start(controls, False, False, 20)
         
         # Volume control
         volume_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-        volume_box.set_size_request(-1, 100)
-        volume_box.set_margin_start(20)
-        volume_box.set_margin_end(20)
-        main_box.pack_start(volume_box, False, False, 10)
+        volume_box.set_spacing(10)
+        volume_box.set_halign(Gtk.Align.CENTER)
+        volume_box.set_size_request(600, -1)
         
-        volume_label = Gtk.Label(label="Volume: ")
+        volume_label = Gtk.Label(label="🔊")
         volume_box.pack_start(volume_label, False, False, 10)
         
         self.volume_scale = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL)
         self.volume_scale.set_range(0, 100)
-        self.volume_scale.set_value(50)
+        self.volume_scale.set_value(70)
         self.volume_scale.set_draw_value(True)
         self.volume_scale.connect("value-changed", self.on_volume_changed)
         volume_box.pack_start(self.volume_scale, True, True, 10)
         
-        # Navigation tabs
-        tab_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-        tab_box.set_size_request(-1, 60)
-        tab_box.set_margin_start(20)
-        tab_box.set_margin_end(20)
-        main_box.pack_start(tab_box, False, False, 10)
+        box.pack_start(volume_box, False, False, 20)
         
-        playlists_btn = Gtk.Button(label="Playlists")
-        playlists_btn.set_size_request(150, 50)
-        playlists_btn.connect("clicked", lambda x: self.show_playlists())
-        tab_box.pack_start(playlists_btn, False, False, 5)
+        self.content_stack.add_named(box, "now_playing")
         
-        albums_btn = Gtk.Button(label="Albums")
-        albums_btn.set_size_request(150, 50)
-        albums_btn.connect("clicked", lambda x: self.show_albums())
-        tab_box.pack_start(albums_btn, False, False, 5)
-        
-        artists_btn = Gtk.Button(label="Artists")
-        artists_btn.set_size_request(150, 50)
-        artists_btn.connect("clicked", lambda x: self.show_artists())
-        tab_box.pack_start(artists_btn, False, False, 5)
-        
-        search_btn = Gtk.Button(label="Search")
-        search_btn.set_size_request(150, 50)
-        search_btn.connect("clicked", lambda x: self.show_search())
-        tab_box.pack_start(search_btn, False, False, 5)
-        
-        # Search section (initially hidden)
-        self.search_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-        self.search_box.set_size_request(-1, 80)
-        self.search_box.set_margin_start(20)
-        self.search_box.set_margin_end(20)
-        main_box.pack_start(self.search_box, False, False, 10)
-        
-        self.search_entry = Gtk.Entry()
-        self.search_entry.set_placeholder_text("Search for music...")
-        self.search_entry.connect("activate", self.on_search)
-        self.search_entry.connect("focus-in-event", self.show_keyboard)
-        self.search_box.pack_start(self.search_entry, True, True, 10)
-        
-        do_search_btn = Gtk.Button(label="Go")
-        do_search_btn.connect("clicked", lambda x: self.on_search(None))
-        self.search_box.pack_start(do_search_btn, False, False, 10)
-        
-        self.search_box.hide()  # Hide by default
-        
-        # Results/content area with scrolling
+    def create_playlists_view(self):
+        """Create the playlists view"""
         scrolled = Gtk.ScrolledWindow()
         scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-        main_box.pack_start(scrolled, True, True, 10)
         
-        self.content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        self.content_box.set_spacing(10)
-        scrolled.add(self.content_box)
+        self.playlists_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.playlists_box.set_spacing(10)
+        scrolled.add(self.playlists_box)
         
-        # Load playlists on startup
-        self.show_playlists()
+        # Add loading message
+        loading = Gtk.Label(label="Loading playlists...")
+        loading.get_style_context().add_class("loading")
+        self.playlists_box.pack_start(loading, False, False, 20)
         
-        # Exit button (only show if not locked)
-        if not self.locked:
-            exit_btn = Gtk.Button(label="Exit")
-            exit_btn.connect("clicked", self.on_quit)
-            main_box.pack_start(exit_btn, False, False, 10)
+        self.content_stack.add_named(scrolled, "playlists")
         
-        # Apply CSS for touch-friendly styling
+    def create_search_view(self):
+        """Create the search view"""
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        box.set_spacing(20)
+        
+        # Search box
+        search_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        search_box.set_margin_start(20)
+        search_box.set_margin_end(20)
+        search_box.set_margin_top(20)
+        
+        self.search_entry = Gtk.Entry()
+        self.search_entry.set_placeholder_text("Search for songs, artists, or albums...")
+        self.search_entry.connect("activate", self.on_search)
+        self.search_entry.connect("focus-in-event", self.show_keyboard)
+        self.search_entry.get_style_context().add_class("search-entry")
+        search_box.pack_start(self.search_entry, True, True, 10)
+        
+        search_btn = Gtk.Button(label="🔍 Search")
+        search_btn.connect("clicked", lambda x: self.on_search(None))
+        search_btn.get_style_context().add_class("search-button")
+        search_box.pack_start(search_btn, False, False, 10)
+        
+        box.pack_start(search_box, False, False, 0)
+        
+        # Search results
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        
+        self.search_results = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.search_results.set_spacing(5)
+        scrolled.add(self.search_results)
+        
+        box.pack_start(scrolled, True, True, 10)
+        
+        self.content_stack.add_named(box, "search")
+        
+    def create_albums_view(self):
+        """Create the albums view"""
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        
+        self.albums_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.albums_box.set_spacing(10)
+        scrolled.add(self.albums_box)
+        
+        # Add loading message
+        loading = Gtk.Label(label="Loading albums...")
+        loading.get_style_context().add_class("loading")
+        self.albums_box.pack_start(loading, False, False, 20)
+        
+        self.content_stack.add_named(scrolled, "albums")
+        
+    def create_artists_view(self):
+        """Create the artists view"""
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        
+        self.artists_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.artists_box.set_spacing(10)
+        scrolled.add(self.artists_box)
+        
+        # Add loading message
+        loading = Gtk.Label(label="Loading artists...")
+        loading.get_style_context().add_class("loading")
+        self.artists_box.pack_start(loading, False, False, 20)
+        
+        self.content_stack.add_named(scrolled, "artists")
+        
+    def create_bluetooth_view(self):
+        """Create the Bluetooth devices view"""
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        box.set_spacing(20)
+        
+        # Header
+        header = Gtk.Label()
+        header.set_markup("<span size='large' weight='bold'>Bluetooth Audio Devices</span>")
+        box.pack_start(header, False, False, 20)
+        
+        # Scan button
+        scan_btn = Gtk.Button(label="🔍 Scan for Devices")
+        scan_btn.connect("clicked", self.scan_bluetooth)
+        scan_btn.get_style_context().add_class("scan-button")
+        box.pack_start(scan_btn, False, False, 10)
+        
+        # Device list
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        
+        self.bluetooth_list = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.bluetooth_list.set_spacing(5)
+        scrolled.add(self.bluetooth_list)
+        
+        box.pack_start(scrolled, True, True, 10)
+        
+        self.content_stack.add_named(box, "bluetooth")
+        
+        # Load current devices
+        self.refresh_bluetooth_devices()
+        
+    def apply_css(self):
+        """Apply CSS styling for touch-friendly interface"""
         css_provider = Gtk.CssProvider()
         css_provider.load_from_data(b"""
-            .control-button {
-                font-size: 48px;
-                min-height: 150px;
-                min-width: 150px;
-                background: #1db954;
-                color: white;
+            window {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            }
+            .header {
+                background: rgba(255, 255, 255, 0.95);
+                padding: 20px;
+                border-radius: 0 0 20px 20px;
+            }
+            .tab-bar {
+                background: rgba(255, 255, 255, 0.9);
+                padding: 10px;
+            }
+            .tab-button {
+                font-size: 18px;
+                min-height: 60px;
+                background: transparent;
+                border: 2px solid transparent;
                 border-radius: 10px;
+                margin: 2px;
+            }
+            .tab-button:hover {
+                background: rgba(102, 126, 234, 0.1);
+                border-color: #667eea;
+            }
+            .tab-button:active {
+                background: rgba(102, 126, 234, 0.2);
+            }
+            .control-button {
+                font-size: 36px;
+                min-height: 80px;
+                min-width: 80px;
+                background: rgba(255, 255, 255, 0.9);
+                border: 2px solid #667eea;
+                border-radius: 50%;
+                margin: 5px;
             }
             .control-button:hover {
+                background: #667eea;
+                color: white;
+            }
+            .control-button-primary {
+                font-size: 48px;
+                min-height: 100px;
+                min-width: 100px;
+                background: #1db954;
+                color: white;
+                border: none;
+                border-radius: 50%;
+                margin: 5px;
+            }
+            .control-button-primary:hover {
                 background: #1ed760;
             }
-            GtkEntry {
-                font-size: 24px;
-                min-height: 60px;
-                padding: 10px;
-                border-radius: 5px;
-            }
-            GtkButton {
+            .search-entry {
                 font-size: 20px;
                 min-height: 60px;
                 padding: 10px;
-                background: #f0f0f0;
-                border: 1px solid #ccc;
-                border-radius: 5px;
-                margin: 2px;
+                border-radius: 30px;
+                border: 2px solid #667eea;
             }
-            GtkButton:hover {
-                background: #e0e0e0;
-            }
-            GtkButton:active {
-                background: #d0d0d0;
-            }
-            GtkLabel {
+            .search-button {
                 font-size: 18px;
-                padding: 5px;
+                min-height: 60px;
+                padding: 0 30px;
+                background: #667eea;
+                color: white;
+                border-radius: 30px;
             }
-            #loading {
+            .playlist-item, .album-item, .artist-item, .search-result {
+                background: rgba(255, 255, 255, 0.95);
+                padding: 20px;
+                margin: 5px 20px;
+                border-radius: 10px;
+                font-size: 18px;
+            }
+            .playlist-item:hover, .album-item:hover, .artist-item:hover, .search-result:hover {
+                background: white;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            }
+            .bluetooth-device {
+                background: rgba(255, 255, 255, 0.95);
+                padding: 20px;
+                margin: 5px 20px;
+                border-radius: 10px;
+                font-size: 16px;
+            }
+            .bluetooth-device:hover {
+                background: white;
+            }
+            .connected {
+                border-left: 5px solid #1db954;
+            }
+            .scan-button {
+                font-size: 20px;
+                min-height: 60px;
+                padding: 0 40px;
+                background: #667eea;
+                color: white;
+                border-radius: 30px;
+            }
+            .album-art {
+                background: white;
+                border-radius: 20px;
+                padding: 20px;
+            }
+            .loading {
                 font-size: 24px;
                 color: #666;
+                padding: 40px;
+            }
+            .exit-button {
+                background: #ef4444;
+                color: white;
+                font-size: 18px;
+                min-height: 50px;
+                margin: 10px;
+                border-radius: 10px;
+            }
+            .exit-button:hover {
+                background: #dc2626;
             }
         """)
         Gtk.StyleContext.add_provider_for_screen(
@@ -868,338 +1257,348 @@ class SpotifyTouchGUI(Gtk.Window):
             Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
         )
         
-    def start_ncspot(self):
-        """Start ncspot in background with IPC enabled"""
-        try:
-            # Log Spotify authentication attempt
-            with open("/opt/spotify-terminal/data/spotify-auth.log", "a") as f:
-                f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Starting ncspot for user {os.environ.get('USER', 'unknown')}\n")
-            
-            # Kill any existing ncspot instances
-            subprocess.run(["pkill", "-f", "ncspot"], capture_output=True)
-            time.sleep(1)
-            
-            # Check if ncspot config exists
-            config_path = f"/home/{os.environ.get('USER', 'spotify-kids')}/.config/ncspot/config.toml"
-            if os.path.exists(config_path):
-                with open("/opt/spotify-terminal/data/spotify-auth.log", "a") as f:
-                    f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Found ncspot config at {config_path}\n")
-                # Try to extract username
-                try:
-                    with open(config_path, 'r') as cfg:
-                        for line in cfg:
-                            if 'username' in line:
-                                with open("/opt/spotify-terminal/data/spotify-auth.log", "a") as f:
-                                    f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Config contains: {line.strip()}\n")
-                                break
-                except Exception as e:
-                    with open("/opt/spotify-terminal/data/spotify-auth.log", "a") as f:
-                        f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Error reading config: {e}\n")
-            else:
-                with open("/opt/spotify-terminal/data/spotify-auth.log", "a") as f:
-                    f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] No ncspot config found at {config_path}\n")
-            
-            # Start ncspot with IPC socket
-            self.ncspot_process = subprocess.Popen(
-                ["ncspot", "--ipc-socket", "/tmp/ncspot.sock"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
-            
-            with open("/opt/spotify-terminal/data/spotify-auth.log", "a") as f:
-                f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] ncspot process started with PID {self.ncspot_process.pid}\n")
-            
-            # Give it time to start
-            time.sleep(3)
-            
-            # Check if authentication succeeded by monitoring stderr
-            threading.Thread(target=self.monitor_ncspot_auth, daemon=True).start()
-            
-            # Start status update thread
-            self.update_thread = threading.Thread(target=self.update_status_loop, daemon=True)
-            self.update_thread.start()
-            
-        except Exception as e:
-            with open("/opt/spotify-terminal/data/spotify-auth.log", "a") as f:
-                f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Failed to start ncspot: {e}\n")
-            print(f"Failed to start ncspot: {e}")
-    
-    def monitor_ncspot_auth(self):
-        """Monitor ncspot stderr for authentication messages"""
-        try:
-            for line in self.ncspot_process.stderr:
-                line_str = line.decode('utf-8', errors='ignore')
-                with open("/opt/spotify-terminal/data/spotify-auth.log", "a") as f:
-                    f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] ncspot: {line_str}")
-                # Check for authentication errors
-                if "authentication" in line_str.lower() or "login" in line_str.lower() or "error" in line_str.lower():
-                    with open("/opt/spotify-terminal/data/spotify-auth.log", "a") as f:
-                        f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] AUTH EVENT: {line_str}")
-        except Exception as e:
-            with open("/opt/spotify-terminal/data/spotify-auth.log", "a") as f:
-                f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Monitor error: {e}\n")
-            
-    def send_ncspot_command(self, command):
-        """Send command to ncspot via IPC"""
-        try:
-            subprocess.run(
-                ["ncspot", "send", command, "--socket", "/tmp/ncspot.sock"],
-                capture_output=True,
-                timeout=2
-            )
-        except Exception as e:
-            print(f"Failed to send command: {e}")
-            
-    def on_volume_changed(self, scale):
-        """Handle volume changes"""
-        volume = int(scale.get_value())
-        try:
-            subprocess.run(["amixer", "set", "Master", f"{volume}%"], capture_output=True)
-        except:
-            pass
-            
-    def show_keyboard(self, widget, event):
-        """Show on-screen keyboard when text field is focused"""
-        try:
-            subprocess.Popen(["matchbox-keyboard"])
-        except:
-            pass
-        return False
+    def switch_tab(self, callback):
+        """Switch to a different tab"""
+        callback()
+        
+    def show_now_playing(self):
+        """Show the now playing view"""
+        self.content_stack.set_visible_child_name("now_playing")
+        self.update_now_playing()
         
     def show_playlists(self):
-        """Show user's playlists"""
-        self.search_box.hide()
-        self.clear_content()
+        """Show and load playlists"""
+        self.content_stack.set_visible_child_name("playlists")
+        self.load_playlists()
         
-        # Add loading message
-        loading_label = Gtk.Label(label="Loading playlists...")
-        loading_label.set_name("loading")
-        self.content_box.pack_start(loading_label, False, False, 10)
-        self.content_box.show_all()
+    def show_search(self):
+        """Show the search view"""
+        self.content_stack.set_visible_child_name("search")
+        self.search_entry.grab_focus()
         
-        # Send command to ncspot to navigate to playlists
-        self.send_ncspot_command("focus playlists")
+    def show_albums(self):
+        """Show and load albums"""
+        self.content_stack.set_visible_child_name("albums")
+        self.load_albums()
         
-        # Simulate playlist items (in real implementation, parse ncspot output)
-        GLib.timeout_add(500, self.load_playlists)
-    
+    def show_artists(self):
+        """Show and load artists"""
+        self.content_stack.set_visible_child_name("artists")
+        self.load_artists()
+        
+    def show_bluetooth(self):
+        """Show Bluetooth devices"""
+        self.content_stack.set_visible_child_name("bluetooth")
+        self.refresh_bluetooth_devices()
+        
+    def send_command(self, command):
+        """Send command to Spotify backend"""
+        try:
+            if self.backend == "ncspot":
+                # Use ncspot's IPC
+                subprocess.run(["ncspot", command], capture_output=True)
+            elif self.backend == "raspotify" or self.backend == "spotifyd":
+                # Use playerctl or dbus for Spotify Connect
+                subprocess.run(["playerctl", command], capture_output=True)
+        except Exception as e:
+            print(f"Error sending command: {e}")
+            
     def load_playlists(self):
-        """Load playlists from ncspot"""
-        self.clear_content()
-        
-        # Example playlists - in real implementation, get from ncspot
+        """Load user's playlists"""
+        # Clear existing items
+        for child in self.playlists_box.get_children():
+            child.destroy()
+            
+        # This would normally fetch from Spotify API
+        # For now, show sample playlists
         playlists = [
-            "Liked Songs",
-            "Kids Music",
-            "Disney Favorites",
+            "Kids Favorites",
+            "Disney Hits",
             "Bedtime Songs",
-            "Morning Playlist"
+            "Dance Party",
+            "Sing Along",
+            "Movie Soundtracks"
         ]
         
         for playlist in playlists:
-            item_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-            item_box.set_size_request(-1, 80)
+            item = Gtk.Button(label=f"📚 {playlist}")
+            item.get_style_context().add_class("playlist-item")
+            item.connect("clicked", lambda x, p=playlist: self.play_playlist(p))
+            self.playlists_box.pack_start(item, False, False, 0)
             
-            # Playlist button
-            btn = Gtk.Button(label=playlist)
-            btn.set_size_request(-1, 70)
-            btn.connect("clicked", lambda x, p=playlist: self.open_playlist(p))
-            item_box.pack_start(btn, True, True, 5)
+        self.playlists_box.show_all()
+        
+    def load_albums(self):
+        """Load saved albums"""
+        # Clear existing items
+        for child in self.albums_box.get_children():
+            child.destroy()
             
-            # Play button
-            play_btn = Gtk.Button(label="▶")
-            play_btn.set_size_request(70, 70)
-            play_btn.connect("clicked", lambda x, p=playlist: self.play_playlist(p))
-            item_box.pack_start(play_btn, False, False, 5)
-            
-            self.content_box.pack_start(item_box, False, False, 5)
-        
-        self.content_box.show_all()
-        return False  # Don't repeat
-    
-    def open_playlist(self, playlist_name):
-        """Open a specific playlist"""
-        self.clear_content()
-        
-        # Show back button
-        back_btn = Gtk.Button(label="← Back to Playlists")
-        back_btn.set_size_request(-1, 60)
-        back_btn.connect("clicked", lambda x: self.show_playlists())
-        self.content_box.pack_start(back_btn, False, False, 10)
-        
-        # Show playlist name
-        title_label = Gtk.Label(label=playlist_name)
-        title_label.set_markup(f"<span size='x-large' weight='bold'>{playlist_name}</span>")
-        self.content_box.pack_start(title_label, False, False, 10)
-        
-        # Play all button
-        play_all_btn = Gtk.Button(label="▶ Play All")
-        play_all_btn.set_size_request(-1, 60)
-        play_all_btn.connect("clicked", lambda x: self.play_playlist(playlist_name))
-        self.content_box.pack_start(play_all_btn, False, False, 10)
-        
-        # Example tracks - in real implementation, get from ncspot
-        tracks = [
-            "Song 1 - Artist A",
-            "Song 2 - Artist B",
-            "Song 3 - Artist C",
-            "Song 4 - Artist D"
+        # Sample albums
+        albums = [
+            "Frozen Soundtrack",
+            "Moana Soundtrack",
+            "The Lion King",
+            "Encanto",
+            "Sing 2"
         ]
         
-        for i, track in enumerate(tracks):
-            track_btn = Gtk.Button(label=track)
-            track_btn.set_size_request(-1, 60)
-            track_btn.connect("clicked", lambda x, t=track, idx=i: self.play_track(playlist_name, idx))
-            self.content_box.pack_start(track_btn, False, False, 5)
+        for album in albums:
+            item = Gtk.Button(label=f"💿 {album}")
+            item.get_style_context().add_class("album-item")
+            item.connect("clicked", lambda x, a=album: self.play_album(a))
+            self.albums_box.pack_start(item, False, False, 0)
+            
+        self.albums_box.show_all()
         
-        self.content_box.show_all()
-    
-    def play_playlist(self, playlist_name):
-        """Play entire playlist"""
-        self.send_ncspot_command(f"play {playlist_name}")
-        # Update now playing label
-        self.now_playing_label.set_markup(f"<span size='x-large' weight='bold'>Playing: {playlist_name}</span>")
-    
-    def play_track(self, playlist_name, track_index):
-        """Play specific track from playlist"""
-        self.send_ncspot_command(f"play {track_index}")
-    
-    def show_albums(self):
-        """Show saved albums"""
-        self.search_box.hide()
-        self.clear_content()
+    def load_artists(self):
+        """Load followed artists"""
+        # Clear existing items
+        for child in self.artists_box.get_children():
+            child.destroy()
+            
+        # Sample artists
+        artists = [
+            "Disney",
+            "Kidz Bop",
+            "The Wiggles",
+            "Cocomelon",
+            "Super Simple Songs"
+        ]
         
-        loading_label = Gtk.Label(label="Loading albums...")
-        self.content_box.pack_start(loading_label, False, False, 10)
-        self.content_box.show_all()
+        for artist in artists:
+            item = Gtk.Button(label=f"🎤 {artist}")
+            item.get_style_context().add_class("artist-item")
+            item.connect("clicked", lambda x, a=artist: self.play_artist(a))
+            self.artists_box.pack_start(item, False, False, 0)
+            
+        self.artists_box.show_all()
         
-        # Send command to ncspot
-        self.send_ncspot_command("focus albums")
-        
-        # TODO: Parse ncspot output for actual albums
-        GLib.timeout_add(500, lambda: self.show_placeholder("Albums"))
-    
-    def show_artists(self):
-        """Show followed artists"""
-        self.search_box.hide()
-        self.clear_content()
-        
-        loading_label = Gtk.Label(label="Loading artists...")
-        self.content_box.pack_start(loading_label, False, False, 10)
-        self.content_box.show_all()
-        
-        # Send command to ncspot
-        self.send_ncspot_command("focus artists")
-        
-        # TODO: Parse ncspot output for actual artists
-        GLib.timeout_add(500, lambda: self.show_placeholder("Artists"))
-    
-    def show_search(self):
-        """Show search interface"""
-        self.clear_content()
-        self.search_box.show()
-        self.search_entry.grab_focus()
-    
-    def show_placeholder(self, content_type):
-        """Show placeholder for unimplemented sections"""
-        self.clear_content()
-        label = Gtk.Label(label=f"{content_type} will be displayed here")
-        self.content_box.pack_start(label, False, False, 10)
-        self.content_box.show_all()
-        return False
-    
-    def clear_content(self):
-        """Clear the content area"""
-        for child in self.content_box.get_children():
-            self.content_box.remove(child)
-    
     def on_search(self, widget):
-        """Handle search"""
+        """Perform search"""
         query = self.search_entry.get_text().strip()
         if not query:
             return
             
-        self.clear_content()
+        # Clear previous results
+        for child in self.search_results.get_children():
+            child.destroy()
+            
+        # Show loading
+        loading = Gtk.Label(label="Searching...")
+        loading.get_style_context().add_class("loading")
+        self.search_results.pack_start(loading, False, False, 20)
+        self.search_results.show_all()
         
-        # Send search to ncspot
-        self.send_ncspot_command(f"search {query}")
+        # This would normally search Spotify
+        # For now, show sample results
+        GLib.timeout_add(500, lambda: self.show_search_results(query))
         
-        # Show search results
-        label = Gtk.Label(label=f"Search results for: {query}")
-        self.content_box.pack_start(label, False, False, 5)
-        
-        # TODO: Parse actual search results from ncspot
+    def show_search_results(self, query):
+        """Display search results"""
+        # Clear loading message
+        for child in self.search_results.get_children():
+            child.destroy()
+            
+        # Sample results
         results = [
-            f"Track: {query} Song 1",
-            f"Track: {query} Song 2",
-            f"Album: {query} Album",
-            f"Artist: {query} Artist"
+            f"🎵 Song: {query} - Artist Name",
+            f"💿 Album: {query} Album",
+            f"🎤 Artist: {query}",
+            f"📚 Playlist: {query} Mix"
         ]
         
         for result in results:
-            result_btn = Gtk.Button(label=result)
-            result_btn.set_size_request(-1, 60)
-            result_btn.connect("clicked", lambda x, r=result: self.play_search_result(r))
-            self.content_box.pack_start(result_btn, False, False, 5)
+            item = Gtk.Button(label=result)
+            item.get_style_context().add_class("search-result")
+            item.connect("clicked", lambda x, r=result: self.play_search_result(r))
+            self.search_results.pack_start(item, False, False, 0)
+            
+        self.search_results.show_all()
+        return False
         
-        self.content_box.show_all()
-    
+    def init_bluetooth(self):
+        """Initialize Bluetooth support"""
+        try:
+            self.bus = dbus.SystemBus()
+        except:
+            self.bus = None
+            
+    def refresh_bluetooth_devices(self):
+        """Refresh list of Bluetooth devices"""
+        # Clear existing items
+        for child in self.bluetooth_list.get_children():
+            child.destroy()
+            
+        try:
+            # Get paired devices
+            result = subprocess.run(["bluetoothctl", "devices"], capture_output=True, text=True)
+            
+            if result.returncode == 0:
+                for line in result.stdout.splitlines():
+                    if "Device" in line:
+                        parts = line.split(" ", 2)
+                        if len(parts) >= 3:
+                            address = parts[1]
+                            name = parts[2]
+                            
+                            # Create device item
+                            device_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+                            device_box.get_style_context().add_class("bluetooth-device")
+                            
+                            # Check if connected
+                            info_result = subprocess.run(["bluetoothctl", "info", address], capture_output=True, text=True)
+                            connected = "Connected: yes" in info_result.stdout
+                            
+                            if connected:
+                                device_box.get_style_context().add_class("connected")
+                            
+                            # Device info
+                            info_label = Gtk.Label(label=f"🔊 {name}")
+                            info_label.set_halign(Gtk.Align.START)
+                            device_box.pack_start(info_label, True, True, 10)
+                            
+                            # Connect/Disconnect button
+                            if connected:
+                                btn = Gtk.Button(label="Disconnect")
+                                btn.connect("clicked", lambda x, a=address: self.disconnect_bluetooth(a))
+                            else:
+                                btn = Gtk.Button(label="Connect")
+                                btn.connect("clicked", lambda x, a=address: self.connect_bluetooth(a))
+                            
+                            device_box.pack_start(btn, False, False, 10)
+                            
+                            self.bluetooth_list.pack_start(device_box, False, False, 0)
+            else:
+                label = Gtk.Label(label="No Bluetooth devices found")
+                self.bluetooth_list.pack_start(label, False, False, 20)
+                
+        except Exception as e:
+            label = Gtk.Label(label=f"Error: {e}")
+            self.bluetooth_list.pack_start(label, False, False, 20)
+            
+        self.bluetooth_list.show_all()
+        
+    def scan_bluetooth(self, widget):
+        """Scan for new Bluetooth devices"""
+        # Show scanning message
+        for child in self.bluetooth_list.get_children():
+            child.destroy()
+            
+        label = Gtk.Label(label="Scanning for devices...")
+        label.get_style_context().add_class("loading")
+        self.bluetooth_list.pack_start(label, False, False, 20)
+        self.bluetooth_list.show_all()
+        
+        # Start scan in background
+        def scan():
+            subprocess.run(["bluetoothctl", "scan", "on"], capture_output=True, timeout=10)
+            GLib.idle_add(self.refresh_bluetooth_devices)
+            
+        thread = threading.Thread(target=scan)
+        thread.daemon = True
+        thread.start()
+        
+    def connect_bluetooth(self, address):
+        """Connect to a Bluetooth device"""
+        try:
+            subprocess.run(["bluetoothctl", "connect", address], capture_output=True)
+            GLib.timeout_add(2000, self.refresh_bluetooth_devices)
+        except Exception as e:
+            print(f"Error connecting: {e}")
+            
+    def disconnect_bluetooth(self, address):
+        """Disconnect from a Bluetooth device"""
+        try:
+            subprocess.run(["bluetoothctl", "disconnect", address], capture_output=True)
+            GLib.timeout_add(1000, self.refresh_bluetooth_devices)
+        except Exception as e:
+            print(f"Error disconnecting: {e}")
+            
+    def show_keyboard(self, widget, event):
+        """Show on-screen keyboard for text input"""
+        try:
+            subprocess.Popen(["matchbox-keyboard"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except:
+            pass
+        return False
+        
+    def update_status_label(self):
+        """Update the status label"""
+        if self.backend:
+            self.status_label.set_markup(f"<span size='medium'>✓ {self.backend} ready</span>")
+        else:
+            self.status_label.set_markup("<span size='medium' color='red'>✗ No backend</span>")
+            
+    def update_status(self):
+        """Update various status indicators"""
+        self.update_now_playing()
+        return True
+        
+    def update_now_playing(self):
+        """Update now playing information"""
+        try:
+            # Try to get current track info
+            if self.backend in ["raspotify", "spotifyd"]:
+                # Use playerctl for Spotify Connect backends
+                title = subprocess.run(["playerctl", "metadata", "title"], capture_output=True, text=True).stdout.strip()
+                artist = subprocess.run(["playerctl", "metadata", "artist"], capture_output=True, text=True).stdout.strip()
+                status = subprocess.run(["playerctl", "status"], capture_output=True, text=True).stdout.strip()
+                
+                if title:
+                    self.track_label.set_markup(f"<span size='x-large' weight='bold'>{title}</span>")
+                    self.artist_label.set_markup(f"<span size='large'>{artist}</span>")
+                    
+                if status == "Playing":
+                    self.play_btn.set_label("⏸")
+                else:
+                    self.play_btn.set_label("▶")
+        except:
+            pass
+            
+    def on_volume_changed(self, widget):
+        """Handle volume change"""
+        volume = int(widget.get_value())
+        try:
+            subprocess.run(["amixer", "sset", "Master", f"{volume}%"], capture_output=True)
+        except:
+            pass
+            
+    def play_playlist(self, playlist):
+        """Play a playlist"""
+        print(f"Playing playlist: {playlist}")
+        # This would normally use Spotify API to play the playlist
+        
+    def play_album(self, album):
+        """Play an album"""
+        print(f"Playing album: {album}")
+        
+    def play_artist(self, artist):
+        """Play artist's top tracks"""
+        print(f"Playing artist: {artist}")
+        
     def play_search_result(self, result):
         """Play a search result"""
-        self.send_ncspot_command("play")
-        self.now_playing_label.set_markup(f"<span size='x-large' weight='bold'>Playing: {result}</span>")
-        
-    def update_status_loop(self):
-        """Update now playing info periodically"""
-        while True:
-            try:
-                # Try to get status from ncspot
-                result = subprocess.run(
-                    ["ncspot", "send", "status", "--socket", "/tmp/ncspot.sock"],
-                    capture_output=True,
-                    text=True,
-                    timeout=2
-                )
-                
-                if result.returncode == 0:
-                    # Parse and update UI
-                    GLib.idle_add(self.update_now_playing, result.stdout)
-                    
-            except:
-                pass
-                
-            time.sleep(2)
-            
-    def update_now_playing(self, status):
-        """Update the now playing label"""
-        # This would parse the actual ncspot status
-        # For now, just show something
-        self.now_playing_label.set_markup("<span size='x-large' weight='bold'>Spotify Music Player</span>")
+        print(f"Playing: {result}")
         
     def on_quit(self, widget=None):
-        """Clean shutdown"""
-        if self.ncspot_process:
-            self.ncspot_process.terminate()
-            try:
-                self.ncspot_process.wait(timeout=5)
-            except:
-                self.ncspot_process.kill()
-        Gtk.main_quit()
-        
+        """Quit the application"""
+        if not self.locked:
+            Gtk.main_quit()
+            
 def main():
-    # Handle signals
-    signal.signal(signal.SIGINT, lambda x, y: Gtk.main_quit())
+    app = SpotifyTouchGUI()
+    app.show_all()
     
-    # Create and show window
-    window = SpotifyTouchGUI()
-    window.show_all()
-    
-    # Start GTK main loop
+    # Trap signals if locked
+    if app.locked:
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
+        signal.signal(signal.SIGTERM, signal.SIG_IGN)
+        
     Gtk.main()
     
 if __name__ == "__main__":
-    main()
-EOF
+    main()EOF
     
     chmod +x "$INSTALL_DIR/scripts/spotify-touch-gui.py"
     
