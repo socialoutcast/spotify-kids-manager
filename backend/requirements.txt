@@ -8,5 +8,5 @@ pytz==2024.2
 schedule==1.2.2
 psutil==6.1.0
 certifi==2024.8.30
-urllib3==2.2.3
+urllib3==2.5.0
 charset-normalizer==3.4.0
