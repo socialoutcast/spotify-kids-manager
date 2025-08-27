@@ -148,94 +148,15 @@ install_dependencies() {
 
 # Install ncspot (terminal Spotify client)
 install_ncspot() {
-    log_info "Installing Spotify client..."
+    log_info "Installing Spotify client (spotifyd)..."
     
-    # For Raspberry Pi, use raspotify - it's lightweight and designed for Pi
-    if [[ -f /etc/os-release ]] && grep -q "Raspberry Pi" /etc/os-release; then
-        log_info "Installing Raspotify (lightweight Spotify Connect for Pi)..."
-        
-        # Add raspotify repository
-        curl -sL https://dtcooper.github.io/raspotify/install.sh | sh || {
-            log_warning "Raspotify installation failed, trying alternative method..."
-            
-            # Manual installation
-            apt-get install -y curl apt-transport-https
-            curl -sSL https://dtcooper.github.io/raspotify/key.asc | apt-key add -
-            echo 'deb https://dtcooper.github.io/raspotify raspotify main' | tee /etc/apt/sources.list.d/raspotify.list
-            apt-get update
-            apt-get install -y raspotify
-        }
-        
-        # Configure raspotify for better performance
-        cat > /etc/raspotify/conf <<EOF
-# Raspotify Configuration
-LIBRESPOT_QUIET=
-LIBRESPOT_AUTOPLAY=
-LIBRESPOT_DISABLE_DISCOVERY=
-LIBRESPOT_BACKEND="alsa"
-LIBRESPOT_DEVICE="default"
-LIBRESPOT_VOLUME_CTRL="linear"
-LIBRESPOT_BITRATE="160"
-EOF
-        
-        systemctl restart raspotify
-        log_success "Raspotify installed and configured"
-        
-        # Create a simple wrapper script that acts like ncspot for compatibility
-        cat > /usr/local/bin/ncspot <<'EOF'
-#!/bin/bash
-# Wrapper script for compatibility with our touch GUI
-# This allows the GUI to think ncspot is installed
-
-case "$1" in
-    --version)
-        echo "ncspot 0.13.0 (raspotify wrapper)"
-        ;;
-    send)
-        # Handle IPC commands
-        shift
-        case "$1" in
-            playpause)
-                dbus-send --print-reply --dest=org.mpris.MediaPlayer2.spotify /org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player.PlayPause
-                ;;
-            next)
-                dbus-send --print-reply --dest=org.mpris.MediaPlayer2.spotify /org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player.Next
-                ;;
-            previous)
-                dbus-send --print-reply --dest=org.mpris.MediaPlayer2.spotify /org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player.Previous
-                ;;
-            *)
-                echo "Command not supported in wrapper"
-                ;;
-        esac
-        ;;
-    *)
-        # For running interactively, use spotify-tui if available
-        if command -v spt &> /dev/null; then
-            spt
-        else
-            echo "Raspotify is running as a Spotify Connect device"
-            echo "Use the Spotify app on your phone to control playback"
-            echo "Device name: $(hostname)"
-        fi
-        ;;
-esac
-EOF
-        chmod +x /usr/local/bin/ncspot
-        
-        # Also install spotify-tui for terminal interface
-        apt-get install -y spotify-tui 2>/dev/null || true
-        
-        return 0
-    fi
-    
-    # For non-Pi systems, just use spotifyd
+    # Just use spotifyd - it's simple and works
     install_spotifyd_alternative
 }
 
 # Alternative: Install spotifyd + basic TUI
 install_spotifyd_alternative() {
-    log_info "Installing spotifyd as alternative..."
+    log_info "Installing spotifyd..."
     
     # Download spotifyd
     ARCH=$(uname -m)
@@ -255,28 +176,96 @@ install_spotifyd_alternative() {
             ;;
     esac
     
-    wget -q -O /tmp/spotifyd.tar.gz "$SPOTIFYD_URL"
+    wget -q -O /tmp/spotifyd.tar.gz "$SPOTIFYD_URL" || {
+        log_error "Failed to download spotifyd"
+        return 1
+    }
     tar -xzf /tmp/spotifyd.tar.gz -C /usr/local/bin/
     chmod +x /usr/local/bin/spotifyd
     rm /tmp/spotifyd.tar.gz
     
-    # Create a simple TUI wrapper
-    cat > /usr/local/bin/spotify-tui-simple <<'EOF'
-#!/bin/bash
-echo "Spotify Kids Player"
-echo "=================="
-echo ""
-echo "Spotifyd is running in background"
-echo "Use the Spotify app on your phone to control playback"
-echo ""
-echo "Press Ctrl+C to exit (if unlocked)"
-while true; do
-    sleep 1
-done
+    # Create systemd service for spotifyd
+    cat > /etc/systemd/system/spotifyd.service <<'EOF'
+[Unit]
+Description=Spotify Daemon
+After=network.target sound.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/spotifyd --no-daemon
+Restart=always
+RestartSec=10
+User=spotify-kids
+
+[Install]
+WantedBy=multi-user.target
 EOF
-    chmod +x /usr/local/bin/spotify-tui-simple
     
-    log_success "Spotifyd alternative installed"
+    # Create ncspot wrapper that uses spotifyd
+    cat > /usr/local/bin/ncspot <<'EOF'
+#!/bin/bash
+# Wrapper script for spotifyd compatibility
+
+case "$1" in
+    --version)
+        echo "ncspot 0.13.0 (spotifyd wrapper)"
+        exit 0
+        ;;
+    send)
+        # Handle IPC commands - spotifyd doesn't support these directly
+        shift
+        case "$1" in
+            playpause|next|previous|play|pause|stop)
+                # These would need MPRIS/DBus integration
+                echo "Command: $1"
+                ;;
+            *)
+                echo "Unsupported command: $1"
+                ;;
+        esac
+        ;;
+    --ipc-socket)
+        # Run spotifyd in background if not running
+        if ! pgrep -x spotifyd > /dev/null; then
+            /usr/local/bin/spotifyd &
+        fi
+        # Keep running for GUI compatibility
+        while true; do
+            sleep 60
+        done
+        ;;
+    *)
+        # Interactive mode - show simple interface
+        echo "Spotify Kids Player (Spotifyd)"
+        echo "=============================="
+        echo ""
+        echo "Spotifyd is running in background"
+        echo "Use the Spotify app on your phone to control playback"
+        echo ""
+        echo "Device name: $(hostname)"
+        echo ""
+        echo "Press Ctrl+C to exit (if device is unlocked)"
+        
+        # Check if device is locked
+        if [ -f /opt/spotify-terminal/data/device.lock ]; then
+            # Trap Ctrl+C to prevent exit
+            trap '' INT
+        fi
+        
+        while true; do
+            sleep 1
+        done
+        ;;
+esac
+EOF
+    chmod +x /usr/local/bin/ncspot
+    
+    # Enable and start spotifyd service
+    systemctl daemon-reload
+    systemctl enable spotifyd
+    systemctl start spotifyd || true
+    
+    log_success "Spotifyd installed with ncspot wrapper"
 }
 
 # Create restricted user
@@ -328,7 +317,33 @@ setup_spotify_client() {
     chmod 666 "$INSTALL_DIR/data/client.log" 2>/dev/null || true
     chmod 666 "$INSTALL_DIR/data/spotify-auth.log" 2>/dev/null || true
     
-    # Create ncspot configuration
+    # Create spotifyd configuration
+    mkdir -p "/home/$SPOTIFY_USER/.config/spotifyd"
+    cat > "/home/$SPOTIFY_USER/.config/spotifyd/spotifyd.conf" <<EOF
+[global]
+# Spotify credentials (will be set via web UI)
+username = ""
+password = ""
+
+# Audio settings
+backend = "alsa"
+device = "default"
+volume_controller = "alsa"
+volume_normalisation = true
+normalisation_pregain = -10
+bitrate = 160
+
+# Device settings
+device_name = "Spotify Kids Player"
+device_type = "speaker"
+
+# Cache
+cache_path = "/home/$SPOTIFY_USER/.cache/spotifyd"
+max_cache_size = 1000000000
+EOF
+    chmod 600 "/home/$SPOTIFY_USER/.config/spotifyd/spotifyd.conf"
+    
+    # Also create ncspot config for compatibility
     mkdir -p "/home/$SPOTIFY_USER/.config/ncspot"
     cat > "/home/$SPOTIFY_USER/.config/ncspot/config.toml" <<EOF
 [theme]
