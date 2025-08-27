@@ -306,6 +306,16 @@ setup_spotify_client() {
     mkdir -p "$INSTALL_DIR/config"
     mkdir -p "$INSTALL_DIR/data"
     
+    # Create log files with proper permissions
+    touch "$INSTALL_DIR/data/login.log"
+    touch "$INSTALL_DIR/data/client.log"
+    touch "$INSTALL_DIR/data/device.lock" && rm "$INSTALL_DIR/data/device.lock"  # Create and remove to ensure directory is writable
+    
+    # Set permissions so all users can write logs
+    chmod 777 "$INSTALL_DIR/data"
+    chmod 666 "$INSTALL_DIR/data/login.log" 2>/dev/null || true
+    chmod 666 "$INSTALL_DIR/data/client.log" 2>/dev/null || true
+    
     # Create ncspot configuration
     mkdir -p "/home/$SPOTIFY_USER/.config/ncspot"
     cat > "/home/$SPOTIFY_USER/.config/ncspot/config.toml" <<EOF
@@ -345,6 +355,10 @@ EOF
 LOCK_FILE="/opt/spotify-terminal/data/device.lock"
 CONFIG_FILE="/opt/spotify-terminal/config/client.conf"
 LOG_FILE="/opt/spotify-terminal/data/client.log"
+
+# Ensure log file is writable
+touch "$LOG_FILE" 2>/dev/null || true
+chmod 666 "$LOG_FILE" 2>/dev/null || true
 
 # Source configuration
 [[ -f "$CONFIG_FILE" ]] && source "$CONFIG_FILE"
@@ -440,6 +454,7 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] User $SPOTIFY_USER logged in on $(tty)" >> 
 if [[ "\$(tty)" == "/dev/tty1" ]]; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting Spotify Kids Manager for user $SPOTIFY_USER..." >> /opt/spotify-terminal/data/login.log
     echo "Starting Spotify Kids Manager..." > /tmp/spotify-startup.log
+    chmod 666 /tmp/spotify-startup.log 2>/dev/null || true
     export HOME=/home/$SPOTIFY_USER
     export USER=$SPOTIFY_USER
     
@@ -1900,6 +1915,7 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] User {username} logged in on $(tty)" >> /op
 if [[ "$(tty)" == "/dev/tty1" ]]; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting Spotify Kids Manager for user {username}..." >> /opt/spotify-terminal/data/login.log
     echo "Starting Spotify Kids Manager in terminal mode..." > /tmp/spotify-startup.log
+    chmod 666 /tmp/spotify-startup.log 2>/dev/null || true
     export HOME={home_dir}
     export USER={username}
     export TERM=linux
@@ -1934,6 +1950,7 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] User {username} logged in on $(tty)" >> /op
 if [[ "$(tty)" == "/dev/tty1" ]]; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting Spotify Kids Manager for user {username}..." >> /opt/spotify-terminal/data/login.log
     echo "Starting Spotify Kids Manager in terminal mode..." > /tmp/spotify-startup.log
+    chmod 666 /tmp/spotify-startup.log 2>/dev/null || true
     export HOME={home_dir}
     export USER={username}
     export TERM=linux
