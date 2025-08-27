@@ -398,12 +398,43 @@ EOF
     
     chmod +x "$INSTALL_DIR/scripts/spotify-client.sh"
     
-    # Create auto-start script
+    # Create auto-start scripts (both .bash_profile and .profile for compatibility)
     cat > "/home/$SPOTIFY_USER/.bash_profile" <<EOF
+#!/bin/bash
 # Auto-start Spotify client on login
 if [[ "\$(tty)" == "/dev/tty1" ]]; then
-    # Start X session with Spotify client
-    startx /opt/spotify-terminal/scripts/start-x.sh
+    echo "Starting Spotify Kids Manager..." > /tmp/spotify-startup.log
+    export DISPLAY=:0
+    export HOME=/home/$SPOTIFY_USER
+    export USER=$SPOTIFY_USER
+    
+    # Check if X is already running
+    if ! pgrep -x "Xorg" > /dev/null; then
+        echo "Starting X session..." >> /tmp/spotify-startup.log
+        # Try to start X with our script
+        if command -v startx > /dev/null 2>&1; then
+            exec startx /opt/spotify-terminal/scripts/start-x.sh -- -nocursor 2>> /tmp/spotify-startup.log
+        else
+            # Fallback to direct terminal launch if X not available
+            echo "X not available, starting in terminal mode" >> /tmp/spotify-startup.log
+            exec /opt/spotify-terminal/scripts/spotify-client.sh
+        fi
+    else
+        echo "X already running" >> /tmp/spotify-startup.log
+        # If X is running, just start the client
+        DISPLAY=:0 /opt/spotify-terminal/scripts/spotify-client.sh
+    fi
+fi
+EOF
+    
+    # Also create .profile for systems that use it instead of .bash_profile
+    cp "/home/$SPOTIFY_USER/.bash_profile" "/home/$SPOTIFY_USER/.profile"
+    
+    # Create .bashrc that sources .bash_profile
+    cat > "/home/$SPOTIFY_USER/.bashrc" <<EOF
+# Source bash_profile if on tty1
+if [[ -f ~/.bash_profile ]]; then
+    source ~/.bash_profile
 fi
 EOF
     
@@ -411,26 +442,44 @@ EOF
     cat > "$INSTALL_DIR/scripts/start-x.sh" <<'EOF'
 #!/bin/bash
 
+# Log startup
+echo "X session starting at $(date)" >> /tmp/spotify-x.log
+
+# Set display
+export DISPLAY=:0
+
+# Wait for X to be ready
+sleep 2
+
 # Disable screen blanking and power management
-xset s off
-xset -dpms
-xset s noblank
+xset s off 2>> /tmp/spotify-x.log
+xset -dpms 2>> /tmp/spotify-x.log
+xset s noblank 2>> /tmp/spotify-x.log
 
 # Hide cursor after 1 second of inactivity
 unclutter -idle 1 &
 
 # Start window manager (minimal)
-openbox &
+openbox & 2>> /tmp/spotify-x.log
+
+# Give openbox time to start
+sleep 1
 
 # Start terminal with Spotify client in fullscreen
+echo "Starting terminal..." >> /tmp/spotify-x.log
 exec urxvt -fn "xft:DejaVu Sans Mono:size=14" \
     -bg black -fg green \
     -geometry 1000x1000 \
     +sb \
-    -e /opt/spotify-terminal/scripts/spotify-client.sh
+    -e /opt/spotify-terminal/scripts/spotify-client.sh 2>> /tmp/spotify-x.log
 EOF
     
     chmod +x "$INSTALL_DIR/scripts/start-x.sh"
+    
+    # Make all scripts executable
+    chmod +x "/home/$SPOTIFY_USER/.bash_profile"
+    chmod +x "/home/$SPOTIFY_USER/.profile"
+    chmod 644 "/home/$SPOTIFY_USER/.bashrc"
     
     # Fix ownership
     chown -R "$SPOTIFY_USER:$SPOTIFY_USER" "/home/$SPOTIFY_USER"
@@ -1379,13 +1428,79 @@ def create_user():
         # Create bash profile for auto-start
         bash_profile = f"{home_dir}/.bash_profile"
         with open(bash_profile, 'w') as f:
-            f.write('''# Auto-start Spotify client on login
+            f.write(f'''#!/bin/bash
+# Auto-start Spotify client on login
 if [[ "$(tty)" == "/dev/tty1" ]]; then
-    # Start X session with Spotify client
-    startx /opt/spotify-terminal/scripts/start-x.sh
+    echo "Starting Spotify Kids Manager..." > /tmp/spotify-startup.log
+    export DISPLAY=:0
+    export HOME={home_dir}
+    export USER={username}
+    
+    # Check if X is already running
+    if ! pgrep -x "Xorg" > /dev/null; then
+        echo "Starting X session..." >> /tmp/spotify-startup.log
+        # Try to start X with our script
+        if command -v startx > /dev/null 2>&1; then
+            exec startx /opt/spotify-terminal/scripts/start-x.sh -- -nocursor 2>> /tmp/spotify-startup.log
+        else
+            # Fallback to direct terminal launch if X not available
+            echo "X not available, starting in terminal mode" >> /tmp/spotify-startup.log
+            exec /opt/spotify-terminal/scripts/spotify-client.sh
+        fi
+    else
+        echo "X already running" >> /tmp/spotify-startup.log
+        # If X is running, just start the client
+        DISPLAY=:0 /opt/spotify-terminal/scripts/spotify-client.sh
+    fi
 fi
 ''')
+        
+        # Also create .profile
+        profile = f"{home_dir}/.profile"
+        with open(profile, 'w') as f:
+            f.write(f'''#!/bin/bash
+# Auto-start Spotify client on login
+if [[ "$(tty)" == "/dev/tty1" ]]; then
+    echo "Starting Spotify Kids Manager..." > /tmp/spotify-startup.log
+    export DISPLAY=:0
+    export HOME={home_dir}
+    export USER={username}
+    
+    # Check if X is already running
+    if ! pgrep -x "Xorg" > /dev/null; then
+        echo "Starting X session..." >> /tmp/spotify-startup.log
+        # Try to start X with our script
+        if command -v startx > /dev/null 2>&1; then
+            exec startx /opt/spotify-terminal/scripts/start-x.sh -- -nocursor 2>> /tmp/spotify-startup.log
+        else
+            # Fallback to direct terminal launch if X not available
+            echo "X not available, starting in terminal mode" >> /tmp/spotify-startup.log
+            exec /opt/spotify-terminal/scripts/spotify-client.sh
+        fi
+    else
+        echo "X already running" >> /tmp/spotify-startup.log
+        # If X is running, just start the client
+        DISPLAY=:0 /opt/spotify-terminal/scripts/spotify-client.sh
+    fi
+fi
+''')
+        
+        # Create .bashrc
+        bashrc = f"{home_dir}/.bashrc"
+        with open(bashrc, 'w') as f:
+            f.write('''# Source bash_profile if on tty1
+if [[ -f ~/.bash_profile ]]; then
+    source ~/.bash_profile
+fi
+''')
+        
+        # Set permissions
+        subprocess.run(['chmod', '+x', bash_profile], check=True)
+        subprocess.run(['chmod', '+x', profile], check=True)
+        subprocess.run(['chmod', '644', bashrc], check=True)
         subprocess.run(['chown', f'{username}:{username}', bash_profile], check=True)
+        subprocess.run(['chown', f'{username}:{username}', profile], check=True)
+        subprocess.run(['chown', f'{username}:{username}', bashrc], check=True)
         
         return jsonify({
             "success": True, 
