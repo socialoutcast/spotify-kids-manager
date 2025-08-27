@@ -3094,7 +3094,8 @@ if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=False)
 EOF
     
-    chmod +x "$INSTALL_DIR/web/app.py"
+    # Make app.py executable if it exists
+    [ -f "$INSTALL_DIR/web/app.py" ] && chmod +x "$INSTALL_DIR/web/app.py"
     
     log_success "Web admin panel created"
 }
@@ -3243,7 +3244,8 @@ test_and_repair_web() {
                 log_info "Attempting automatic repair..."
                 
                 # Fix permissions
-                chmod +x "$INSTALL_DIR/web/app.py"
+                # Make app.py executable if it exists
+    [ -f "$INSTALL_DIR/web/app.py" ] && chmod +x "$INSTALL_DIR/web/app.py"
                 chown -R root:root "$INSTALL_DIR"
                 
                 # Ensure config directories exist
