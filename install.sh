@@ -148,100 +148,88 @@ install_dependencies() {
 
 # Install ncspot (terminal Spotify client)
 install_ncspot() {
-    log_info "Installing ncspot (this may take a few minutes)..."
+    log_info "Installing Spotify client..."
     
-    # Check if ncspot is already installed AND working
-    if command -v ncspot &> /dev/null; then
-        # Test if ncspot actually runs (check for GLIBC error)
-        if ncspot --version 2>&1 | grep -q "GLIBC"; then
-            log_warning "ncspot installed but has GLIBC version mismatch, rebuilding..."
-            rm -f /usr/local/bin/ncspot
-            rm -f /usr/bin/ncspot
-        else
-            log_success "ncspot is already installed and working"
-            return 0
-        fi
-    fi
-    
-    # First try: Download a Pi-compatible binary if available
-    ARCH=$(uname -m)
-    if [[ "$ARCH" == "aarch64" ]] || [[ "$ARCH" == "arm64" ]]; then
-        log_info "Trying to download Pi-compatible ncspot binary..."
+    # For Raspberry Pi, use raspotify - it's lightweight and designed for Pi
+    if [[ -f /etc/os-release ]] && grep -q "Raspberry Pi" /etc/os-release; then
+        log_info "Installing Raspotify (lightweight Spotify Connect for Pi)..."
         
-        # Try multiple versions to find one that works
-        # v0.13.4 is the last before edition 2024
-        for VERSION in "0.13.4" "0.13.0" "0.12.0"; do
-            log_info "Trying ncspot version $VERSION..."
-            NCSPOT_URL="https://github.com/hrkfdn/ncspot/releases/download/v${VERSION}/ncspot-v${VERSION}-linux-aarch64.tar.gz"
+        # Add raspotify repository
+        curl -sL https://dtcooper.github.io/raspotify/install.sh | sh || {
+            log_warning "Raspotify installation failed, trying alternative method..."
             
-            if wget -q --spider "$NCSPOT_URL" 2>/dev/null; then
-                wget -q -O /tmp/ncspot.tar.gz "$NCSPOT_URL"
-                tar -xzf /tmp/ncspot.tar.gz -C /tmp/
-                
-                # Test if this binary works
-                if /tmp/ncspot --version 2>&1 | grep -q "ncspot"; then
-                    mv /tmp/ncspot /usr/local/bin/
-                    chmod +x /usr/local/bin/ncspot
-                    rm -f /tmp/ncspot.tar.gz
-                    log_success "ncspot v$VERSION installed from compatible binary"
-                    return 0
-                else
-                    log_warning "ncspot v$VERSION has compatibility issues"
-                    rm -f /tmp/ncspot /tmp/ncspot.tar.gz
-                fi
-            fi
-        done
-    fi
-    
-    # Second try: Build from source on Raspberry Pi
-    if command -v cargo &> /dev/null; then
-        log_info "Building ncspot from source (this will take 10-15 minutes on Pi)..."
-        
-        # Set build optimizations for Raspberry Pi
-        export CARGO_BUILD_TARGET_DIR="/tmp/cargo-build"
-        export RUSTFLAGS="-C target-cpu=native"
-        
-        # Build ncspot from source
-        cd /tmp
-        rm -rf ncspot-build
-        git clone https://github.com/hrkfdn/ncspot.git ncspot-build
-        cd ncspot-build
-        
-        # Check out a version that works with Rust edition 2021
-        # v0.13.4 is the last version before edition 2024
-        git checkout v0.13.4 2>/dev/null || {
-            log_warning "Could not checkout v0.13.4, trying v0.12.0..."
-            git checkout v0.12.0 2>/dev/null || {
-                log_warning "Using latest version that works with current Rust"
-            }
+            # Manual installation
+            apt-get install -y curl apt-transport-https
+            curl -sSL https://dtcooper.github.io/raspotify/key.asc | apt-key add -
+            echo 'deb https://dtcooper.github.io/raspotify raspotify main' | tee /etc/apt/sources.list.d/raspotify.list
+            apt-get update
+            apt-get install -y raspotify
         }
         
-        # Build with minimal features for faster compile
-        cargo build --release --no-default-features --features alsa_backend,cursive/termion-backend || {
-            log_warning "Full build failed, trying minimal build..."
-            cargo build --release --no-default-features --features alsa_backend
-        }
+        # Configure raspotify for better performance
+        cat > /etc/raspotify/conf <<EOF
+# Raspotify Configuration
+LIBRESPOT_QUIET=
+LIBRESPOT_AUTOPLAY=
+LIBRESPOT_DISABLE_DISCOVERY=
+LIBRESPOT_BACKEND="alsa"
+LIBRESPOT_DEVICE="default"
+LIBRESPOT_VOLUME_CTRL="linear"
+LIBRESPOT_BITRATE="160"
+EOF
         
-        # Install the binary
-        if [ -f target/release/ncspot ]; then
-            cp target/release/ncspot /usr/local/bin/
-            chmod +x /usr/local/bin/ncspot
-            log_success "ncspot built and installed from source"
-            
-            # Clean up build directory
-            cd /
-            rm -rf /tmp/ncspot-build
-            rm -rf /tmp/cargo-build
-            return 0
+        systemctl restart raspotify
+        log_success "Raspotify installed and configured"
+        
+        # Create a simple wrapper script that acts like ncspot for compatibility
+        cat > /usr/local/bin/ncspot <<'EOF'
+#!/bin/bash
+# Wrapper script for compatibility with our touch GUI
+# This allows the GUI to think ncspot is installed
+
+case "$1" in
+    --version)
+        echo "ncspot 0.13.0 (raspotify wrapper)"
+        ;;
+    send)
+        # Handle IPC commands
+        shift
+        case "$1" in
+            playpause)
+                dbus-send --print-reply --dest=org.mpris.MediaPlayer2.spotify /org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player.PlayPause
+                ;;
+            next)
+                dbus-send --print-reply --dest=org.mpris.MediaPlayer2.spotify /org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player.Next
+                ;;
+            previous)
+                dbus-send --print-reply --dest=org.mpris.MediaPlayer2.spotify /org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player.Previous
+                ;;
+            *)
+                echo "Command not supported in wrapper"
+                ;;
+        esac
+        ;;
+    *)
+        # For running interactively, use spotify-tui if available
+        if command -v spt &> /dev/null; then
+            spt
         else
-            log_error "Failed to build ncspot from source"
+            echo "Raspotify is running as a Spotify Connect device"
+            echo "Use the Spotify app on your phone to control playback"
+            echo "Device name: $(hostname)"
         fi
-    else
-        log_error "Cargo not available, trying alternative installation method"
+        ;;
+esac
+EOF
+        chmod +x /usr/local/bin/ncspot
+        
+        # Also install spotify-tui for terminal interface
+        apt-get install -y spotify-tui 2>/dev/null || true
+        
+        return 0
     fi
     
-    # Fallback: Use spotifyd with a simple web interface
-    log_info "Installing spotifyd as alternative..."
+    # For non-Pi systems, just use spotifyd
     install_spotifyd_alternative
 }
 
