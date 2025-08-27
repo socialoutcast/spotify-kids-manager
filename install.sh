@@ -1650,9 +1650,13 @@ main() {
         echo "============================================"
         echo ""
         log_warning "This will completely remove and reinstall everything!"
-        read -p "Are you sure you want to reset? (yes/no): " -r
+        echo ""
+        echo -e "${YELLOW}Type 'yes' to continue or anything else to cancel:${NC}"
+        read -p "Continue with reset? " -r
+        echo ""
         if [[ ! $REPLY == "yes" ]]; then
-            log_info "Reset cancelled"
+            log_info "Reset cancelled (you typed: '$REPLY')"
+            log_info "To reset, type exactly: yes"
             exit 0
         fi
         
