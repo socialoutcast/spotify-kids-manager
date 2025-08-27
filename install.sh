@@ -455,6 +455,7 @@ import json
 import subprocess
 import dbus
 import pulsectl
+import threading
 from functools import wraps
 from datetime import datetime
 
@@ -788,6 +789,7 @@ HTML_TEMPLATE = '''
                 <button class="btn danger" onclick="restartService()">Restart Service</button>
                 <button class="btn" onclick="viewLogs()">View Logs</button>
                 <button class="btn danger" onclick="rebootSystem()">Reboot System</button>
+                <button class="btn danger" onclick="shutdownSystem()">Shutdown</button>
             </div>
         </div>
         
@@ -1046,6 +1048,14 @@ HTML_TEMPLATE = '''
             const response = await fetch('/api/system/reboot', {method: 'POST'});
             if (response.ok) {
                 showAlert('System rebooting in 5 seconds...');
+            }
+        }
+        
+        async function shutdownSystem() {
+            if (!confirm('Shutdown the system? You will need to manually power it back on.')) return;
+            const response = await fetch('/api/system/shutdown', {method: 'POST'});
+            if (response.ok) {
+                showAlert('System shutting down in 5 seconds...');
             }
         }
         
@@ -1583,8 +1593,40 @@ normalisation_pregain = -10
 @login_required
 def reboot_system():
     # Schedule a reboot in 5 seconds to allow response to be sent
-    subprocess.Popen(['sleep', '5', '&&', 'reboot'], shell=True)
+    import threading
+    def do_reboot():
+        import time
+        time.sleep(5)
+        # Try multiple commands to ensure it works
+        try:
+            subprocess.run(['/sbin/reboot'], check=True)
+        except:
+            try:
+                subprocess.run(['systemctl', 'reboot'], check=True)
+            except:
+                subprocess.run(['reboot'], check=True)
+    
+    threading.Thread(target=do_reboot, daemon=True).start()
     return jsonify({"success": True, "message": "System will reboot in 5 seconds"})
+
+@app.route('/api/system/shutdown', methods=['POST'])
+@login_required
+def shutdown_system():
+    # Schedule a shutdown in 5 seconds to allow response to be sent
+    import threading
+    def do_shutdown():
+        import time
+        time.sleep(5)
+        try:
+            subprocess.run(['/sbin/poweroff'], check=True)
+        except:
+            try:
+                subprocess.run(['systemctl', 'poweroff'], check=True)
+            except:
+                subprocess.run(['poweroff'], check=True)
+    
+    threading.Thread(target=do_shutdown, daemon=True).start()
+    return jsonify({"success": True, "message": "System will shutdown in 5 seconds"})
 
 if __name__ == '__main__':
     os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
