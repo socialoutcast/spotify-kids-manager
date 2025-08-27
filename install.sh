@@ -630,31 +630,63 @@ class SpotifyTouchGUI(Gtk.Window):
         self.volume_scale.connect("value-changed", self.on_volume_changed)
         volume_box.pack_start(self.volume_scale, True, True, 10)
         
-        # Search section
-        search_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-        search_box.set_size_request(-1, 80)
-        search_box.set_margin_start(20)
-        search_box.set_margin_end(20)
-        main_box.pack_start(search_box, False, False, 10)
+        # Navigation tabs
+        tab_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        tab_box.set_size_request(-1, 60)
+        tab_box.set_margin_start(20)
+        tab_box.set_margin_end(20)
+        main_box.pack_start(tab_box, False, False, 10)
+        
+        playlists_btn = Gtk.Button(label="Playlists")
+        playlists_btn.set_size_request(150, 50)
+        playlists_btn.connect("clicked", lambda x: self.show_playlists())
+        tab_box.pack_start(playlists_btn, False, False, 5)
+        
+        albums_btn = Gtk.Button(label="Albums")
+        albums_btn.set_size_request(150, 50)
+        albums_btn.connect("clicked", lambda x: self.show_albums())
+        tab_box.pack_start(albums_btn, False, False, 5)
+        
+        artists_btn = Gtk.Button(label="Artists")
+        artists_btn.set_size_request(150, 50)
+        artists_btn.connect("clicked", lambda x: self.show_artists())
+        tab_box.pack_start(artists_btn, False, False, 5)
+        
+        search_btn = Gtk.Button(label="Search")
+        search_btn.set_size_request(150, 50)
+        search_btn.connect("clicked", lambda x: self.show_search())
+        tab_box.pack_start(search_btn, False, False, 5)
+        
+        # Search section (initially hidden)
+        self.search_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        self.search_box.set_size_request(-1, 80)
+        self.search_box.set_margin_start(20)
+        self.search_box.set_margin_end(20)
+        main_box.pack_start(self.search_box, False, False, 10)
         
         self.search_entry = Gtk.Entry()
         self.search_entry.set_placeholder_text("Search for music...")
         self.search_entry.connect("activate", self.on_search)
         self.search_entry.connect("focus-in-event", self.show_keyboard)
-        search_box.pack_start(self.search_entry, True, True, 10)
+        self.search_box.pack_start(self.search_entry, True, True, 10)
         
-        search_btn = Gtk.Button(label="Search")
-        search_btn.connect("clicked", lambda x: self.on_search(None))
-        search_box.pack_start(search_btn, False, False, 10)
+        do_search_btn = Gtk.Button(label="Go")
+        do_search_btn.connect("clicked", lambda x: self.on_search(None))
+        self.search_box.pack_start(do_search_btn, False, False, 10)
         
-        # Results/playlists area with scrolling
+        self.search_box.hide()  # Hide by default
+        
+        # Results/content area with scrolling
         scrolled = Gtk.ScrolledWindow()
         scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         main_box.pack_start(scrolled, True, True, 10)
         
-        self.results_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        self.results_box.set_spacing(10)
-        scrolled.add(self.results_box)
+        self.content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.content_box.set_spacing(10)
+        scrolled.add(self.content_box)
+        
+        # Load playlists on startup
+        self.show_playlists()
         
         # Exit button (only show if not locked)
         if not self.locked:
@@ -680,14 +712,30 @@ class SpotifyTouchGUI(Gtk.Window):
                 font-size: 24px;
                 min-height: 60px;
                 padding: 10px;
+                border-radius: 5px;
             }
             GtkButton {
                 font-size: 20px;
                 min-height: 60px;
                 padding: 10px;
+                background: #f0f0f0;
+                border: 1px solid #ccc;
+                border-radius: 5px;
+                margin: 2px;
+            }
+            GtkButton:hover {
+                background: #e0e0e0;
+            }
+            GtkButton:active {
+                background: #d0d0d0;
             }
             GtkLabel {
                 font-size: 18px;
+                padding: 5px;
+            }
+            #loading {
+                font-size: 24px;
+                color: #666;
             }
         """)
         Gtk.StyleContext.add_provider_for_screen(
@@ -794,24 +842,188 @@ class SpotifyTouchGUI(Gtk.Window):
             pass
         return False
         
+    def show_playlists(self):
+        """Show user's playlists"""
+        self.search_box.hide()
+        self.clear_content()
+        
+        # Add loading message
+        loading_label = Gtk.Label(label="Loading playlists...")
+        loading_label.set_name("loading")
+        self.content_box.pack_start(loading_label, False, False, 10)
+        self.content_box.show_all()
+        
+        # Send command to ncspot to navigate to playlists
+        self.send_ncspot_command("focus playlists")
+        
+        # Simulate playlist items (in real implementation, parse ncspot output)
+        GLib.timeout_add(500, self.load_playlists)
+    
+    def load_playlists(self):
+        """Load playlists from ncspot"""
+        self.clear_content()
+        
+        # Example playlists - in real implementation, get from ncspot
+        playlists = [
+            "Liked Songs",
+            "Kids Music",
+            "Disney Favorites",
+            "Bedtime Songs",
+            "Morning Playlist"
+        ]
+        
+        for playlist in playlists:
+            item_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+            item_box.set_size_request(-1, 80)
+            
+            # Playlist button
+            btn = Gtk.Button(label=playlist)
+            btn.set_size_request(-1, 70)
+            btn.connect("clicked", lambda x, p=playlist: self.open_playlist(p))
+            item_box.pack_start(btn, True, True, 5)
+            
+            # Play button
+            play_btn = Gtk.Button(label="▶")
+            play_btn.set_size_request(70, 70)
+            play_btn.connect("clicked", lambda x, p=playlist: self.play_playlist(p))
+            item_box.pack_start(play_btn, False, False, 5)
+            
+            self.content_box.pack_start(item_box, False, False, 5)
+        
+        self.content_box.show_all()
+        return False  # Don't repeat
+    
+    def open_playlist(self, playlist_name):
+        """Open a specific playlist"""
+        self.clear_content()
+        
+        # Show back button
+        back_btn = Gtk.Button(label="← Back to Playlists")
+        back_btn.set_size_request(-1, 60)
+        back_btn.connect("clicked", lambda x: self.show_playlists())
+        self.content_box.pack_start(back_btn, False, False, 10)
+        
+        # Show playlist name
+        title_label = Gtk.Label(label=playlist_name)
+        title_label.set_markup(f"<span size='x-large' weight='bold'>{playlist_name}</span>")
+        self.content_box.pack_start(title_label, False, False, 10)
+        
+        # Play all button
+        play_all_btn = Gtk.Button(label="▶ Play All")
+        play_all_btn.set_size_request(-1, 60)
+        play_all_btn.connect("clicked", lambda x: self.play_playlist(playlist_name))
+        self.content_box.pack_start(play_all_btn, False, False, 10)
+        
+        # Example tracks - in real implementation, get from ncspot
+        tracks = [
+            "Song 1 - Artist A",
+            "Song 2 - Artist B",
+            "Song 3 - Artist C",
+            "Song 4 - Artist D"
+        ]
+        
+        for i, track in enumerate(tracks):
+            track_btn = Gtk.Button(label=track)
+            track_btn.set_size_request(-1, 60)
+            track_btn.connect("clicked", lambda x, t=track, idx=i: self.play_track(playlist_name, idx))
+            self.content_box.pack_start(track_btn, False, False, 5)
+        
+        self.content_box.show_all()
+    
+    def play_playlist(self, playlist_name):
+        """Play entire playlist"""
+        self.send_ncspot_command(f"play {playlist_name}")
+        # Update now playing label
+        self.now_playing_label.set_markup(f"<span size='x-large' weight='bold'>Playing: {playlist_name}</span>")
+    
+    def play_track(self, playlist_name, track_index):
+        """Play specific track from playlist"""
+        self.send_ncspot_command(f"play {track_index}")
+    
+    def show_albums(self):
+        """Show saved albums"""
+        self.search_box.hide()
+        self.clear_content()
+        
+        loading_label = Gtk.Label(label="Loading albums...")
+        self.content_box.pack_start(loading_label, False, False, 10)
+        self.content_box.show_all()
+        
+        # Send command to ncspot
+        self.send_ncspot_command("focus albums")
+        
+        # TODO: Parse ncspot output for actual albums
+        GLib.timeout_add(500, lambda: self.show_placeholder("Albums"))
+    
+    def show_artists(self):
+        """Show followed artists"""
+        self.search_box.hide()
+        self.clear_content()
+        
+        loading_label = Gtk.Label(label="Loading artists...")
+        self.content_box.pack_start(loading_label, False, False, 10)
+        self.content_box.show_all()
+        
+        # Send command to ncspot
+        self.send_ncspot_command("focus artists")
+        
+        # TODO: Parse ncspot output for actual artists
+        GLib.timeout_add(500, lambda: self.show_placeholder("Artists"))
+    
+    def show_search(self):
+        """Show search interface"""
+        self.clear_content()
+        self.search_box.show()
+        self.search_entry.grab_focus()
+    
+    def show_placeholder(self, content_type):
+        """Show placeholder for unimplemented sections"""
+        self.clear_content()
+        label = Gtk.Label(label=f"{content_type} will be displayed here")
+        self.content_box.pack_start(label, False, False, 10)
+        self.content_box.show_all()
+        return False
+    
+    def clear_content(self):
+        """Clear the content area"""
+        for child in self.content_box.get_children():
+            self.content_box.remove(child)
+    
     def on_search(self, widget):
         """Handle search"""
         query = self.search_entry.get_text().strip()
         if not query:
             return
             
-        # Clear previous results
-        for child in self.results_box.get_children():
-            self.results_box.remove(child)
-            
+        self.clear_content()
+        
         # Send search to ncspot
         self.send_ncspot_command(f"search {query}")
         
-        # Note: In a real implementation, we'd parse ncspot's output
-        # For now, show a message
-        label = Gtk.Label(label=f"Searching for: {query}")
-        self.results_box.pack_start(label, False, False, 5)
-        self.results_box.show_all()
+        # Show search results
+        label = Gtk.Label(label=f"Search results for: {query}")
+        self.content_box.pack_start(label, False, False, 5)
+        
+        # TODO: Parse actual search results from ncspot
+        results = [
+            f"Track: {query} Song 1",
+            f"Track: {query} Song 2",
+            f"Album: {query} Album",
+            f"Artist: {query} Artist"
+        ]
+        
+        for result in results:
+            result_btn = Gtk.Button(label=result)
+            result_btn.set_size_request(-1, 60)
+            result_btn.connect("clicked", lambda x, r=result: self.play_search_result(r))
+            self.content_box.pack_start(result_btn, False, False, 5)
+        
+        self.content_box.show_all()
+    
+    def play_search_result(self, result):
+        """Play a search result"""
+        self.send_ncspot_command("play")
+        self.now_playing_label.set_markup(f"<span size='x-large' weight='bold'>Playing: {result}</span>")
         
     def update_status_loop(self):
         """Update now playing info periodically"""
