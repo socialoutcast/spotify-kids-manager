@@ -98,18 +98,24 @@ install_dependencies() {
         alsa-utils \
         screen \
         tmux \
-        xinit \
-        x11-xserver-utils \
-        openbox \
-        rxvt-unicode \
-        fonts-dejavu-core \
         nginx \
         cargo \
         build-essential \
         libasound2-dev \
         libssl-dev \
         libdbus-1-dev \
-        pkg-config
+        pkg-config \
+        xinput-calibrator \
+        libinput-tools \
+        florence \
+        matchbox-keyboard \
+        xinit \
+        xserver-xorg \
+        xserver-xorg-input-libinput \
+        openbox \
+        unclutter \
+        xterm \
+        xinput
     
     # Python packages for web admin
     pip3 install --break-system-packages \
@@ -337,21 +343,36 @@ is_locked() {
 
 # Start ncspot with appropriate settings
 start_client() {
-    # Clear screen
-    clear
+    # Set terminal settings for better display
+    stty sane
+    export TERM=linux
     
-    # Display header
-    echo "================================================"
-    echo "         Spotify Kids Music Player             "
-    echo "================================================"
+    # Clear screen and reset cursor
+    clear
+    tput cnorm 2>/dev/null || true  # Show cursor if hidden
+    
+    # Display header with colors if available
+    if command -v tput > /dev/null 2>&1; then
+        tput bold
+        echo "================================================"
+        echo "         Spotify Kids Music Player             "
+        echo "================================================"
+        tput sgr0
+    else
+        echo "================================================"
+        echo "         Spotify Kids Music Player             "
+        echo "================================================"
+    fi
     echo ""
     
     # Check if Spotify is disabled
     if [[ "$SPOTIFY_DISABLED" == "true" ]]; then
         echo "Spotify is currently disabled by administrator"
         echo "Please contact your parent to enable it"
-        sleep infinity
-        exit 0
+        # Keep terminal alive but don't consume CPU
+        while true; do
+            sleep 3600
+        done
     fi
     
     # Start the appropriate client
@@ -398,31 +419,24 @@ EOF
     
     chmod +x "$INSTALL_DIR/scripts/spotify-client.sh"
     
-    # Create auto-start scripts (both .bash_profile and .profile for compatibility)
+    # Create auto-start scripts with minimal X for touchscreen support
     cat > "/home/$SPOTIFY_USER/.bash_profile" <<EOF
 #!/bin/bash
 # Auto-start Spotify client on login
 if [[ "\$(tty)" == "/dev/tty1" ]]; then
     echo "Starting Spotify Kids Manager..." > /tmp/spotify-startup.log
-    export DISPLAY=:0
     export HOME=/home/$SPOTIFY_USER
     export USER=$SPOTIFY_USER
     
-    # Check if X is already running
-    if ! pgrep -x "Xorg" > /dev/null; then
-        echo "Starting X session..." >> /tmp/spotify-startup.log
-        # Try to start X with our script
-        if command -v startx > /dev/null 2>&1; then
-            exec startx /opt/spotify-terminal/scripts/start-x.sh -- -nocursor 2>> /tmp/spotify-startup.log
-        else
-            # Fallback to direct terminal launch if X not available
-            echo "X not available, starting in terminal mode" >> /tmp/spotify-startup.log
-            exec /opt/spotify-terminal/scripts/spotify-client.sh
-        fi
+    # Check for touchscreen
+    if ls /dev/input/by-path/*event* 2>/dev/null | xargs -I{} udevadm info --query=property --name={} | grep -q "ID_INPUT_TOUCHSCREEN=1"; then
+        echo "Touchscreen detected, starting with GUI support..." >> /tmp/spotify-startup.log
+        # Start minimal X with touchscreen support
+        exec startx /opt/spotify-terminal/scripts/start-touchscreen.sh -- -nocursor 2>> /tmp/spotify-startup.log
     else
-        echo "X already running" >> /tmp/spotify-startup.log
-        # If X is running, just start the client
-        DISPLAY=:0 /opt/spotify-terminal/scripts/spotify-client.sh
+        echo "No touchscreen, starting in terminal mode..." >> /tmp/spotify-startup.log
+        # Start in pure terminal mode
+        exec /opt/spotify-terminal/scripts/spotify-client.sh 2>> /tmp/spotify-startup.log
     fi
 fi
 EOF
@@ -438,43 +452,42 @@ if [[ -f ~/.bash_profile ]]; then
 fi
 EOF
     
-    # Create X session startup script
-    cat > "$INSTALL_DIR/scripts/start-x.sh" <<'EOF'
+    # Create touchscreen startup script
+    cat > "$INSTALL_DIR/scripts/start-touchscreen.sh" <<'EOF'
 #!/bin/bash
 
-# Log startup
-echo "X session starting at $(date)" >> /tmp/spotify-x.log
+# Minimal X session for touchscreen support
+echo "Starting touchscreen session at $(date)" >> /tmp/spotify-touch.log
 
 # Set display
 export DISPLAY=:0
 
-# Wait for X to be ready
-sleep 2
+# Configure touchscreen input
+xinput set-prop "$(xinput list --name-only | grep -i touch | head -1)" "libinput Tapping Enabled" 1 2>/dev/null || true
 
-# Disable screen blanking and power management
-xset s off 2>> /tmp/spotify-x.log
-xset -dpms 2>> /tmp/spotify-x.log
-xset s noblank 2>> /tmp/spotify-x.log
+# Disable screen blanking
+xset s off
+xset -dpms
+xset s noblank
 
-# Hide cursor after 1 second of inactivity
-unclutter -idle 1 &
+# Hide cursor
+unclutter -idle 0.1 &
 
-# Start window manager (minimal)
-openbox & 2>> /tmp/spotify-x.log
+# Start minimal window manager
+openbox &
 
-# Give openbox time to start
-sleep 1
+# Start on-screen keyboard in background
+matchbox-keyboard -d &
 
-# Start terminal with Spotify client in fullscreen
-echo "Starting terminal..." >> /tmp/spotify-x.log
-exec urxvt -fn "xft:DejaVu Sans Mono:size=14" \
-    -bg black -fg green \
-    -geometry 1000x1000 \
-    +sb \
-    -e /opt/spotify-terminal/scripts/spotify-client.sh 2>> /tmp/spotify-x.log
+# Start terminal with ncspot in fullscreen
+exec xterm -fullscreen -fa 'Monospace' -fs 14 -bg black -fg green -e /opt/spotify-terminal/scripts/spotify-client.sh
 EOF
     
-    chmod +x "$INSTALL_DIR/scripts/start-x.sh"
+    chmod +x "$INSTALL_DIR/scripts/start-touchscreen.sh"
+    
+    # Keep multi-user.target as default (no GUI unless touchscreen detected)
+    log_info "Setting system to multi-user mode..."
+    systemctl set-default multi-user.target 2>/dev/null || true
     
     # Make all scripts executable
     chmod +x "/home/$SPOTIFY_USER/.bash_profile"
@@ -1425,33 +1438,22 @@ def create_user():
         # Set ownership
         subprocess.run(['chown', '-R', f'{username}:{username}', home_dir], check=True)
         
-        # Create bash profile for auto-start
+        # Create bash profile for auto-start (terminal mode)
         bash_profile = f"{home_dir}/.bash_profile"
         with open(bash_profile, 'w') as f:
             f.write(f'''#!/bin/bash
-# Auto-start Spotify client on login
+# Auto-start Spotify client on login (terminal mode)
 if [[ "$(tty)" == "/dev/tty1" ]]; then
-    echo "Starting Spotify Kids Manager..." > /tmp/spotify-startup.log
-    export DISPLAY=:0
+    echo "Starting Spotify Kids Manager in terminal mode..." > /tmp/spotify-startup.log
     export HOME={home_dir}
     export USER={username}
+    export TERM=linux
     
-    # Check if X is already running
-    if ! pgrep -x "Xorg" > /dev/null; then
-        echo "Starting X session..." >> /tmp/spotify-startup.log
-        # Try to start X with our script
-        if command -v startx > /dev/null 2>&1; then
-            exec startx /opt/spotify-terminal/scripts/start-x.sh -- -nocursor 2>> /tmp/spotify-startup.log
-        else
-            # Fallback to direct terminal launch if X not available
-            echo "X not available, starting in terminal mode" >> /tmp/spotify-startup.log
-            exec /opt/spotify-terminal/scripts/spotify-client.sh
-        fi
-    else
-        echo "X already running" >> /tmp/spotify-startup.log
-        # If X is running, just start the client
-        DISPLAY=:0 /opt/spotify-terminal/scripts/spotify-client.sh
-    fi
+    # Clear the screen
+    clear
+    
+    # Start the Spotify client directly in terminal
+    exec /opt/spotify-terminal/scripts/spotify-client.sh 2>> /tmp/spotify-startup.log
 fi
 ''')
         
@@ -1459,29 +1461,18 @@ fi
         profile = f"{home_dir}/.profile"
         with open(profile, 'w') as f:
             f.write(f'''#!/bin/bash
-# Auto-start Spotify client on login
+# Auto-start Spotify client on login (terminal mode)
 if [[ "$(tty)" == "/dev/tty1" ]]; then
-    echo "Starting Spotify Kids Manager..." > /tmp/spotify-startup.log
-    export DISPLAY=:0
+    echo "Starting Spotify Kids Manager in terminal mode..." > /tmp/spotify-startup.log
     export HOME={home_dir}
     export USER={username}
+    export TERM=linux
     
-    # Check if X is already running
-    if ! pgrep -x "Xorg" > /dev/null; then
-        echo "Starting X session..." >> /tmp/spotify-startup.log
-        # Try to start X with our script
-        if command -v startx > /dev/null 2>&1; then
-            exec startx /opt/spotify-terminal/scripts/start-x.sh -- -nocursor 2>> /tmp/spotify-startup.log
-        else
-            # Fallback to direct terminal launch if X not available
-            echo "X not available, starting in terminal mode" >> /tmp/spotify-startup.log
-            exec /opt/spotify-terminal/scripts/spotify-client.sh
-        fi
-    else
-        echo "X already running" >> /tmp/spotify-startup.log
-        # If X is running, just start the client
-        DISPLAY=:0 /opt/spotify-terminal/scripts/spotify-client.sh
-    fi
+    # Clear the screen
+    clear
+    
+    # Start the Spotify client directly in terminal
+    exec /opt/spotify-terminal/scripts/spotify-client.sh 2>> /tmp/spotify-startup.log
 fi
 ''')
         
