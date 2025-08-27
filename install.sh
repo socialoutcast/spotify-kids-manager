@@ -168,26 +168,29 @@ install_ncspot() {
     if [[ "$ARCH" == "aarch64" ]] || [[ "$ARCH" == "arm64" ]]; then
         log_info "Trying to download Pi-compatible ncspot binary..."
         
-        # Try to get a binary compiled for older GLIBC
-        # Using a version known to work with Debian Bookworm
-        NCSPOT_URL="https://github.com/hrkfdn/ncspot/releases/download/v0.12.0/ncspot-v0.12.0-linux-aarch64.tar.gz"
-        
-        if wget -q --spider "$NCSPOT_URL" 2>/dev/null; then
-            wget -q -O /tmp/ncspot.tar.gz "$NCSPOT_URL"
-            tar -xzf /tmp/ncspot.tar.gz -C /tmp/
+        # Try multiple versions to find one that works
+        # v0.13.4 is the last before edition 2024
+        for VERSION in "0.13.4" "0.13.0" "0.12.0"; do
+            log_info "Trying ncspot version $VERSION..."
+            NCSPOT_URL="https://github.com/hrkfdn/ncspot/releases/download/v${VERSION}/ncspot-v${VERSION}-linux-aarch64.tar.gz"
             
-            # Test if this binary works
-            if /tmp/ncspot --version 2>&1 | grep -q "ncspot"; then
-                mv /tmp/ncspot /usr/local/bin/
-                chmod +x /usr/local/bin/ncspot
-                rm -f /tmp/ncspot.tar.gz
-                log_success "ncspot installed from compatible binary"
-                return 0
-            else
-                log_warning "Downloaded binary has compatibility issues"
-                rm -f /tmp/ncspot /tmp/ncspot.tar.gz
+            if wget -q --spider "$NCSPOT_URL" 2>/dev/null; then
+                wget -q -O /tmp/ncspot.tar.gz "$NCSPOT_URL"
+                tar -xzf /tmp/ncspot.tar.gz -C /tmp/
+                
+                # Test if this binary works
+                if /tmp/ncspot --version 2>&1 | grep -q "ncspot"; then
+                    mv /tmp/ncspot /usr/local/bin/
+                    chmod +x /usr/local/bin/ncspot
+                    rm -f /tmp/ncspot.tar.gz
+                    log_success "ncspot v$VERSION installed from compatible binary"
+                    return 0
+                else
+                    log_warning "ncspot v$VERSION has compatibility issues"
+                    rm -f /tmp/ncspot /tmp/ncspot.tar.gz
+                fi
             fi
-        fi
+        done
     fi
     
     # Second try: Build from source on Raspberry Pi
@@ -203,6 +206,15 @@ install_ncspot() {
         rm -rf ncspot-build
         git clone https://github.com/hrkfdn/ncspot.git ncspot-build
         cd ncspot-build
+        
+        # Check out a version that works with Rust edition 2021
+        # v0.13.4 is the last version before edition 2024
+        git checkout v0.13.4 2>/dev/null || {
+            log_warning "Could not checkout v0.13.4, trying v0.12.0..."
+            git checkout v0.12.0 2>/dev/null || {
+                log_warning "Using latest version that works with current Rust"
+            }
+        }
         
         # Build with minimal features for faster compile
         cargo build --release --no-default-features --features alsa_backend,cursive/termion-backend || {
