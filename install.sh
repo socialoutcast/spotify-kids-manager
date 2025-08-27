@@ -96,7 +96,6 @@ install_dependencies() {
         bluez-tools \
         pulseaudio-module-bluetooth \
         alsa-utils \
-        ncspot \
         screen \
         tmux \
         xinit \
@@ -104,7 +103,13 @@ install_dependencies() {
         openbox \
         rxvt-unicode \
         fonts-dejavu-core \
-        nginx
+        nginx \
+        cargo \
+        build-essential \
+        libasound2-dev \
+        libssl-dev \
+        libdbus-1-dev \
+        pkg-config
     
     # Python packages for web admin
     pip3 install --break-system-packages \
@@ -117,6 +122,132 @@ install_dependencies() {
         pulsectl
     
     log_success "Dependencies installed"
+    
+    # Install ncspot
+    install_ncspot
+}
+
+# Install ncspot (terminal Spotify client)
+install_ncspot() {
+    log_info "Installing ncspot (this may take a few minutes)..."
+    
+    # Check if ncspot is already installed
+    if command -v ncspot &> /dev/null; then
+        log_success "ncspot is already installed"
+        return 0
+    fi
+    
+    # Try to install from cargo
+    if command -v cargo &> /dev/null; then
+        log_info "Building ncspot from source with cargo..."
+        
+        # Install using cargo (for the spotify-kids user)
+        sudo -u "$SPOTIFY_USER" cargo install ncspot --no-default-features --features alsa_backend 2>/dev/null || \
+        cargo install ncspot --no-default-features --features alsa_backend || {
+            log_warning "Cargo installation failed, trying alternative..."
+            
+            # Alternative: Install pre-built binary
+            log_info "Downloading pre-built ncspot binary..."
+            
+            # Detect architecture
+            ARCH=$(uname -m)
+            case "$ARCH" in
+                aarch64|arm64)
+                    NCSPOT_ARCH="aarch64"
+                    ;;
+                armv7l|armhf)
+                    NCSPOT_ARCH="armv7"
+                    ;;
+                x86_64)
+                    NCSPOT_ARCH="x86_64"
+                    ;;
+                *)
+                    log_error "Unsupported architecture: $ARCH"
+                    log_info "Using alternative: spotify-tui"
+                    apt-get install -y spotify-tui 2>/dev/null || true
+                    return 1
+                    ;;
+            esac
+            
+            # Download from GitHub releases (if available)
+            NCSPOT_VERSION="0.13.4"
+            NCSPOT_URL="https://github.com/hrkfdn/ncspot/releases/download/v${NCSPOT_VERSION}/ncspot-v${NCSPOT_VERSION}-linux-${NCSPOT_ARCH}.tar.gz"
+            
+            if wget -q --spider "$NCSPOT_URL" 2>/dev/null; then
+                wget -q -O /tmp/ncspot.tar.gz "$NCSPOT_URL"
+                tar -xzf /tmp/ncspot.tar.gz -C /usr/local/bin/
+                chmod +x /usr/local/bin/ncspot
+                rm /tmp/ncspot.tar.gz
+                log_success "ncspot installed from pre-built binary"
+            else
+                log_warning "Pre-built binary not available"
+                
+                # Last resort: build from source
+                log_info "Building ncspot from source..."
+                cd /tmp
+                git clone https://github.com/hrkfdn/ncspot.git
+                cd ncspot
+                cargo build --release --no-default-features --features alsa_backend
+                cp target/release/ncspot /usr/local/bin/
+                chmod +x /usr/local/bin/ncspot
+                cd /
+                rm -rf /tmp/ncspot
+                log_success "ncspot built from source"
+            fi
+        }
+    else
+        log_error "Cargo not available, cannot install ncspot"
+        log_info "Using alternative: installing spotifyd instead"
+        
+        # Install spotifyd as alternative
+        install_spotifyd_alternative
+    fi
+}
+
+# Alternative: Install spotifyd + basic TUI
+install_spotifyd_alternative() {
+    log_info "Installing spotifyd as alternative..."
+    
+    # Download spotifyd
+    ARCH=$(uname -m)
+    case "$ARCH" in
+        aarch64|arm64)
+            SPOTIFYD_URL="https://github.com/Spotifyd/spotifyd/releases/latest/download/spotifyd-linux-armv6-slim.tar.gz"
+            ;;
+        armv7l|armhf)
+            SPOTIFYD_URL="https://github.com/Spotifyd/spotifyd/releases/latest/download/spotifyd-linux-armv7-slim.tar.gz"
+            ;;
+        x86_64)
+            SPOTIFYD_URL="https://github.com/Spotifyd/spotifyd/releases/latest/download/spotifyd-linux-slim.tar.gz"
+            ;;
+        *)
+            log_error "Unsupported architecture for spotifyd: $ARCH"
+            return 1
+            ;;
+    esac
+    
+    wget -q -O /tmp/spotifyd.tar.gz "$SPOTIFYD_URL"
+    tar -xzf /tmp/spotifyd.tar.gz -C /usr/local/bin/
+    chmod +x /usr/local/bin/spotifyd
+    rm /tmp/spotifyd.tar.gz
+    
+    # Create a simple TUI wrapper
+    cat > /usr/local/bin/spotify-tui-simple <<'EOF'
+#!/bin/bash
+echo "Spotify Kids Player"
+echo "=================="
+echo ""
+echo "Spotifyd is running in background"
+echo "Use the Spotify app on your phone to control playback"
+echo ""
+echo "Press Ctrl+C to exit (if unlocked)"
+while true; do
+    sleep 1
+done
+EOF
+    chmod +x /usr/local/bin/spotify-tui-simple
+    
+    log_success "Spotifyd alternative installed"
 }
 
 # Create restricted user
@@ -221,13 +352,25 @@ start_client() {
         exit 0
     fi
     
-    # Start ncspot
-    if is_locked; then
-        # Locked mode - disable quit key
-        exec ncspot --config <(cat ~/.config/ncspot/config.toml | sed '/^"q"/d')
+    # Start the appropriate client
+    if command -v ncspot &> /dev/null; then
+        # Use ncspot if available
+        if is_locked; then
+            # Locked mode - disable quit key
+            exec ncspot --config <(cat ~/.config/ncspot/config.toml | sed '/^"q"/d')
+        else
+            # Unlocked mode - normal operation
+            exec ncspot
+        fi
+    elif command -v spotifyd &> /dev/null; then
+        # Use spotifyd with simple UI
+        spotifyd --no-daemon --backend alsa &
+        exec spotify-tui-simple
     else
-        # Unlocked mode - normal operation
-        exec ncspot
+        echo "No Spotify client installed!"
+        echo "Please run the installer again"
+        sleep 10
+        exit 1
     fi
 }
 
