@@ -22,18 +22,44 @@ A terminal-based Spotify client for Raspberry Pi with parental controls and web-
 
 ## Installation
 
-Run this single command to install:
+### Quick Install (One Command)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/main/remote-install.sh | sudo bash
 ```
 
-Or clone and run locally:
+### Complete Reset (Fix 502 Errors)
+
+If you're getting 502 errors or need to completely reset:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/main/remote-install.sh | sudo bash -s -- reset
+```
+
+### Other Commands
+
+```bash
+# Diagnose issues (including 502 errors)
+curl -fsSL https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/main/remote-install.sh | sudo bash -s -- diagnose
+
+# Repair existing installation
+curl -fsSL https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/main/remote-install.sh | sudo bash -s -- repair
+
+# Completely uninstall
+curl -fsSL https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/main/remote-install.sh | sudo bash -s -- uninstall
+
+# Show help
+curl -fsSL https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/main/remote-install.sh | sudo bash -s -- help
+```
+
+### Local Installation
 
 ```bash
 git clone https://github.com/socialoutcast/spotify-kids-manager.git
 cd spotify-kids-manager
-sudo ./install.sh
+sudo ./install.sh           # Normal install
+sudo ./install.sh --reset    # Complete reset
+sudo ./install.sh --diagnose # Run diagnostics
 ```
 
 ## Post-Installation
