@@ -1021,6 +1021,130 @@ EOF
     log_success "Uninstall script created"
 }
 
+# Test and repair web admin panel
+test_and_repair_web() {
+    log_info "Testing web admin panel..."
+    
+    # Give services time to start
+    sleep 3
+    
+    # Test if nginx is responding
+    if curl -s -o /dev/null -w "%{http_code}" "http://localhost:$WEB_PORT" | grep -q "502"; then
+        log_warning "502 Bad Gateway detected - attempting to fix..."
+        
+        # Check if Flask app is running
+        if ! pgrep -f "app.py" > /dev/null; then
+            log_warning "Flask app not running - checking why..."
+            
+            # Check if Python dependencies are installed
+            log_info "Installing/verifying Python dependencies..."
+            pip3 install --break-system-packages flask flask-cors flask-socketio werkzeug python-dotenv dbus-python pulsectl 2>/dev/null || \
+            pip3 install flask flask-cors flask-socketio werkzeug python-dotenv dbus-python pulsectl 2>/dev/null || \
+            python3 -m pip install flask flask-cors flask-socketio werkzeug python-dotenv dbus-python pulsectl 2>/dev/null
+            
+            # Test Flask app directly
+            log_info "Testing Flask app directly..."
+            cd "$INSTALL_DIR/web"
+            timeout 5 python3 app.py > /tmp/flask_test.log 2>&1 &
+            sleep 2
+            
+            if pgrep -f "app.py" > /dev/null; then
+                log_success "Flask app can run - restarting service..."
+                pkill -f "app.py"
+                systemctl restart "$SERVICE_NAME"
+                sleep 3
+            else
+                log_error "Flask app failed to start. Check /tmp/flask_test.log"
+                cat /tmp/flask_test.log
+                
+                # Try to fix common issues
+                log_info "Attempting automatic repair..."
+                
+                # Fix permissions
+                chmod +x "$INSTALL_DIR/web/app.py"
+                chown -R root:root "$INSTALL_DIR"
+                
+                # Ensure config directories exist
+                mkdir -p "$INSTALL_DIR/config"
+                mkdir -p "$INSTALL_DIR/data"
+                touch "$INSTALL_DIR/config/admin.json"
+                touch "$INSTALL_DIR/config/client.conf"
+                
+                # Restart service again
+                systemctl daemon-reload
+                systemctl restart "$SERVICE_NAME"
+                sleep 3
+            fi
+        fi
+        
+        # Check nginx configuration
+        if ! nginx -t 2>/dev/null; then
+            log_warning "Nginx configuration error - fixing..."
+            
+            # Recreate nginx config
+            cat > "/etc/nginx/sites-available/spotify-admin" <<EOF
+server {
+    listen $WEB_PORT;
+    server_name _;
+    
+    location / {
+        proxy_pass http://127.0.0.1:5001;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+    }
+}
+EOF
+            ln -sf /etc/nginx/sites-available/spotify-admin /etc/nginx/sites-enabled/
+            nginx -s reload
+        fi
+        
+        # Final test
+        sleep 2
+        HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:$WEB_PORT")
+        if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "302" ]; then
+            log_success "Web admin panel is working!"
+        else
+            log_warning "Web panel returned HTTP $HTTP_CODE"
+            log_info "Checking service logs..."
+            journalctl -u "$SERVICE_NAME" -n 20 --no-pager
+        fi
+    else
+        HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:$WEB_PORT")
+        if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "302" ]; then
+            log_success "Web admin panel is working! (HTTP $HTTP_CODE)"
+        else
+            log_warning "Web panel returned HTTP $HTTP_CODE - may need login"
+        fi
+    fi
+    
+    # Show access URL
+    IP=$(hostname -I | awk '{print $1}')
+    log_info "Testing external access at http://$IP:$WEB_PORT ..."
+    
+    # Test from external IP
+    if curl -s -o /dev/null -w "%{http_code}" "http://$IP:$WEB_PORT" | grep -q "200\|302"; then
+        log_success "External access confirmed!"
+    else
+        log_warning "Cannot access from external IP - checking firewall..."
+        
+        # Check if port is open
+        if ! ss -tln | grep -q ":$WEB_PORT"; then
+            log_error "Port $WEB_PORT is not listening"
+            systemctl status nginx --no-pager
+        else
+            log_info "Port $WEB_PORT is listening - may be firewall issue"
+        fi
+    fi
+}
+
 # Function to uninstall everything (used when re-running installer)
 uninstall_all() {
     log_info "Removing existing installation..."
@@ -1072,6 +1196,9 @@ main() {
     setup_web_admin
     create_systemd_service
     create_uninstall_script
+    
+    # Test and fix web panel if needed
+    test_and_repair_web
     
     echo ""
     log_success "Installation complete!"
