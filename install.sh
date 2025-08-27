@@ -502,7 +502,7 @@ is_locked() {
     [[ -f "$LOCK_FILE" ]]
 }
 
-# Start ncspot with appropriate settings
+# Start ncspot with appropriate settings  
 start_client() {
     # Set terminal settings for better display
     stty sane
@@ -1616,8 +1616,9 @@ if __name__ == "__main__":
     
     log_success "Spotify client configured"
 }
+# End of setup_spotify_client
 
-# Setup web admin panel
+# Setup web admin panel function
 setup_web_admin() {
     log_info "Setting up web admin panel..."
     
@@ -3601,6 +3602,14 @@ main() {
     install_dependencies
     create_spotify_user
     setup_spotify_client
+    
+    # Debug: Check if function exists
+    if ! type -t setup_web_admin > /dev/null; then
+        log_error "setup_web_admin function not found!"
+        log_info "Available functions:"
+        declare -F | grep setup
+    fi
+    
     setup_web_admin
     create_systemd_service
     create_uninstall_script
