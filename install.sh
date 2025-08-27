@@ -1177,6 +1177,142 @@ uninstall_all() {
 
 # Main installation flow
 main() {
+    # Check for help parameter
+    if [[ "$1" == "--help" ]] || [[ "$1" == "-h" ]]; then
+        echo "Spotify Kids Terminal Manager - Installer"
+        echo ""
+        echo "Usage: sudo ./install.sh [OPTIONS]"
+        echo ""
+        echo "Options:"
+        echo "  --help, -h      Show this help message"
+        echo "  --reset, -r     Complete reset - remove everything and reinstall"
+        echo "  --diagnose, -d  Run diagnostics to troubleshoot issues"
+        echo "  --uninstall     Remove the installation completely"
+        echo ""
+        echo "Examples:"
+        echo "  sudo ./install.sh           # Normal installation"
+        echo "  sudo ./install.sh --reset   # Complete reset and reinstall"
+        echo "  sudo ./install.sh --diagnose # Diagnose 502 or other issues"
+        echo ""
+        exit 0
+    fi
+    
+    # Check for uninstall parameter
+    if [[ "$1" == "--uninstall" ]]; then
+        clear
+        echo "============================================"
+        echo "    UNINSTALL"
+        echo "============================================"
+        echo ""
+        check_root
+        uninstall_all
+        log_success "Uninstallation complete"
+        exit 0
+    fi
+    
+    # Check for diagnostic parameter
+    if [[ "$1" == "--diagnose" ]] || [[ "$1" == "-d" ]]; then
+        clear
+        echo "============================================"
+        echo "    DIAGNOSTIC MODE"
+        echo "============================================"
+        echo ""
+        check_root
+        
+        log_info "Running diagnostics..."
+        
+        # Check installation
+        if [ -d "$INSTALL_DIR" ]; then
+            log_success "Installation directory exists"
+            ls -la "$INSTALL_DIR/"
+        else
+            log_error "Not installed at $INSTALL_DIR"
+        fi
+        
+        echo ""
+        log_info "Checking services..."
+        systemctl status "$SERVICE_NAME" --no-pager 2>/dev/null || log_error "Service not found"
+        
+        echo ""
+        log_info "Checking nginx..."
+        systemctl status nginx --no-pager 2>/dev/null || log_error "Nginx not running"
+        
+        echo ""
+        log_info "Checking ports..."
+        ss -tln | grep -E ":(8080|5001)" || log_error "Ports not listening"
+        
+        echo ""
+        log_info "Testing Flask app directly..."
+        if [ -f "$INSTALL_DIR/web/app.py" ]; then
+            cd "$INSTALL_DIR/web"
+            timeout 3 python3 -c "import flask; print('Flask available')" || log_error "Flask not installed"
+            timeout 5 python3 app.py 2>&1 | head -20
+        else
+            log_error "Flask app not found"
+        fi
+        
+        echo ""
+        log_info "Checking logs..."
+        journalctl -u "$SERVICE_NAME" -n 30 --no-pager
+        
+        echo ""
+        log_info "Testing web access..."
+        curl -v "http://localhost:$WEB_PORT" 2>&1 | head -30
+        
+        exit 0
+    fi
+    
+    # Check for reset parameter
+    if [[ "$1" == "--reset" ]] || [[ "$1" == "-r" ]]; then
+        clear
+        echo "============================================"
+        echo "    COMPLETE SYSTEM RESET"
+        echo "============================================"
+        echo ""
+        log_warning "This will completely remove and reinstall everything!"
+        read -p "Are you sure you want to reset? (yes/no): " -r
+        if [[ ! $REPLY == "yes" ]]; then
+            log_info "Reset cancelled"
+            exit 0
+        fi
+        
+        check_root
+        log_info "Performing complete reset..."
+        
+        # Force uninstall everything
+        systemctl stop "$SERVICE_NAME" 2>/dev/null || true
+        systemctl disable "$SERVICE_NAME" 2>/dev/null || true
+        systemctl stop nginx 2>/dev/null || true
+        
+        # Kill all related processes
+        pkill -f "app.py" 2>/dev/null || true
+        pkill -f "ncspot" 2>/dev/null || true
+        pkill -u "$SPOTIFY_USER" 2>/dev/null || true
+        
+        # Remove everything
+        rm -rf "$INSTALL_DIR"
+        rm -f "/etc/systemd/system/$SERVICE_NAME.service"
+        rm -rf /etc/systemd/system/getty@tty1.service.d/
+        rm -f /etc/nginx/sites-enabled/spotify-admin
+        rm -f /etc/nginx/sites-available/spotify-admin
+        userdel -rf "$SPOTIFY_USER" 2>/dev/null || true
+        
+        # Clean up Python packages
+        pip3 uninstall -y flask flask-cors flask-socketio werkzeug dbus-python pulsectl 2>/dev/null || true
+        
+        # Reset nginx to default
+        apt-get remove --purge -y nginx nginx-common 2>/dev/null || true
+        apt-get autoremove -y 2>/dev/null || true
+        rm -rf /etc/nginx
+        
+        # Reload systemd
+        systemctl daemon-reload
+        
+        log_success "Complete reset done. Starting fresh installation..."
+        echo ""
+        sleep 2
+    fi
+    
     clear
     echo "============================================"
     echo "    Spotify Kids Terminal Manager"
@@ -1186,7 +1322,11 @@ main() {
     
     check_root
     detect_system
-    check_existing_installation
+    
+    # Skip existing installation check if we just reset
+    if [[ "$1" != "--reset" ]] && [[ "$1" != "-r" ]]; then
+        check_existing_installation
+    fi
     
     log_info "Starting installation..."
     
