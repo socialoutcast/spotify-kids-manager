@@ -309,12 +309,14 @@ setup_spotify_client() {
     # Create log files with proper permissions
     touch "$INSTALL_DIR/data/login.log"
     touch "$INSTALL_DIR/data/client.log"
+    touch "$INSTALL_DIR/data/spotify-auth.log"
     touch "$INSTALL_DIR/data/device.lock" && rm "$INSTALL_DIR/data/device.lock"  # Create and remove to ensure directory is writable
     
     # Set permissions so all users can write logs
     chmod 777 "$INSTALL_DIR/data"
     chmod 666 "$INSTALL_DIR/data/login.log" 2>/dev/null || true
     chmod 666 "$INSTALL_DIR/data/client.log" 2>/dev/null || true
+    chmod 666 "$INSTALL_DIR/data/spotify-auth.log" 2>/dev/null || true
     
     # Create ncspot configuration
     mkdir -p "/home/$SPOTIFY_USER/.config/ncspot"
@@ -447,16 +449,16 @@ EOF
     chmod +x "$INSTALL_DIR/scripts/spotify-client.sh"
     
     # Create auto-start scripts with minimal X for touchscreen support
-    cat > "/home/$SPOTIFY_USER/.bash_profile" <<EOF
+    cat > "/home/$SPOTIFY_USER/.bash_profile" <<'EOF'
 #!/bin/bash
 # Auto-start Spotify client on login
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] User $SPOTIFY_USER logged in on $(tty)" >> /opt/spotify-terminal/data/login.log
-if [[ "\$(tty)" == "/dev/tty1" ]]; then
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting Spotify Kids Manager for user $SPOTIFY_USER..." >> /opt/spotify-terminal/data/login.log
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] User spotify-kids logged in on $(tty)" >> /opt/spotify-terminal/data/login.log
+if [[ "$(tty)" == "/dev/tty1" ]]; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting Spotify Kids Manager for user spotify-kids..." >> /opt/spotify-terminal/data/login.log
     echo "Starting Spotify Kids Manager..." > /tmp/spotify-startup.log
     chmod 666 /tmp/spotify-startup.log 2>/dev/null || true
-    export HOME=/home/$SPOTIFY_USER
-    export USER=$SPOTIFY_USER
+    export HOME=/home/spotify-kids
+    export USER=spotify-kids
     
     # Log environment
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] HOME=$HOME, USER=$USER, TTY=$(tty)" >> /opt/spotify-terminal/data/login.log
@@ -697,9 +699,33 @@ class SpotifyTouchGUI(Gtk.Window):
     def start_ncspot(self):
         """Start ncspot in background with IPC enabled"""
         try:
+            # Log Spotify authentication attempt
+            with open("/opt/spotify-terminal/data/spotify-auth.log", "a") as f:
+                f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Starting ncspot for user {os.environ.get('USER', 'unknown')}\n")
+            
             # Kill any existing ncspot instances
             subprocess.run(["pkill", "-f", "ncspot"], capture_output=True)
             time.sleep(1)
+            
+            # Check if ncspot config exists
+            config_path = f"/home/{os.environ.get('USER', 'spotify-kids')}/.config/ncspot/config.toml"
+            if os.path.exists(config_path):
+                with open("/opt/spotify-terminal/data/spotify-auth.log", "a") as f:
+                    f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Found ncspot config at {config_path}\n")
+                # Try to extract username
+                try:
+                    with open(config_path, 'r') as cfg:
+                        for line in cfg:
+                            if 'username' in line:
+                                with open("/opt/spotify-terminal/data/spotify-auth.log", "a") as f:
+                                    f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Config contains: {line.strip()}\n")
+                                break
+                except Exception as e:
+                    with open("/opt/spotify-terminal/data/spotify-auth.log", "a") as f:
+                        f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Error reading config: {e}\n")
+            else:
+                with open("/opt/spotify-terminal/data/spotify-auth.log", "a") as f:
+                    f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] No ncspot config found at {config_path}\n")
             
             # Start ncspot with IPC socket
             self.ncspot_process = subprocess.Popen(
@@ -708,15 +734,38 @@ class SpotifyTouchGUI(Gtk.Window):
                 stderr=subprocess.PIPE
             )
             
+            with open("/opt/spotify-terminal/data/spotify-auth.log", "a") as f:
+                f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] ncspot process started with PID {self.ncspot_process.pid}\n")
+            
             # Give it time to start
             time.sleep(3)
+            
+            # Check if authentication succeeded by monitoring stderr
+            threading.Thread(target=self.monitor_ncspot_auth, daemon=True).start()
             
             # Start status update thread
             self.update_thread = threading.Thread(target=self.update_status_loop, daemon=True)
             self.update_thread.start()
             
         except Exception as e:
+            with open("/opt/spotify-terminal/data/spotify-auth.log", "a") as f:
+                f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Failed to start ncspot: {e}\n")
             print(f"Failed to start ncspot: {e}")
+    
+    def monitor_ncspot_auth(self):
+        """Monitor ncspot stderr for authentication messages"""
+        try:
+            for line in self.ncspot_process.stderr:
+                line_str = line.decode('utf-8', errors='ignore')
+                with open("/opt/spotify-terminal/data/spotify-auth.log", "a") as f:
+                    f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] ncspot: {line_str}")
+                # Check for authentication errors
+                if "authentication" in line_str.lower() or "login" in line_str.lower() or "error" in line_str.lower():
+                    with open("/opt/spotify-terminal/data/spotify-auth.log", "a") as f:
+                        f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] AUTH EVENT: {line_str}")
+        except Exception as e:
+            with open("/opt/spotify-terminal/data/spotify-auth.log", "a") as f:
+                f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Monitor error: {e}\n")
             
     def send_ncspot_command(self, command):
         """Send command to ncspot via IPC"""
@@ -1497,6 +1546,10 @@ HTML_TEMPLATE = '''
                 logDisplay += "\\n\\n=== Client Log ===\\n" + data.client_log;
             }
             
+            if (data.spotify_auth_log) {
+                logDisplay += "\\n\\n=== Spotify Authentication Log ===\\n" + data.spotify_auth_log;
+            }
+            
             // Create a modal or use a better display method
             const logWindow = window.open('', 'Login Logs', 'width=800,height=600');
             logWindow.document.write('<pre>' + logDisplay + '</pre>');
@@ -1685,6 +1738,7 @@ def login_logs():
         "login_log": "",
         "startup_log": "",
         "client_log": "",
+        "spotify_auth_log": "",
         "last_login": None,
         "status": "unknown"
     }
@@ -1717,6 +1771,14 @@ def login_logs():
         if os.path.exists('/opt/spotify-terminal/data/client.log'):
             with open('/opt/spotify-terminal/data/client.log', 'r') as f:
                 logs["client_log"] = f.read()
+    except:
+        pass
+    
+    # Read Spotify authentication log
+    try:
+        if os.path.exists('/opt/spotify-terminal/data/spotify-auth.log'):
+            with open('/opt/spotify-terminal/data/spotify-auth.log', 'r') as f:
+                logs["spotify_auth_log"] = f.read()
     except:
         pass
     
