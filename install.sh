@@ -260,6 +260,8 @@ create_spotify_user() {
     # Set up user environment
     mkdir -p "/home/$SPOTIFY_USER/.config"
     mkdir -p "/home/$SPOTIFY_USER/.cache"
+    mkdir -p "/home/$SPOTIFY_USER/.cache/ncspot"
+    mkdir -p "/home/$SPOTIFY_USER/.cache/spotifyd"
     
     # Configure auto-login on tty1
     mkdir -p /etc/systemd/system/getty@tty1.service.d/
@@ -1208,6 +1210,13 @@ search_match = "light red"
 backend = "pulseaudio"
 username = "{username}"
 password = "{password}"
+bitrate = 320
+enable_cache = true
+
+[cache]
+enabled = true
+path = "/home/spotify-kids/.cache/ncspot"
+size = 10000
 
 [keybindings]
 "q" = "quit"
@@ -1246,8 +1255,10 @@ username = {username}
 password = {password}
 backend = alsa
 device_name = Spotify Kids Player
-bitrate = 160
+bitrate = 320
 cache_path = /home/spotify-kids/.cache/spotifyd
+max_cache_size = 10000000000
+cache = true
 volume_normalisation = true
 normalisation_pregain = -10
 '''
