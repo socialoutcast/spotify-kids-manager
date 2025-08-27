@@ -715,19 +715,44 @@ HTML_TEMPLATE = '''
                 <div id="bluetoothDevices" class="device-list"></div>
             </div>
             
+            <!-- Spotify Configuration -->
+            <div class="card">
+                <h2>Spotify Account</h2>
+                <div id="spotifyStatus">
+                    <p>Loading...</p>
+                </div>
+                <form id="spotifyForm">
+                    <div class="form-group">
+                        <label>Spotify Username</label>
+                        <input type="text" id="spotifyUsername" placeholder="Your Spotify username (not email)" required>
+                        <p style="margin-top: 5px; color: #666; font-size: 12px;">
+                            ⚠️ Use your Spotify username, NOT your email address!
+                        </p>
+                    </div>
+                    <div class="form-group">
+                        <label>Spotify Password</label>
+                        <input type="password" id="spotifyPassword" required>
+                        <p style="margin-top: 5px; color: #666; font-size: 12px;">
+                            Requires Spotify Premium account
+                        </p>
+                    </div>
+                    <button type="submit" class="btn success">Configure Spotify</button>
+                </form>
+            </div>
+            
             <!-- Account Settings -->
             <div class="card">
-                <h2>Account Settings</h2>
+                <h2>Admin Settings</h2>
                 <form id="passwordForm">
                     <div class="form-group">
-                        <label>New Password</label>
+                        <label>New Admin Password</label>
                         <input type="password" id="newPassword" required>
                     </div>
                     <div class="form-group">
                         <label>Confirm Password</label>
                         <input type="password" id="confirmPassword" required>
                     </div>
-                    <button type="submit" class="btn">Change Password</button>
+                    <button type="submit" class="btn">Change Admin Password</button>
                 </form>
             </div>
             
@@ -829,6 +854,49 @@ HTML_TEMPLATE = '''
             }
         }
         
+        // Load Spotify configuration
+        async function loadSpotifyConfig() {
+            const response = await fetch('/api/spotify/config');
+            const config = await response.json();
+            
+            const statusDiv = document.getElementById('spotifyStatus');
+            if (config.configured) {
+                statusDiv.innerHTML = `
+                    <p style="color: green;">✓ Configured for: <strong>${config.username}</strong></p>
+                    <p style="color: #666; font-size: 12px;">Using: ${config.backend}</p>
+                `;
+                document.getElementById('spotifyUsername').value = config.username;
+            } else {
+                statusDiv.innerHTML = `
+                    <p style="color: red;">✗ Not configured</p>
+                    <p style="color: #666; font-size: 12px;">Please enter your Spotify credentials</p>
+                `;
+            }
+        }
+        
+        // Spotify configuration
+        document.getElementById('spotifyForm')?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('spotifyUsername').value;
+            const password = document.getElementById('spotifyPassword').value;
+            
+            const response = await fetch('/api/spotify/config', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username, password})
+            });
+            
+            if (response.ok) {
+                const result = await response.json();
+                showAlert(`Spotify configured successfully! Using ${result.backend}`);
+                loadSpotifyConfig();
+                document.getElementById('spotifyPassword').value = '';
+            } else {
+                const error = await response.json();
+                showAlert(error.error || 'Failed to configure Spotify', 'error');
+            }
+        });
+        
         // Password change
         document.getElementById('passwordForm')?.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -895,6 +963,10 @@ HTML_TEMPLATE = '''
         if (document.getElementById('systemInfo')) {
             loadSystemInfo();
             setInterval(loadSystemInfo, 30000);
+        }
+        
+        if (document.getElementById('spotifyStatus')) {
+            loadSpotifyConfig();
         }
     </script>
 </body>
@@ -1046,6 +1118,160 @@ def uninstall():
     # Run uninstall script
     subprocess.Popen(['/opt/spotify-terminal/scripts/uninstall.sh'])
     return jsonify({"success": True})
+
+@app.route('/api/spotify/config', methods=['GET'])
+@login_required
+def get_spotify_config():
+    # Get current Spotify configuration
+    config_file = "/home/spotify-kids/.config/ncspot/config.toml"
+    spotifyd_config = "/home/spotify-kids/.config/spotifyd/spotifyd.conf"
+    
+    spotify_config = {
+        "configured": False,
+        "username": "",
+        "backend": "ncspot"
+    }
+    
+    # Check ncspot config
+    if os.path.exists(config_file):
+        try:
+            with open(config_file, 'r') as f:
+                content = f.read()
+                # Extract username if present
+                for line in content.splitlines():
+                    if 'username' in line:
+                        spotify_config['username'] = line.split('=')[1].strip().strip('"')
+                        spotify_config['configured'] = True
+                        break
+        except:
+            pass
+    
+    # Check if using spotifyd
+    if os.path.exists(spotifyd_config):
+        spotify_config['backend'] = 'spotifyd'
+        try:
+            with open(spotifyd_config, 'r') as f:
+                content = f.read()
+                for line in content.splitlines():
+                    if line.startswith('username'):
+                        spotify_config['username'] = line.split('=')[1].strip()
+                        spotify_config['configured'] = True
+                        break
+        except:
+            pass
+    
+    return jsonify(spotify_config)
+
+@app.route('/api/spotify/config', methods=['POST'])
+@login_required
+def set_spotify_config():
+    data = request.json
+    username = data.get('username', '').strip()
+    password = data.get('password', '').strip()
+    
+    if not username or not password:
+        return jsonify({"error": "Username and password required"}), 400
+    
+    # Detect which backend we're using
+    backend = "ncspot"
+    if os.path.exists("/usr/local/bin/spotifyd"):
+        backend = "spotifyd"
+    
+    if backend == "ncspot":
+        # Configure ncspot
+        config_dir = "/home/spotify-kids/.config/ncspot"
+        config_file = f"{config_dir}/config.toml"
+        
+        os.makedirs(config_dir, exist_ok=True)
+        
+        # Create ncspot config with credentials
+        config_content = f'''[theme]
+background = "black"
+primary = "green"
+secondary = "light white"
+title = "white"
+playing = "green"
+playing_selected = "light green"
+playing_bg = "black"
+highlight = "light white"
+highlight_bg = "#484848"
+error = "light red"
+error_bg = "red"
+statusbar = "black"
+statusbar_progress = "green"
+statusbar_bg = "green"
+cmdline = "light white"
+cmdline_bg = "black"
+search_match = "light red"
+
+[backend]
+backend = "pulseaudio"
+username = "{username}"
+password = "{password}"
+
+[keybindings]
+"q" = "quit"
+'''
+        
+        with open(config_file, 'w') as f:
+            f.write(config_content)
+        
+        # Set proper ownership
+        subprocess.run(['chown', '-R', 'spotify-kids:spotify-kids', config_dir])
+        
+        # Also create credentials cache file for ncspot
+        creds_file = f"{config_dir}/credentials.json"
+        creds_content = {
+            "username": username,
+            "auth_type": "password",
+            "password": password
+        }
+        
+        with open(creds_file, 'w') as f:
+            json.dump(creds_content, f)
+        
+        subprocess.run(['chmod', '600', creds_file])
+        subprocess.run(['chown', 'spotify-kids:spotify-kids', creds_file])
+        
+    else:
+        # Configure spotifyd
+        config_dir = "/home/spotify-kids/.config/spotifyd"
+        config_file = f"{config_dir}/spotifyd.conf"
+        
+        os.makedirs(config_dir, exist_ok=True)
+        
+        # Create spotifyd config
+        config_content = f'''[global]
+username = {username}
+password = {password}
+backend = alsa
+device_name = Spotify Kids Player
+bitrate = 160
+cache_path = /home/spotify-kids/.cache/spotifyd
+volume_normalisation = true
+normalisation_pregain = -10
+'''
+        
+        with open(config_file, 'w') as f:
+            f.write(config_content)
+        
+        # Set proper ownership
+        subprocess.run(['chown', '-R', 'spotify-kids:spotify-kids', config_dir])
+        subprocess.run(['chmod', '600', config_file])
+        
+        # Restart spotifyd if running
+        subprocess.run(['systemctl', 'restart', 'spotifyd'], capture_output=True)
+    
+    # Save to our config
+    config = load_config()
+    config['spotify_configured'] = True
+    config['spotify_username'] = username
+    save_config(config)
+    
+    # Restart the spotify user session to apply changes
+    subprocess.run(['pkill', '-u', 'spotify-kids'], capture_output=True)
+    
+    return jsonify({"success": True, "message": f"Spotify configured for {username}", "backend": backend})
 
 if __name__ == '__main__':
     os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
