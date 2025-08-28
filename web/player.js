@@ -45,22 +45,25 @@ class SpotifyPlayer {
                 
                 // Refresh token before expiry
                 setTimeout(() => this.refreshToken(), (data.expires_in - 60) * 1000);
-            } else if (data.username && data.needs_oauth) {
-                // Username/password mode - no tokens needed for raspotify/spotifyd
-                // The backend handles auth directly
-                this.accessToken = 'backend-auth'; // Dummy token to indicate auth is handled by backend
+            } else if (data.username) {
+                // Username/password mode with backend auth
+                this.accessToken = 'proxy'; // Use proxy endpoints
                 document.getElementById('username').textContent = data.username;
-                document.getElementById('connectionText').textContent = 'Connected (Direct)';
-                
-                // Don't need to refresh for direct backend auth
-            } else {
+                document.getElementById('connectionText').textContent = 'Connected (Backend)';
+            } else if (data.needs_oauth) {
+                // API credentials configured but no login yet
                 this.showAuthPrompt();
+                return;
+            } else {
+                // No configuration at all
+                this.showAuthPrompt();
+                return;
             }
         } catch (error) {
             console.error('Auth check failed:', error);
             document.getElementById('connectionText').textContent = 'Offline';
-            // Still try to load content even if auth check fails
-            // Backend might handle auth directly
+            // Try to continue anyway - backend might be configured
+            this.accessToken = 'proxy';
         }
     }
 
@@ -81,9 +84,7 @@ class SpotifyPlayer {
     async connectToDevice() {
         // Connect to local Spotify Connect device
         try {
-            const response = await fetch('https://api.spotify.com/v1/me/player/devices', {
-                headers: { 'Authorization': `Bearer ${this.accessToken}` }
-            });
+            const response = await fetch('/api/proxy/player/devices');
             
             const data = await response.json();
             const localDevice = data.devices.find(d => d.name === window.location.hostname);
@@ -173,9 +174,7 @@ class SpotifyPlayer {
         content.innerHTML = '<h2 style="color: white; margin-bottom: 20px;">Recently Played</h2>';
         
         try {
-            const response = await fetch('https://api.spotify.com/v1/me/player/recently-played?limit=20', {
-                headers: { 'Authorization': `Bearer ${this.accessToken}` }
-            });
+            const response = await fetch('/api/proxy/player/recently-played');
             
             const data = await response.json();
             const grid = document.createElement('div');
@@ -199,9 +198,7 @@ class SpotifyPlayer {
         const playlistsList = document.getElementById('playlistsList');
         
         try {
-            const response = await fetch('https://api.spotify.com/v1/me/playlists?limit=50', {
-                headers: { 'Authorization': `Bearer ${this.accessToken}` }
-            });
+            const response = await fetch('/api/proxy/playlists');
             
             const data = await response.json();
             playlistsList.innerHTML = '';
@@ -226,9 +223,7 @@ class SpotifyPlayer {
         const content = document.getElementById('contentArea');
         
         try {
-            const response = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}`, {
-                headers: { 'Authorization': `Bearer ${this.accessToken}` }
-            });
+            const response = await fetch(`/api/proxy/playlist/${playlistId}`);
             
             const playlist = await response.json();
             
@@ -263,9 +258,7 @@ class SpotifyPlayer {
         content.innerHTML = '<h2 style="color: white; margin-bottom: 20px;">Liked Songs</h2>';
         
         try {
-            const response = await fetch('https://api.spotify.com/v1/me/tracks?limit=50', {
-                headers: { 'Authorization': `Bearer ${this.accessToken}` }
-            });
+            const response = await fetch('/api/proxy/tracks?limit=50');
             
             const data = await response.json();
             const grid = document.createElement('div');
@@ -290,9 +283,7 @@ class SpotifyPlayer {
         content.innerHTML = '<p style="color: white;">Searching...</p>';
         
         try {
-            const response = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track,album,artist&limit=20`, {
-                headers: { 'Authorization': `Bearer ${this.accessToken}` }
-            });
+            const response = await fetch(`/api/proxy/search?q=${encodeURIComponent(query)}`);
             
             const data = await response.json();
             
@@ -422,13 +413,13 @@ class SpotifyPlayer {
 
     async playTrack(uri) {
         try {
-            await fetch(`https://api.spotify.com/v1/me/player/play${this.deviceId ? `?device_id=${this.deviceId}` : ''}`, {
+            await fetch('/api/proxy/player/play', {
                 method: 'PUT',
-                headers: {
-                    'Authorization': `Bearer ${this.accessToken}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ uris: [uri] })
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    uris: [uri],
+                    device_id: this.deviceId
+                })
             });
             
             this.updateNowPlaying();
@@ -439,12 +430,9 @@ class SpotifyPlayer {
 
     async playPlaylist(playlistId) {
         try {
-            await fetch(`https://api.spotify.com/v1/me/player/play${this.deviceId ? `?device_id=${this.deviceId}` : ''}`, {
+            await fetch('/api/proxy/player/play', {
                 method: 'PUT',
-                headers: {
-                    'Authorization': `Bearer ${this.accessToken}`,
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ context_uri: `spotify:playlist:${playlistId}` })
             });
             
@@ -456,12 +444,9 @@ class SpotifyPlayer {
 
     async playAlbum(uri) {
         try {
-            await fetch(`https://api.spotify.com/v1/me/player/play${this.deviceId ? `?device_id=${this.deviceId}` : ''}`, {
+            await fetch('/api/proxy/player/play', {
                 method: 'PUT',
-                headers: {
-                    'Authorization': `Bearer ${this.accessToken}`,
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ context_uri: uri })
             });
             
@@ -473,12 +458,9 @@ class SpotifyPlayer {
 
     async playArtist(uri) {
         try {
-            await fetch(`https://api.spotify.com/v1/me/player/play${this.deviceId ? `?device_id=${this.deviceId}` : ''}`, {
+            await fetch('/api/proxy/player/play', {
                 method: 'PUT',
-                headers: {
-                    'Authorization': `Bearer ${this.accessToken}`,
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ context_uri: uri })
             });
             
@@ -491,9 +473,8 @@ class SpotifyPlayer {
     async togglePlayPause() {
         try {
             const endpoint = this.isPlaying ? 'pause' : 'play';
-            await fetch(`https://api.spotify.com/v1/me/player/${endpoint}`, {
-                method: 'PUT',
-                headers: { 'Authorization': `Bearer ${this.accessToken}` }
+            await fetch(`/api/proxy/player/${endpoint}`, {
+                method: 'PUT'
             });
             
             this.isPlaying = !this.isPlaying;
@@ -505,9 +486,8 @@ class SpotifyPlayer {
 
     async previousTrack() {
         try {
-            await fetch('https://api.spotify.com/v1/me/player/previous', {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${this.accessToken}` }
+            await fetch('/api/proxy/player/previous', {
+                method: 'POST'
             });
             
             setTimeout(() => this.updateNowPlaying(), 500);
@@ -518,9 +498,8 @@ class SpotifyPlayer {
 
     async nextTrack() {
         try {
-            await fetch('https://api.spotify.com/v1/me/player/next', {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${this.accessToken}` }
+            await fetch('/api/proxy/player/next', {
+                method: 'POST'
             });
             
             setTimeout(() => this.updateNowPlaying(), 500);
@@ -533,9 +512,8 @@ class SpotifyPlayer {
         this.shuffle = !this.shuffle;
         
         try {
-            await fetch(`https://api.spotify.com/v1/me/player/shuffle?state=${this.shuffle}`, {
-                method: 'PUT',
-                headers: { 'Authorization': `Bearer ${this.accessToken}` }
+            await fetch(`/api/proxy/player/shuffle?state=${this.shuffle}`, {
+                method: 'PUT'
             });
             
             document.getElementById('shuffleBtn').classList.toggle('active', this.shuffle);
@@ -550,9 +528,8 @@ class SpotifyPlayer {
         this.repeat = modes[(currentIndex + 1) % 3];
         
         try {
-            await fetch(`https://api.spotify.com/v1/me/player/repeat?state=${this.repeat}`, {
-                method: 'PUT',
-                headers: { 'Authorization': `Bearer ${this.accessToken}` }
+            await fetch(`/api/proxy/player/repeat?state=${this.repeat}`, {
+                method: 'PUT'
             });
             
             const repeatBtn = document.getElementById('repeatBtn');
@@ -569,9 +546,8 @@ class SpotifyPlayer {
         const isLiked = likeBtn.classList.contains('liked');
         
         try {
-            await fetch(`https://api.spotify.com/v1/me/tracks?ids=${this.currentTrack.id}`, {
-                method: isLiked ? 'DELETE' : 'PUT',
-                headers: { 'Authorization': `Bearer ${this.accessToken}` }
+            await fetch(`/api/proxy/tracks?ids=${this.currentTrack.id}`, {
+                method: isLiked ? 'DELETE' : 'PUT'
             });
             
             likeBtn.classList.toggle('liked');
@@ -582,9 +558,8 @@ class SpotifyPlayer {
 
     async seek(position) {
         try {
-            await fetch(`https://api.spotify.com/v1/me/player/seek?position_ms=${Math.floor(position * 1000)}`, {
-                method: 'PUT',
-                headers: { 'Authorization': `Bearer ${this.accessToken}` }
+            await fetch(`/api/proxy/player/seek?position_ms=${Math.floor(position * 1000)}`, {
+                method: 'PUT'
             });
             
             this.position = position;
@@ -597,9 +572,8 @@ class SpotifyPlayer {
         this.volume = percent;
         
         try {
-            await fetch(`https://api.spotify.com/v1/me/player/volume?volume_percent=${Math.floor(percent * 100)}`, {
-                method: 'PUT',
-                headers: { 'Authorization': `Bearer ${this.accessToken}` }
+            await fetch(`/api/proxy/player/volume?volume_percent=${Math.floor(percent * 100)}`, {
+                method: 'PUT'
             });
             
             document.getElementById('volumeFill').style.width = `${percent * 100}%`;
@@ -610,9 +584,7 @@ class SpotifyPlayer {
 
     async updateNowPlaying() {
         try {
-            const response = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
-                headers: { 'Authorization': `Bearer ${this.accessToken}` }
-            });
+            const response = await fetch('/api/proxy/player/currently-playing');
             
             if (response.status === 204) {
                 // No track playing
@@ -638,9 +610,7 @@ class SpotifyPlayer {
             this.updateProgress();
             
             // Check if liked
-            const likeResponse = await fetch(`https://api.spotify.com/v1/me/tracks/contains?ids=${data.item.id}`, {
-                headers: { 'Authorization': `Bearer ${this.accessToken}` }
-            });
+            const likeResponse = await fetch(`/api/proxy/tracks/contains?ids=${data.item.id}`);
             const [isLiked] = await likeResponse.json();
             document.getElementById('likeBtn').classList.toggle('liked', isLiked);
         } catch (error) {
