@@ -751,8 +751,8 @@ export DISPLAY=:0
 export HOME=/home/spotify-kids
 export USER=spotify-kids
 
-# Quit Plymouth splash now that X is starting
-plymouth quit 2>/dev/null || true
+# Let systemd handle Plymouth quit naturally - removing manual quit
+# plymouth quit 2>/dev/null || true
 
 # Wait for X to be ready
 sleep 2
@@ -836,8 +836,8 @@ export DISPLAY=:0
 export HOME=/home/spotify-kids
 export USER=spotify-kids
 
-# Quit Plymouth if it's still running
-plymouth quit 2>/dev/null || true
+# Let systemd handle Plymouth quit naturally - removing manual quit
+# plymouth quit 2>/dev/null || true
 
 LOG_FILE="/opt/spotify-terminal/data/web-player.log"
 
@@ -2906,74 +2906,84 @@ install_bootsplash() {
     # Create a professional logo using ImageMagick
     log_info "Creating professional boot logo..."
     
-    # Create a sleek, modern logo with gradient and shadow
-    convert -size 300x300 xc:transparent \
-        \( -size 260x260 \
-           radial-gradient:'#1ed760'-'#1db954' \
-           -alpha set -channel A -evaluate set 100% \
-        \) -geometry +20+20 -composite \
-        -fill black -draw "circle 150,150 150,20" -channel A -blur 0x8 -level 0%,50% \
-        \( -size 260x260 xc:transparent \
-           -fill '#1db954' -draw "circle 130,130 130,10" \
-           -fill '#1ed760' -draw "circle 130,130 130,8" \
-        \) -geometry +20+20 -composite \
-        \( -size 200x200 xc:transparent \
-           -fill white \
-           -draw "path 'M 100,60 L 100,140 M 100,140 Q 80,120 60,120 T 40,140 Q 40,160 60,160 T 100,140 M 100,100 Q 120,80 140,80 T 160,100 Q 160,120 140,120 T 100,100'" \
-           -stroke white -stroke-width 8 -stroke-linecap round \
-        \) -geometry +50+50 -composite \
-        \( -size 300x80 xc:transparent \
-           -font DejaVu-Sans -pointsize 48 -fill white \
-           -gravity center -annotate +0+0 'SpotifyKids' \
-           -blur 0x1 \
-        \) -geometry +0+200 -composite \
-        -resize 256x256 \
-        "$THEME_DIR/logo.png" 2>/dev/null || {
-            # Fallback to simpler professional logo
-            convert -size 256x256 xc:transparent \
-                \( -size 240x240 xc:'#1db954' \
-                   -fill '#1ed760' -draw "circle 120,120 120,100" \
-                   -fill '#1db954' -draw "circle 120,120 120,90" \
-                \) -geometry +8+8 -composite \
-                -fill white -font DejaVu-Sans-Bold -pointsize 64 \
-                -gravity center -annotate +0-20 'S' \
-                -fill white -font DejaVu-Sans -pointsize 28 \
-                -gravity center -annotate +0+30 'KIDS' \
-                -fill white -font DejaVu-Sans -pointsize 16 \
-                -gravity south -annotate +0+20 'Music Manager' \
-                "$THEME_DIR/logo.png" 2>/dev/null || {
-                    # Ultimate fallback - simple but clean
-                    convert -size 256x256 xc:'#1db954' \
-                        -fill white -font Helvetica-Bold -pointsize 72 \
-                        -gravity center -annotate +0+0 'SK' \
-                        "$THEME_DIR/logo.png" 2>/dev/null
-                }
-        }
+    # Check if ImageMagick is available
+    if ! command -v convert >/dev/null 2>&1; then
+        log_warning "ImageMagick not found, creating simple text logo"
+        # Create simple colored rectangle as fallback
+        echo "No ImageMagick available" > "$THEME_DIR/logo.txt"
+        # Create a minimal logo file
+        printf '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x01\x00\x00\x00\x01\x00\x08\x06\x00\x00\x00' > "$THEME_DIR/logo.png"
+    else
+        # Create a reliable, professional logo
+        convert -size 256x256 xc:'#1db954' \
+            \( -size 220x220 xc:'#1ed760' \) -gravity center -composite \
+            \( -size 200x200 xc:'#1db954' \) -gravity center -composite \
+            -fill white -font DejaVu-Sans-Bold -pointsize 48 \
+            -gravity center -annotate +0-20 'Spotify' \
+            -fill white -font DejaVu-Sans -pointsize 32 \
+            -gravity center -annotate +0+20 'Kids' \
+            "$THEME_DIR/logo.png" 2>/dev/null || {
+                # Simpler fallback if font issues
+                convert -size 256x256 xc:'#1db954' \
+                    -fill white -pointsize 72 \
+                    -gravity center -annotate +0+0 'SK' \
+                    "$THEME_DIR/logo.png" 2>/dev/null || {
+                        # Create minimal 1x1 green pixel as ultimate fallback
+                        convert -size 256x256 xc:'#1db954' "$THEME_DIR/logo.png" 2>/dev/null
+                    }
+            }
+    fi
+    
+    # Verify logo was created successfully
+    if [ ! -f "$THEME_DIR/logo.png" ] || [ ! -s "$THEME_DIR/logo.png" ]; then
+        log_warning "Failed to create logo.png, creating text-based fallback"
+        # Create a simple solid color image as fallback
+        printf '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x01\x00\x00\x00\x01\x00\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\tpHYs\x00\x00\x0b\x13\x00\x00\x0b\x13\x01\x00\x9a\x9c\x18\x00\x00\x00\x12IDATx\x9cc\xf8\x0f\x00\x00\x01\x00\x01\x00\x18\xdd\x8d\xb4\x1c\x00\x00\x00\x00IEND\xaeB`\x82' > "$THEME_DIR/logo.png"
+    fi
     
     # Create smaller versions
-    convert "$THEME_DIR/logo.png" -resize 128x128 "$THEME_DIR/logo-128.png" 2>/dev/null
+    if command -v convert >/dev/null 2>&1 && [ -f "$THEME_DIR/logo.png" ]; then
+        convert "$THEME_DIR/logo.png" -resize 128x128 "$THEME_DIR/logo-128.png" 2>/dev/null
+    fi
     
     # Create spinning wheel frames
     log_info "Creating spinner animation..."
+    if command -v convert >/dev/null 2>&1; then
+        for i in {0..11}; do
+            angle=$((i * 30))
+            convert -size 64x64 xc:transparent \
+                -stroke '#1ed760' -stroke-width 4 -fill none \
+                -draw "arc 16,16 48,48 $((angle)),$(((angle + 60) % 360))" \
+                -stroke '#1ed76088' -stroke-width 3 \
+                -draw "arc 18,18 46,46 $(((angle + 60) % 360)),$(((angle + 120) % 360))" \
+                -stroke '#1ed76044' -stroke-width 2 \
+                -draw "arc 20,20 44,44 $(((angle + 120) % 360)),$(((angle + 180) % 360))" \
+                "$THEME_DIR/spinner-$i.png" 2>/dev/null || {
+                    # Create simple colored square as fallback
+                    convert -size 64x64 xc:'#1ed760' "$THEME_DIR/spinner-$i.png" 2>/dev/null
+                }
+        done
+    else
+        # Create fallback spinner images without ImageMagick
+        for i in {0..11}; do
+            # Create minimal 1px PNG files as placeholders
+            printf '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00@\x00\x00\x00@\x08\x02\x00\x00\x00%\x0b\xe6\x89\x00\x00\x00\x15IDATx\x9cc\xf8\x0f\x00\x00\x01\x00\x01\x00\x18\xdd\x8d\xb4\x1c\x00\x00\x00\x00IEND\xaeB`\x82' > "$THEME_DIR/spinner-$i.png"
+        done
+    fi
+    
+    # Verify all spinner files were created
+    missing_spinners=0
     for i in {0..11}; do
-        angle=$((i * 30))
-        convert -size 64x64 xc:transparent \
-            -stroke '#1ed760' -stroke-width 6 -fill none \
-            -draw "arc 8,8 56,56 0,30" \
-            -stroke '#1ed760dd' -draw "arc 8,8 56,56 30,60" \
-            -stroke '#1ed760bb' -draw "arc 8,8 56,56 60,90" \
-            -stroke '#1ed76099' -draw "arc 8,8 56,56 90,120" \
-            -stroke '#1ed76077' -draw "arc 8,8 56,56 120,150" \
-            -stroke '#1ed76055' -draw "arc 8,8 56,56 150,180" \
-            -stroke '#1ed76033' -draw "arc 8,8 56,56 180,210" \
-            -stroke '#1ed76022' -draw "arc 8,8 56,56 210,240" \
-            -stroke '#1ed76011' -draw "arc 8,8 56,56 240,270" \
-            -stroke '#1ed76011' -draw "arc 8,8 56,56 270,300" \
-            -stroke '#1ed76011' -draw "arc 8,8 56,56 300,330" \
-            -stroke '#1ed76011' -draw "arc 8,8 56,56 330,360" \
-            -rotate $angle \
-            "$THEME_DIR/spinner-$(printf "%02d" $i).png" 2>/dev/null || true
+        if [ ! -f "$THEME_DIR/spinner-$i.png" ]; then
+            missing_spinners=$((missing_spinners + 1))
+            # Create minimal fallback
+            printf '\x89PNG\r\n\x1a\n' > "$THEME_DIR/spinner-$i.png"
+        fi
     done
+    
+    if [ $missing_spinners -gt 0 ]; then
+        log_warning "Created $missing_spinners fallback spinner images"
+    fi
     
     # Create the Plymouth theme script
     cat > "$THEME_DIR/spotify-kids.script" <<'EOF'
@@ -2993,6 +3003,9 @@ logo.sprite.SetOpacity(1);
 # Message sprite for boot status
 message_sprite = Sprite();
 message_sprite.SetPosition(Window.GetWidth() / 2 - 200, Window.GetHeight() / 2 + 120, 0);
+
+# Prompt sprite for password prompts (CRITICAL: was missing)
+prompt_sprite = Sprite();
 
 # Spinner setup
 spinner.count = 12;
@@ -3048,19 +3061,37 @@ fun display_password_callback(prompt, bullets) {
     prompt_sprite.SetOpacity(1);
 }
 
+# Progress bar sprite
+progress_bar = Sprite();
+progress_bar.SetX(Window.GetWidth() / 2 - 150);
+progress_bar.SetY(Window.GetHeight() / 2 + 100);
+
 # Refresh callback for animation
 fun refresh_callback() {
     global.counter++;
     
-    # Animate spinner
+    # Animate spinner at reasonable speed
     if (global.progress < 1) {
-        spinner_index = Math.Int(global.counter / 3) % spinner.count;
+        spinner_index = Math.Int(global.counter / 2) % spinner.count;  # Faster animation
         spinner.sprite.SetImage(spinner[spinner_index].image);
         spinner.sprite.SetOpacity(1);
     }
     
+    # Draw progress bar
+    if (global.progress > 0) {
+        bar_width = Math.Int(300 * global.progress);
+        if (bar_width > 0) {
+            # Create a simple progress indicator
+            progress_text = "Boot Progress: " + Math.Int(global.progress * 100) + "%";
+            progress_image = Image.Text(progress_text, 0.9, 0.9, 0.9);
+            progress_bar.SetImage(progress_image);
+            progress_bar.SetX(Window.GetWidth() / 2 - progress_image.GetWidth() / 2);
+            progress_bar.SetOpacity(1);
+        }
+    }
+    
     # Pulse logo gently
-    opacity = 0.9 + 0.1 * Math.Sin(global.counter / 10.0);
+    opacity = 0.9 + 0.1 * Math.Sin(global.counter / 8.0);  # Slightly faster pulse
     logo.sprite.SetOpacity(opacity);
 }
 
@@ -3128,20 +3159,15 @@ EOF
         fi
     fi
     
-    # Configure Plymouth to not quit on boot completion
-    if [ -f /etc/plymouth/plymouthd.conf ]; then
-        if ! grep -q "DeviceTimeout" /etc/plymouth/plymouthd.conf; then
-            echo "DeviceTimeout=10" >> /etc/plymouth/plymouthd.conf
-        fi
-    else
-        mkdir -p /etc/plymouth
-        cat > /etc/plymouth/plymouthd.conf <<EOF
+    # Configure Plymouth for better display duration
+    mkdir -p /etc/plymouth
+    cat > /etc/plymouth/plymouthd.conf <<EOF
 [Daemon]
 Theme=spotify-kids
 ShowDelay=0
-DeviceTimeout=10
+DeviceTimeout=30
+# Ensure Plymouth stays visible longer during boot
 EOF
-    fi
     
     # Simple Plymouth configuration - let it work normally
     log_info "Configuring Plymouth services..."
