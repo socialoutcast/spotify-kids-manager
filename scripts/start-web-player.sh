@@ -8,10 +8,23 @@ export DISPLAY=:0
 export HOME=/home/spotify-kids
 export USER=spotify-kids
 
-LOG_FILE="/opt/spotify-terminal/data/web-player.log"
+# Determine log directory - prefer system path but fallback to user directory
+LOG_DIR="/opt/spotify-terminal/data"
+if ! mkdir -p "$LOG_DIR" 2>/dev/null || ! touch "$LOG_DIR/test" 2>/dev/null; then
+    # Fallback to user directory if system directory isn't writable
+    LOG_DIR="$HOME/.spotify-terminal/data"
+    mkdir -p "$LOG_DIR" 2>/dev/null || true
+fi
+rm -f "$LOG_DIR/test" 2>/dev/null || true
+
+LOG_FILE="$LOG_DIR/web-player.log"
 
 # Ensure log file exists and is writable
-touch "$LOG_FILE" 2>/dev/null || true
+if ! touch "$LOG_FILE" 2>/dev/null; then
+    # If still can't create log file, use /tmp as final fallback
+    LOG_FILE="/tmp/spotify-web-player.log"
+    touch "$LOG_FILE" 2>/dev/null || true
+fi
 chmod 666 "$LOG_FILE" 2>/dev/null || true
 
 log() {
@@ -53,9 +66,26 @@ if lsof -Pi :8888 -sTCP:LISTEN -t >/dev/null ; then
     sleep 1
 fi
 
+# Determine web directory - check production first, then development
+WEB_DIR=""
+if [ -d "/opt/spotify-terminal/web" ]; then
+    WEB_DIR="/opt/spotify-terminal/web"
+elif [ -f "$(dirname "$0")/../web/spotify_server.py" ]; then
+    # Development environment - script is in scripts/ dir, web files in ../web/
+    WEB_DIR="$(cd "$(dirname "$0")/../web" && pwd)"
+else
+    log "ERROR: Cannot find web directory with spotify_server.py"
+    exit 1
+fi
+
+log "Using web directory: $WEB_DIR"
+
 # Start the Spotify player server (not admin panel)
 log "Starting Spotify web player server on port 8888..."
-cd /opt/spotify-terminal/web
+cd "$WEB_DIR" || {
+    log "ERROR: Cannot change to web directory: $WEB_DIR"
+    exit 1
+}
 
 # Check if web files exist, download if missing
 if [ ! -f spotify_server.py ]; then
@@ -165,7 +195,10 @@ if [ -n "$DISPLAY" ] && xset q &>/dev/null; then
         # Check if server is still running
         if ! kill -0 $SERVER_PID 2>/dev/null; then
             log "Server died, restarting..."
-            cd /opt/spotify-terminal/web
+            cd "$WEB_DIR" || {
+                log "ERROR: Cannot change to web directory for restart: $WEB_DIR"
+                break
+            }
             python3 spotify_server.py >> "$LOG_FILE" 2>&1 &
             SERVER_PID=$!
         fi
