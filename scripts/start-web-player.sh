@@ -118,8 +118,8 @@ if [ -n "$DISPLAY" ] && xset q &>/dev/null; then
         )
     fi
     
-    # Add the URL
-    CHROME_ARGS+=("http://localhost:8080")
+    # Add the URL (Spotify player on non-standard port)
+    CHROME_ARGS+=("http://localhost:8888")
     
     # Check if locked and add restrictions
     if [ "$LOCKED" = true ]; then

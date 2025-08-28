@@ -2308,7 +2308,7 @@ if __name__ == '__main__':
     os.makedirs(os.path.dirname(LOCK_FILE), exist_ok=True)
     os.makedirs(os.path.dirname(CLIENT_CONFIG), exist_ok=True)
     
-    app.run(host='0.0.0.0', port=5001, debug=False)
+    app.run(host='0.0.0.0', port=8080, debug=False)
 EOF
     
     # Make app.py executable if it exists
@@ -2848,7 +2848,7 @@ if __name__ == '__main__':
     import os
     os.makedirs('/opt/spotify-terminal/config', exist_ok=True)
     os.makedirs('/opt/spotify-terminal/data', exist_ok=True)
-    app.run(host='0.0.0.0', port=5001, debug=False)
+    app.run(host='0.0.0.0', port=8080, debug=False)
 MINIMAL_APP
         }
         
