@@ -2889,20 +2889,27 @@ install_bootsplash() {
     # Create smaller versions
     convert "$THEME_DIR/logo.png" -resize 128x128 "$THEME_DIR/logo-128.png" 2>/dev/null
     
-    # No spinner needed - we have the progress bar
-    
-    # Create professional progress bar with gradient
-    convert -size 400x12 xc:transparent \
-        \( -size 400x12 xc:'#1a1a1a' \
-           -fill '#2a2a2a' -draw "roundrectangle 1,1 398,10 3,3" \
-        \) -composite \
-        "$THEME_DIR/progress-bar-bg.png" 2>/dev/null
-    
-    convert -size 400x12 xc:transparent \
-        \( -size 400x10 gradient:'#1ed760'-'#1db954' \
-           -fill gradient:'#1ed760'-'#1db954' -draw "roundrectangle 0,0 399,9 3,3" \
-        \) -geometry +0+1 -composite \
-        "$THEME_DIR/progress-bar-fg.png" 2>/dev/null
+    # Create spinning wheel frames
+    log_info "Creating spinner animation..."
+    for i in {0..11}; do
+        angle=$((i * 30))
+        convert -size 64x64 xc:transparent \
+            -stroke '#1ed760' -stroke-width 6 -fill none \
+            -draw "arc 8,8 56,56 0,30" \
+            -stroke '#1ed760dd' -draw "arc 8,8 56,56 30,60" \
+            -stroke '#1ed760bb' -draw "arc 8,8 56,56 60,90" \
+            -stroke '#1ed76099' -draw "arc 8,8 56,56 90,120" \
+            -stroke '#1ed76077' -draw "arc 8,8 56,56 120,150" \
+            -stroke '#1ed76055' -draw "arc 8,8 56,56 150,180" \
+            -stroke '#1ed76033' -draw "arc 8,8 56,56 180,210" \
+            -stroke '#1ed76022' -draw "arc 8,8 56,56 210,240" \
+            -stroke '#1ed76011' -draw "arc 8,8 56,56 240,270" \
+            -stroke '#1ed76011' -draw "arc 8,8 56,56 270,300" \
+            -stroke '#1ed76011' -draw "arc 8,8 56,56 300,330" \
+            -stroke '#1ed76011' -draw "arc 8,8 56,56 330,360" \
+            -rotate $angle \
+            "$THEME_DIR/spinner-$(printf "%02d" $i).png" 2>/dev/null || true
+    done
     
     # Create the Plymouth theme script
     cat > "$THEME_DIR/spotify-kids.script" <<'EOF'
@@ -2921,35 +2928,29 @@ logo.sprite.SetOpacity(1);
 
 # Message sprite for boot status
 message_sprite = Sprite();
-message_sprite.SetPosition(Window.GetWidth() / 2 - 200, Window.GetHeight() / 2 + 100, 0);
+message_sprite.SetPosition(Window.GetWidth() / 2 - 200, Window.GetHeight() / 2 + 120, 0);
 
-# Progress bar background
-progress_box.image = Image("progress-bar-bg.png");
-progress_box.sprite = Sprite(progress_box.image);
-progress_box.sprite.SetX(Window.GetWidth() / 2 - 200);
-progress_box.sprite.SetY(Window.GetHeight() / 2 + 150);
-
-# Progress bar foreground
-progress_bar.original_image = Image("progress-bar-fg.png");
-progress_bar.sprite = Sprite();
-progress_bar.sprite.SetX(Window.GetWidth() / 2 - 200);
-progress_bar.sprite.SetY(Window.GetHeight() / 2 + 150);
+# Spinner setup
+spinner.count = 12;
+for (i = 0; i < spinner.count; i++) {
+    spinner[i].image = Image("spinner-" + i + ".png");
+}
+spinner.sprite = Sprite();
+spinner.sprite.SetX(Window.GetWidth() / 2 - 32);
+spinner.sprite.SetY(Window.GetHeight() / 2 + 60);
 
 # Animation variables
 global.counter = 0;
-global.progress_value = 0;
-global.progress_target = 0;
-global.progress_current = 0;
+global.progress = 0;
 
-# Boot progress callback - smooth animation
+# Boot progress callback
 fun boot_progress_callback(time, progress) {
-    # Set target progress
-    if (progress > global.progress_target) {
-        global.progress_target = progress;
-    }
+    global.progress = progress;
     
-    # Ensure we always make some progress
-    if (global.progress_target < 0.1) global.progress_target = 0.1;
+    # Hide spinner when boot is complete
+    if (progress >= 1) {
+        spinner.sprite.SetOpacity(0);
+    }
 }
 
 # Update status callback
@@ -2987,25 +2988,11 @@ fun display_password_callback(prompt, bullets) {
 fun refresh_callback() {
     global.counter++;
     
-    # Smooth progress bar animation
-    if (global.progress_current < global.progress_target) {
-        # Accelerate progress animation
-        increment = (global.progress_target - global.progress_current) * 0.05;
-        if (increment < 0.002) increment = 0.002;  # Minimum speed
-        global.progress_current = global.progress_current + increment;
-        
-        if (global.progress_current > 1) global.progress_current = 1;
-        
-        # Update progress bar
-        if (progress_bar.original_image) {
-            progress_bar.image = progress_bar.original_image.Scale(400 * global.progress_current, 12);
-            progress_bar.sprite.SetImage(progress_bar.image);
-        }
-    }
-    
-    # Fake progress if nothing is happening (prevent stuck appearance)
-    if (global.counter % 30 == 0 && global.progress_target < 0.9) {
-        global.progress_target = global.progress_target + 0.01;
+    # Animate spinner
+    if (global.progress < 1) {
+        spinner_index = Math.Int(global.counter / 3) % spinner.count;
+        spinner.sprite.SetImage(spinner[spinner_index].image);
+        spinner.sprite.SetOpacity(1);
     }
     
     # Pulse logo gently
@@ -3099,35 +3086,27 @@ DeviceTimeout=10
 EOF
     fi
     
-    # Create service to quit Plymouth when X starts
-    cat > /etc/systemd/system/plymouth-quit-on-x.service <<EOF
+    # Don't mess with Plymouth quit - let it work normally
+    # Just ensure it quits after a reasonable time
+    cat > /etc/systemd/system/plymouth-force-quit.service <<EOF
 [Unit]
-Description=Quit Plymouth when X server starts
+Description=Force quit Plymouth if still running
 After=multi-user.target
-Wants=plymouth-quit.service
 
 [Service]
 Type=oneshot
-ExecStart=/bin/bash -c 'while ! pgrep -x "Xorg" > /dev/null; do sleep 1; done; sleep 2; /usr/bin/plymouth quit'
+ExecStartPre=/bin/sleep 15
+ExecStart=/bin/bash -c 'plymouth quit 2>/dev/null; pkill plymouthd 2>/dev/null'
 RemainAfterExit=yes
-TimeoutSec=60
 
 [Install]
-WantedBy=graphical.target
+WantedBy=multi-user.target
 EOF
     
-    systemctl enable plymouth-quit-on-x.service 2>/dev/null || true
+    systemctl enable plymouth-force-quit.service 2>/dev/null || true
     
-    # Override getty to not kill Plymouth
-    mkdir -p /etc/systemd/system/getty@tty1.service.d
-    cat > /etc/systemd/system/getty@tty1.service.d/plymouth.conf <<EOF
-[Unit]
-After=plymouth-persist.service
-ConditionPathExists=!/var/run/plymouth/pid
-
-[Service]
-ExecStartPre=-/usr/bin/plymouth quit --retain-splash
-EOF
+    # Remove any getty overrides that might interfere
+    rm -rf /etc/systemd/system/getty@tty1.service.d/
     
     # Ensure Plymouth modules in initramfs
     if [ -f /etc/initramfs-tools/modules ]; then
