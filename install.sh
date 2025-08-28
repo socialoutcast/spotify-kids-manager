@@ -2839,24 +2839,51 @@ install_bootsplash() {
     THEME_DIR="/usr/share/plymouth/themes/spotify-kids"
     mkdir -p "$THEME_DIR"
     
-    # Create the logo PNG directly using ImageMagick
-    log_info "Creating boot logo..."
+    # Create a professional logo using ImageMagick
+    log_info "Creating professional boot logo..."
     
-    # Create a green circle with music note
-    convert -size 256x256 xc:none \
-        -fill '#1db954' -draw "circle 128,128 128,8" \
-        -fill white -font DejaVu-Sans-Bold -pointsize 120 \
-        -gravity center -annotate +0+0 '♪' \
-        -fill white -font DejaVu-Sans-Bold -pointsize 32 \
-        -gravity south -annotate +0+20 'KIDS' \
+    # Create a sleek, modern logo with gradient and shadow
+    convert -size 300x300 xc:transparent \
+        \( -size 260x260 \
+           radial-gradient:'#1ed760'-'#1db954' \
+           -alpha set -channel A -evaluate set 100% \
+        \) -geometry +20+20 -composite \
+        -fill black -draw "circle 150,150 150,20" -channel A -blur 0x8 -level 0%,50% \
+        \( -size 260x260 xc:transparent \
+           -fill '#1db954' -draw "circle 130,130 130,10" \
+           -fill '#1ed760' -draw "circle 130,130 130,8" \
+        \) -geometry +20+20 -composite \
+        \( -size 200x200 xc:transparent \
+           -fill white \
+           -draw "path 'M 100,60 L 100,140 M 100,140 Q 80,120 60,120 T 40,140 Q 40,160 60,160 T 100,140 M 100,100 Q 120,80 140,80 T 160,100 Q 160,120 140,120 T 100,100'" \
+           -stroke white -stroke-width 8 -stroke-linecap round \
+        \) -geometry +50+50 -composite \
+        \( -size 300x80 xc:transparent \
+           -font DejaVu-Sans -pointsize 48 -fill white \
+           -gravity center -annotate +0+0 'SpotifyKids' \
+           -blur 0x1 \
+        \) -geometry +0+200 -composite \
+        -resize 256x256 \
         "$THEME_DIR/logo.png" 2>/dev/null || {
-            # Fallback: create a simple text logo if fonts are missing
-            convert -size 256x256 xc:'#1db954' \
-                -fill white -font Helvetica -pointsize 48 \
-                -gravity center -annotate +0-20 'Spotify' \
-                -fill white -font Helvetica -pointsize 32 \
-                -gravity center -annotate +0+20 'Kids' \
-                "$THEME_DIR/logo.png" 2>/dev/null
+            # Fallback to simpler professional logo
+            convert -size 256x256 xc:transparent \
+                \( -size 240x240 xc:'#1db954' \
+                   -fill '#1ed760' -draw "circle 120,120 120,100" \
+                   -fill '#1db954' -draw "circle 120,120 120,90" \
+                \) -geometry +8+8 -composite \
+                -fill white -font DejaVu-Sans-Bold -pointsize 64 \
+                -gravity center -annotate +0-20 'S' \
+                -fill white -font DejaVu-Sans -pointsize 28 \
+                -gravity center -annotate +0+30 'KIDS' \
+                -fill white -font DejaVu-Sans -pointsize 16 \
+                -gravity south -annotate +0+20 'Music Manager' \
+                "$THEME_DIR/logo.png" 2>/dev/null || {
+                    # Ultimate fallback - simple but clean
+                    convert -size 256x256 xc:'#1db954' \
+                        -fill white -font Helvetica-Bold -pointsize 72 \
+                        -gravity center -annotate +0+0 'SK' \
+                        "$THEME_DIR/logo.png" 2>/dev/null
+                }
         }
     
     # Create smaller versions
@@ -2864,9 +2891,18 @@ install_bootsplash() {
     
     # No spinner needed - we have the progress bar
     
-    # Create progress bar (larger and more visible)
-    convert -size 400x10 xc:'#333333' -bordercolor '#555555' -border 1 "$THEME_DIR/progress-bar-bg.png" 2>/dev/null
-    convert -size 400x10 xc:'#1db954' "$THEME_DIR/progress-bar-fg.png" 2>/dev/null
+    # Create professional progress bar with gradient
+    convert -size 400x12 xc:transparent \
+        \( -size 400x12 xc:'#1a1a1a' \
+           -fill '#2a2a2a' -draw "roundrectangle 1,1 398,10 3,3" \
+        \) -composite \
+        "$THEME_DIR/progress-bar-bg.png" 2>/dev/null
+    
+    convert -size 400x12 xc:transparent \
+        \( -size 400x10 gradient:'#1ed760'-'#1db954' \
+           -fill gradient:'#1ed760'-'#1db954' -draw "roundrectangle 0,0 399,9 3,3" \
+        \) -geometry +0+1 -composite \
+        "$THEME_DIR/progress-bar-fg.png" 2>/dev/null
     
     # Create the Plymouth theme script
     cat > "$THEME_DIR/spotify-kids.script" <<'EOF'
@@ -2902,16 +2938,18 @@ progress_bar.sprite.SetY(Window.GetHeight() / 2 + 150);
 # Animation variables
 global.counter = 0;
 global.progress_value = 0;
+global.progress_target = 0;
+global.progress_current = 0;
 
-# Boot progress callback
+# Boot progress callback - smooth animation
 fun boot_progress_callback(time, progress) {
-    global.progress_value = progress;
-    if (progress_bar.original_image) {
-        if (progress > 0) {
-            progress_bar.image = progress_bar.original_image.Scale(400 * progress, 10);
-            progress_bar.sprite.SetImage(progress_bar.image);
-        }
+    # Set target progress
+    if (progress > global.progress_target) {
+        global.progress_target = progress;
     }
+    
+    # Ensure we always make some progress
+    if (global.progress_target < 0.1) global.progress_target = 0.1;
 }
 
 # Update status callback
@@ -2948,6 +2986,27 @@ fun display_password_callback(prompt, bullets) {
 # Refresh callback for animation
 fun refresh_callback() {
     global.counter++;
+    
+    # Smooth progress bar animation
+    if (global.progress_current < global.progress_target) {
+        # Accelerate progress animation
+        increment = (global.progress_target - global.progress_current) * 0.05;
+        if (increment < 0.002) increment = 0.002;  # Minimum speed
+        global.progress_current = global.progress_current + increment;
+        
+        if (global.progress_current > 1) global.progress_current = 1;
+        
+        # Update progress bar
+        if (progress_bar.original_image) {
+            progress_bar.image = progress_bar.original_image.Scale(400 * global.progress_current, 12);
+            progress_bar.sprite.SetImage(progress_bar.image);
+        }
+    }
+    
+    # Fake progress if nothing is happening (prevent stuck appearance)
+    if (global.counter % 30 == 0 && global.progress_target < 0.9) {
+        global.progress_target = global.progress_target + 0.01;
+    }
     
     # Pulse logo gently
     opacity = 0.9 + 0.1 * Math.Sin(global.counter / 10.0);
