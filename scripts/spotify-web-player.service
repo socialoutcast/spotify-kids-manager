@@ -1,0 +1,36 @@
+[Unit]
+Description=Spotify Kids Web Player
+After=network.target sound.target graphical.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=spotify-kids
+Group=audio
+
+# Environment
+Environment="HOME=/home/spotify-kids"
+Environment="USER=spotify-kids"
+Environment="DISPLAY=:0"
+Environment="XAUTHORITY=/home/spotify-kids/.Xauthority"
+
+# Working directory
+WorkingDirectory=/opt/spotify-terminal/web
+
+# Start command
+ExecStart=/opt/spotify-terminal/scripts/start-web-player.sh
+
+# Restart policy
+Restart=always
+RestartSec=5
+
+# Logging
+StandardOutput=append:/opt/spotify-terminal/data/web-player.log
+StandardError=append:/opt/spotify-terminal/data/web-player-error.log
+
+# Security
+PrivateTmp=false
+NoNewPrivileges=true
+
+[Install]
+WantedBy=graphical.target
