@@ -2993,15 +2993,19 @@ EOF
     
     # Configure boot parameters for Raspberry Pi
     if [ -f /boot/cmdline.txt ]; then
-        if ! grep -q "splash" /boot/cmdline.txt; then
-            cp /boot/cmdline.txt /boot/cmdline.txt.backup
-            # Add comprehensive Plymouth parameters
-            sed -i 's/$/ quiet splash plymouth.ignore-serial-consoles logo.nologo vt.global_cursor_default=0/' /boot/cmdline.txt
-            # Change console to prevent text output
-            sed -i 's/console=tty1/console=tty3/g' /boot/cmdline.txt
-            # Remove any fbcon parameters that might interfere
-            sed -i 's/fbcon=[^ ]*//g' /boot/cmdline.txt
-        fi
+        cp /boot/cmdline.txt /boot/cmdline.txt.backup
+        
+        # Clean up existing parameters first
+        sed -i 's/ quiet//g; s/ splash//g; s/ plymouth[^ ]*//g; s/ logo[^ ]*//g; s/ vt[^ ]*//g; s/ loglevel=[^ ]*//g; s/ rd\.[^ ]*//g; s/ fsck\.[^ ]*//g' /boot/cmdline.txt
+        
+        # Add comprehensive Plymouth parameters for persistent splash
+        sed -i 's/$/ quiet splash plymouth.enable=1 plymouth.ignore-serial-consoles logo.nologo vt.global_cursor_default=0 loglevel=0 rd.systemd.show_status=0 rd.udev.log_level=0 fsck.mode=skip/' /boot/cmdline.txt
+        
+        # Change console to prevent text output
+        sed -i 's/console=tty1/console=tty3/g' /boot/cmdline.txt
+        
+        # Remove any fbcon parameters that might interfere
+        sed -i 's/fbcon=[^ ]*//g' /boot/cmdline.txt
     fi
     
     # Configure GRUB for standard systems
@@ -3030,23 +3034,51 @@ DeviceTimeout=10
 EOF
     fi
     
-    # Create systemd service to properly transition from Plymouth to X
-    cat > /etc/systemd/system/plymouth-quit-wait.service <<EOF
+    # Fix Plymouth to not quit early
+    systemctl disable plymouth-quit.service 2>/dev/null || true
+    systemctl disable plymouth-quit-wait.service 2>/dev/null || true
+    systemctl mask plymouth-quit.service 2>/dev/null || true
+    
+    # Create service to keep Plymouth running
+    cat > /etc/systemd/system/plymouth-persist.service <<EOF
 [Unit]
-Description=Wait for Plymouth to quit before starting display manager
-After=plymouth-quit.service
-Before=display-manager.service getty@tty1.service
+Description=Keep Plymouth running during boot
+After=plymouth-start.service
+Before=getty@tty1.service
+DefaultDependencies=no
 
 [Service]
 Type=oneshot
-ExecStart=/bin/plymouth quit --wait
+ExecStart=/bin/true
 RemainAfterExit=yes
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=sysinit.target
 EOF
     
-    systemctl enable plymouth-quit-wait.service 2>/dev/null || true
+    systemctl enable plymouth-persist.service 2>/dev/null || true
+    
+    # Override getty to not kill Plymouth
+    mkdir -p /etc/systemd/system/getty@tty1.service.d
+    cat > /etc/systemd/system/getty@tty1.service.d/plymouth.conf <<EOF
+[Unit]
+After=plymouth-persist.service
+ConditionPathExists=!/var/run/plymouth/pid
+
+[Service]
+ExecStartPre=-/usr/bin/plymouth quit --retain-splash
+EOF
+    
+    # Ensure Plymouth modules in initramfs
+    if [ -f /etc/initramfs-tools/modules ]; then
+        grep -q "drm" /etc/initramfs-tools/modules || echo "drm" >> /etc/initramfs-tools/modules
+        grep -q "drm_kms_helper" /etc/initramfs-tools/modules || echo "drm_kms_helper" >> /etc/initramfs-tools/modules
+    fi
+    
+    # Force framebuffer for Plymouth
+    cat > /etc/initramfs-tools/conf.d/plymouth <<EOF
+FRAMEBUFFER=y
+EOF
     
     log_success "Boot splash installed successfully"
 }
