@@ -20,6 +20,17 @@ log() {
 
 log "Starting Spotify Kids Web Player..."
 
+# Ensure Python dependencies are installed
+if ! python3 -c "import flask; import spotipy" 2>/dev/null; then
+    log "Installing missing Python dependencies..."
+    pip3 install --break-system-packages flask flask-cors spotipy 2>/dev/null || \
+    pip3 install flask flask-cors spotipy 2>/dev/null || \
+    python3 -m pip install flask flask-cors spotipy 2>/dev/null || {
+        log "ERROR: Failed to install Python dependencies"
+        exit 1
+    }
+fi
+
 # Check if device is locked
 if [ -f /opt/spotify-terminal/data/device.lock ]; then
     LOCKED=true
@@ -35,16 +46,30 @@ pkill -f app.py 2>/dev/null  # Kill admin panel if running
 pkill -f chromium 2>/dev/null
 sleep 2
 
-# Make sure admin panel isn't using port 8080
-if lsof -Pi :8080 -sTCP:LISTEN -t >/dev/null ; then
-    log "Port 8080 is in use, killing process..."
-    lsof -Pi :8080 -sTCP:LISTEN -t | xargs kill -9 2>/dev/null
+# Make sure nothing is using port 8888
+if lsof -Pi :8888 -sTCP:LISTEN -t >/dev/null ; then
+    log "Port 8888 is in use, killing process..."
+    lsof -Pi :8888 -sTCP:LISTEN -t | xargs kill -9 2>/dev/null
     sleep 1
 fi
 
 # Start the Spotify player server (not admin panel)
-log "Starting Spotify web player server on port 8080..."
+log "Starting Spotify web player server on port 8888..."
 cd /opt/spotify-terminal/web
+
+# Check if web files exist, download if missing
+if [ ! -f spotify_server.py ]; then
+    log "Web player files missing, downloading from GitHub..."
+    for file in spotify_server.py player.html player.js; do
+        wget -q -O "$file" \
+            "https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/main/web/$file" || {
+            log "ERROR: Failed to download $file"
+            exit 1
+        }
+    done
+    chmod 644 *.py *.html *.js 2>/dev/null || true
+fi
+
 if [ -f spotify_server.py ]; then
     python3 spotify_server.py >> "$LOG_FILE" 2>&1 &
     SERVER_PID=$!
@@ -166,7 +191,7 @@ if [ -n "$DISPLAY" ] && xset q &>/dev/null; then
     
 else
     log "No X server detected, running in headless mode"
-    log "Web interface available at http://$(hostname -I | awk '{print $1}'):8080"
+    log "Web interface available at http://$(hostname -I | awk '{print $1}'):8888"
     
     # Just keep the server running
     wait $SERVER_PID

@@ -1028,6 +1028,15 @@ EOF
         log_warning "Failed to download start-spotify-player.sh"
     }
     
+    # Install Python dependencies for web player
+    log_info "Installing Python dependencies for Spotify web player..."
+    pip3 install --break-system-packages flask flask-cors spotipy 2>/dev/null || \
+    pip3 install flask flask-cors spotipy 2>/dev/null || \
+    python3 -m pip install flask flask-cors spotipy 2>/dev/null || {
+        log_error "Failed to install Python dependencies"
+        log_error "Please install manually: pip3 install flask flask-cors spotipy"
+    }
+    
     # Create systemd service for web player
     cat > "/etc/systemd/system/spotify-web-player.service" <<'EOF'
 [Unit]
@@ -2746,6 +2755,15 @@ EOF
         done
     fi
     
+    # Install Python dependencies for web player
+    log_info "Installing Python dependencies for web player..."
+    pip3 install --break-system-packages flask flask-cors spotipy 2>/dev/null || \
+    pip3 install flask flask-cors spotipy 2>/dev/null || \
+    python3 -m pip install flask flask-cors spotipy 2>/dev/null || {
+        log_error "Failed to install Python dependencies"
+        log_error "Please install manually: pip3 install flask flask-cors spotipy"
+    }
+    
     # Ensure permissions
     chown -R root:root "$INSTALL_DIR/web"
     chmod 755 "$INSTALL_DIR/web"
@@ -3590,7 +3608,7 @@ main() {
         rm -rf /root/.cache/ncspot
         
         # Clean up Python packages
-        pip3 uninstall -y flask flask-cors flask-socketio werkzeug dbus-python pulsectl 2>/dev/null || true
+        pip3 uninstall -y flask flask-cors flask-socketio werkzeug dbus-python pulsectl spotipy 2>/dev/null || true
         
         # Reset nginx to default
         apt-get remove --purge -y nginx nginx-common 2>/dev/null || true
