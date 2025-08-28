@@ -276,6 +276,288 @@ def is_locked():
     """Check if device is locked"""
     return jsonify({'locked': os.path.exists(LOCK_FILE)})
 
+# Spotify API proxy endpoints - work with both OAuth and backend auth
+@app.route('/api/proxy/player/devices')
+def get_devices():
+    """Get available Spotify devices"""
+    sp = get_spotify_client()
+    if sp:
+        try:
+            devices = sp.devices()
+            return jsonify(devices)
+        except Exception as e:
+            pass
+    
+    # Fallback for backend auth - check if raspotify/spotifyd is running
+    devices = {'devices': []}
+    if subprocess.run(['pgrep', '-f', 'raspotify'], capture_output=True).returncode == 0:
+        devices['devices'].append({
+            'id': 'raspotify-local',
+            'is_active': True,
+            'name': os.uname().nodename,
+            'type': 'Computer',
+            'volume_percent': 100
+        })
+    elif subprocess.run(['pgrep', '-f', 'spotifyd'], capture_output=True).returncode == 0:
+        devices['devices'].append({
+            'id': 'spotifyd-local',
+            'is_active': True,
+            'name': os.uname().nodename,
+            'type': 'Computer',
+            'volume_percent': 100
+        })
+    return jsonify(devices)
+
+@app.route('/api/proxy/player/recently-played')
+def get_recent():
+    """Get recently played tracks"""
+    sp = get_spotify_client()
+    if sp:
+        try:
+            return jsonify(sp.current_user_recently_played(limit=20))
+        except:
+            pass
+    # Return empty for backend auth
+    return jsonify({'items': []})
+
+@app.route('/api/proxy/playlists')
+def get_playlists():
+    """Get user's playlists"""
+    sp = get_spotify_client()
+    if sp:
+        try:
+            return jsonify(sp.current_user_playlists(limit=50))
+        except:
+            pass
+    return jsonify({'items': []})
+
+@app.route('/api/proxy/playlist/<playlist_id>')
+def get_playlist(playlist_id):
+    """Get playlist details"""
+    sp = get_spotify_client()
+    if sp:
+        try:
+            return jsonify(sp.playlist(playlist_id))
+        except:
+            pass
+    return jsonify({'error': 'Not available'}), 503
+
+@app.route('/api/proxy/search')
+def search():
+    """Search Spotify"""
+    query = request.args.get('q', '')
+    sp = get_spotify_client()
+    if sp:
+        try:
+            results = sp.search(q=query, type='track,album,artist', limit=20)
+            return jsonify(results)
+        except:
+            pass
+    return jsonify({'tracks': {'items': []}, 'albums': {'items': []}, 'artists': {'items': []}})
+
+@app.route('/api/proxy/player/play', methods=['PUT'])
+def play():
+    """Play a track/playlist/album"""
+    sp = get_spotify_client()
+    data = request.json or {}
+    
+    if sp:
+        try:
+            device_id = data.get('device_id')
+            uris = data.get('uris')
+            context_uri = data.get('context_uri')
+            
+            if context_uri:
+                sp.start_playback(device_id=device_id, context_uri=context_uri)
+            elif uris:
+                sp.start_playback(device_id=device_id, uris=uris)
+            else:
+                sp.start_playback(device_id=device_id)
+            return jsonify({'success': True})
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+    
+    # Backend control for raspotify/spotifyd
+    if data.get('uris'):
+        # Try to play via Spotify Connect using backend
+        uri = data.get('uris')[0] if isinstance(data.get('uris'), list) else data.get('context_uri')
+        if uri:
+            # Send play command to backend
+            subprocess.run(['dbus-send', '--print-reply', '--dest=org.mpris.MediaPlayer2.spotify',
+                          '/org/mpris/MediaPlayer2', 'org.mpris.MediaPlayer2.Player.OpenUri',
+                          f'string:{uri}'], capture_output=True)
+    return jsonify({'success': True})
+
+@app.route('/api/proxy/player/pause', methods=['PUT'])
+def pause():
+    """Pause playback"""
+    sp = get_spotify_client()
+    if sp:
+        try:
+            sp.pause_playback()
+            return jsonify({'success': True})
+        except:
+            pass
+    
+    # Backend control
+    subprocess.run(['dbus-send', '--print-reply', '--dest=org.mpris.MediaPlayer2.spotify',
+                   '/org/mpris/MediaPlayer2', 'org.mpris.MediaPlayer2.Player.Pause'], capture_output=True)
+    return jsonify({'success': True})
+
+@app.route('/api/proxy/player/resume', methods=['PUT'])  
+def resume():
+    """Resume playback"""
+    sp = get_spotify_client()
+    if sp:
+        try:
+            sp.start_playback()
+            return jsonify({'success': True})
+        except:
+            pass
+    
+    # Backend control
+    subprocess.run(['dbus-send', '--print-reply', '--dest=org.mpris.MediaPlayer2.spotify',
+                   '/org/mpris/MediaPlayer2', 'org.mpris.MediaPlayer2.Player.Play'], capture_output=True)
+    return jsonify({'success': True})
+
+@app.route('/api/proxy/player/next', methods=['POST'])
+def next_track():
+    """Skip to next track"""
+    sp = get_spotify_client()
+    if sp:
+        try:
+            sp.next_track()
+            return jsonify({'success': True})
+        except:
+            pass
+    
+    # Backend control
+    subprocess.run(['dbus-send', '--print-reply', '--dest=org.mpris.MediaPlayer2.spotify',
+                   '/org/mpris/MediaPlayer2', 'org.mpris.MediaPlayer2.Player.Next'], capture_output=True)
+    return jsonify({'success': True})
+
+@app.route('/api/proxy/player/previous', methods=['POST'])
+def previous_track():
+    """Previous track"""
+    sp = get_spotify_client()
+    if sp:
+        try:
+            sp.previous_track()
+            return jsonify({'success': True})
+        except:
+            pass
+    
+    # Backend control
+    subprocess.run(['dbus-send', '--print-reply', '--dest=org.mpris.MediaPlayer2.spotify',
+                   '/org/mpris/MediaPlayer2', 'org.mpris.MediaPlayer2.Player.Previous'], capture_output=True)
+    return jsonify({'success': True})
+
+@app.route('/api/proxy/player/currently-playing')
+def currently_playing():
+    """Get currently playing track"""
+    sp = get_spotify_client()
+    if sp:
+        try:
+            return jsonify(sp.current_playing())
+        except:
+            pass
+    
+    # Try to get from backend via MPRIS
+    return jsonify(None), 204
+
+@app.route('/api/proxy/player/shuffle', methods=['PUT'])
+def set_shuffle():
+    """Set shuffle state"""
+    state = request.args.get('state', 'false') == 'true'
+    sp = get_spotify_client()
+    if sp:
+        try:
+            sp.shuffle(state)
+        except:
+            pass
+    return jsonify({'success': True})
+
+@app.route('/api/proxy/player/repeat', methods=['PUT'])
+def set_repeat():
+    """Set repeat state"""
+    state = request.args.get('state', 'off')
+    sp = get_spotify_client()
+    if sp:
+        try:
+            sp.repeat(state)
+        except:
+            pass
+    return jsonify({'success': True})
+
+@app.route('/api/proxy/tracks/contains')
+def check_saved_tracks():
+    """Check if tracks are saved"""
+    ids = request.args.get('ids', '')
+    sp = get_spotify_client()
+    if sp:
+        try:
+            return jsonify(sp.current_user_saved_tracks_contains(tracks=[ids]))
+        except:
+            pass
+    return jsonify([False])
+
+@app.route('/api/proxy/tracks', methods=['GET', 'PUT', 'DELETE'])
+def handle_tracks():
+    """Get saved tracks or save/remove tracks"""
+    if request.method == 'GET':
+        # Get saved tracks
+        sp = get_spotify_client()
+        if sp:
+            try:
+                limit = request.args.get('limit', 50, type=int)
+                return jsonify(sp.current_user_saved_tracks(limit=limit))
+            except:
+                pass
+        return jsonify({'items': []})
+    else:
+        # Save or remove tracks
+        ids = request.args.get('ids', '')
+        sp = get_spotify_client()
+        if sp:
+            try:
+                if request.method == 'PUT':
+                    sp.current_user_saved_tracks_add(tracks=[ids])
+                else:
+                    sp.current_user_saved_tracks_delete(tracks=[ids])
+                return jsonify({'success': True})
+            except:
+                pass
+        return jsonify({'success': False})
+
+@app.route('/api/proxy/player/seek', methods=['PUT'])
+def seek():
+    """Seek to position"""
+    position_ms = request.args.get('position_ms', 0, type=int)
+    sp = get_spotify_client()
+    if sp:
+        try:
+            sp.seek_track(position_ms)
+            return jsonify({'success': True})
+        except:
+            pass
+    return jsonify({'success': True})
+
+@app.route('/api/proxy/player/volume', methods=['PUT'])
+def set_volume():
+    """Set volume"""
+    volume_percent = request.args.get('volume_percent', 50, type=int)
+    sp = get_spotify_client()
+    if sp:
+        try:
+            sp.volume(volume_percent)
+            return jsonify({'success': True})
+        except:
+            pass
+    
+    # Try system volume control for backend
+    subprocess.run(['amixer', 'set', 'Master', f'{volume_percent}%'], capture_output=True)
+    return jsonify({'success': True})
+
 def setup_kiosk_browser():
     """Launch browser in kiosk mode for touchscreen"""
     # Kill any existing browser

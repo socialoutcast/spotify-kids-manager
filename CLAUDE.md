@@ -1,0 +1,1 @@
+- dont take things at face value you need to validate the issue before you say YOUR RIGHT! Stop being so posative you are an engineer act like it!
