@@ -16,10 +16,19 @@ from datetime import datetime, timedelta
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 
+# Load Spotify OAuth Configuration from env file if it exists
+env_file = '/opt/spotify-terminal/config/spotify.env'
+if os.path.exists(env_file):
+    with open(env_file) as f:
+        for line in f:
+            if '=' in line:
+                key, value = line.strip().split('=', 1)
+                os.environ[key] = value
+
 # Spotify OAuth Configuration
 SPOTIFY_CLIENT_ID = os.getenv('SPOTIFY_CLIENT_ID', '')
 SPOTIFY_CLIENT_SECRET = os.getenv('SPOTIFY_CLIENT_SECRET', '')
-SPOTIFY_REDIRECT_URI = 'http://localhost:8080/callback'
+SPOTIFY_REDIRECT_URI = os.getenv('SPOTIFY_REDIRECT_URI', 'http://localhost:8888/callback')
 SCOPE = '''
     user-read-playback-state
     user-modify-playback-state

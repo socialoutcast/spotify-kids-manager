@@ -38,18 +38,29 @@ class SpotifyPlayer {
             const data = await response.json();
             
             if (data.access_token) {
+                // OAuth mode - we have tokens
                 this.accessToken = data.access_token;
                 document.getElementById('username').textContent = data.username || 'User';
                 document.getElementById('connectionText').textContent = 'Connected';
                 
                 // Refresh token before expiry
                 setTimeout(() => this.refreshToken(), (data.expires_in - 60) * 1000);
+            } else if (data.username && data.needs_oauth) {
+                // Username/password mode - no tokens needed for raspotify/spotifyd
+                // The backend handles auth directly
+                this.accessToken = 'backend-auth'; // Dummy token to indicate auth is handled by backend
+                document.getElementById('username').textContent = data.username;
+                document.getElementById('connectionText').textContent = 'Connected (Direct)';
+                
+                // Don't need to refresh for direct backend auth
             } else {
                 this.showAuthPrompt();
             }
         } catch (error) {
             console.error('Auth check failed:', error);
             document.getElementById('connectionText').textContent = 'Offline';
+            // Still try to load content even if auth check fails
+            // Backend might handle auth directly
         }
     }
 
