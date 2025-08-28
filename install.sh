@@ -751,6 +751,9 @@ export DISPLAY=:0
 export HOME=/home/spotify-kids
 export USER=spotify-kids
 
+# Quit Plymouth splash now that X is starting
+plymouth quit 2>/dev/null || true
+
 # Wait for X to be ready
 sleep 2
 
@@ -832,6 +835,9 @@ EOF
 export DISPLAY=:0
 export HOME=/home/spotify-kids
 export USER=spotify-kids
+
+# Quit Plymouth if it's still running
+plymouth quit 2>/dev/null || true
 
 LOG_FILE="/opt/spotify-terminal/data/web-player.log"
 
@@ -3034,29 +3040,24 @@ DeviceTimeout=10
 EOF
     fi
     
-    # Fix Plymouth to not quit early
-    systemctl disable plymouth-quit.service 2>/dev/null || true
-    systemctl disable plymouth-quit-wait.service 2>/dev/null || true
-    systemctl mask plymouth-quit.service 2>/dev/null || true
-    
-    # Create service to keep Plymouth running
-    cat > /etc/systemd/system/plymouth-persist.service <<EOF
+    # Create service to quit Plymouth when X starts
+    cat > /etc/systemd/system/plymouth-quit-on-x.service <<EOF
 [Unit]
-Description=Keep Plymouth running during boot
-After=plymouth-start.service
-Before=getty@tty1.service
-DefaultDependencies=no
+Description=Quit Plymouth when X server starts
+After=multi-user.target
+Wants=plymouth-quit.service
 
 [Service]
 Type=oneshot
-ExecStart=/bin/true
+ExecStart=/bin/bash -c 'while ! pgrep -x "Xorg" > /dev/null; do sleep 1; done; sleep 2; /usr/bin/plymouth quit'
 RemainAfterExit=yes
+TimeoutSec=60
 
 [Install]
-WantedBy=sysinit.target
+WantedBy=graphical.target
 EOF
     
-    systemctl enable plymouth-persist.service 2>/dev/null || true
+    systemctl enable plymouth-quit-on-x.service 2>/dev/null || true
     
     # Override getty to not kill Plymouth
     mkdir -p /etc/systemd/system/getty@tty1.service.d
