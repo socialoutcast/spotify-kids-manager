@@ -2817,17 +2817,27 @@ EOF
 uninstall_all() {
     log_info "Removing ALL traces of installation..."
     
-    # Stop services
-    systemctl stop "$SERVICE_NAME" 2>/dev/null
-    systemctl disable "$SERVICE_NAME" 2>/dev/null
-    systemctl stop nginx 2>/dev/null
+    # Stop all services first
+    log_info "Stopping all services..."
+    systemctl stop "$SERVICE_NAME" 2>/dev/null || true
+    systemctl disable "$SERVICE_NAME" 2>/dev/null || true
+    systemctl stop raspotify 2>/dev/null || true
+    systemctl stop spotifyd 2>/dev/null || true
+    systemctl stop nginx 2>/dev/null || true
     
-    # Kill all related processes
-    pkill -f "app.py" 2>/dev/null || true
-    pkill -f "ncspot" 2>/dev/null || true
-    pkill -f "spotify_server.py" 2>/dev/null || true
-    pkill -f "chromium" 2>/dev/null || true
-    pkill -u "$SPOTIFY_USER" 2>/dev/null || true
+    # Kill all related processes forcefully
+    log_info "Killing all related processes..."
+    pkill -9 -f "app.py" 2>/dev/null || true
+    pkill -9 -f "ncspot" 2>/dev/null || true
+    pkill -9 -f "spotify_server.py" 2>/dev/null || true
+    pkill -9 -f "chromium" 2>/dev/null || true
+    pkill -9 -f "start-web-player" 2>/dev/null || true
+    pkill -9 -f "start-touchscreen" 2>/dev/null || true
+    pkill -9 -u "$SPOTIFY_USER" 2>/dev/null || true
+    
+    # Clean up any lingering browser processes
+    pkill -9 chromium-browser 2>/dev/null || true
+    pkill -9 chrome 2>/dev/null || true
     
     # Find and remove ALL users created by our system
     log_info "Removing all created users..."
@@ -2835,8 +2845,13 @@ uninstall_all() {
     # Remove the main spotify-kids user
     if id "$SPOTIFY_USER" &>/dev/null; then
         log_info "Removing user: $SPOTIFY_USER"
-        pkill -u "$SPOTIFY_USER" 2>/dev/null || true
+        # Kill all processes for this user first
+        pkill -9 -u "$SPOTIFY_USER" 2>/dev/null || true
+        sleep 1
+        # Force remove user
         userdel -rf "$SPOTIFY_USER" 2>/dev/null || true
+        # If userdel fails, manually remove
+        rm -rf "/home/$SPOTIFY_USER" 2>/dev/null || true
     fi
     
     # Find and remove any other users created via the admin panel
@@ -2845,48 +2860,80 @@ uninstall_all() {
         # Skip system users and root
         if [[ "$username" != "pi" ]] && [[ "$username" != "root" ]] && [[ "$username" != "$SUDO_USER" ]]; then
             # Check if user has our Spotify setup files
-            if [[ -f "$user_home/.bash_profile" ]] && grep -q "spotify-client.sh" "$user_home/.bash_profile" 2>/dev/null; then
+            if [[ -f "$user_home/.bash_profile" ]] && grep -q "spotify" "$user_home/.bash_profile" 2>/dev/null; then
                 log_info "Removing user created by admin panel: $username"
-                pkill -u "$username" 2>/dev/null || true
+                pkill -9 -u "$username" 2>/dev/null || true
+                sleep 1
                 userdel -rf "$username" 2>/dev/null || true
+                rm -rf "$user_home" 2>/dev/null || true
             fi
         fi
     done
     
-    # Remove systemd files
+    # Remove ALL systemd files
+    log_info "Removing systemd configurations..."
     rm -f "/etc/systemd/system/$SERVICE_NAME.service"
+    rm -f "/etc/systemd/system/spotify-"* 2>/dev/null || true
+    rm -f "/lib/systemd/system/spotify-"* 2>/dev/null || true
     
     # Remove auto-login configurations for all ttys
     for i in {1..6}; do
         rm -rf "/etc/systemd/system/getty@tty$i.service.d/"
     done
     
-    # Remove nginx config
+    # Clean up systemd user services
+    rm -rf /home/*/.config/systemd/user/spotify-* 2>/dev/null || true
+    
+    # Remove nginx config completely
+    log_info "Removing nginx configurations..."
     rm -f /etc/nginx/sites-enabled/spotify-admin
     rm -f /etc/nginx/sites-available/spotify-admin
+    rm -f /etc/nginx/sites-enabled/spotify*
+    rm -f /etc/nginx/sites-available/spotify*
     
     # Remove all installation directories
+    log_info "Removing installation directories..."
     rm -rf "$INSTALL_DIR"
     rm -rf /opt/spotify-terminal
+    rm -rf /opt/spotify-kids
+    rm -rf /opt/spotify*
     
-    # Remove ncspot configs for all users
+    # Clean up all config and cache directories
+    log_info "Cleaning up config and cache..."
     rm -rf /home/*/.config/ncspot
     rm -rf /home/*/.cache/ncspot
     rm -rf /home/*/.cache/spotifyd
+    rm -rf /home/*/.config/spotify*
+    rm -rf /home/*/.cache/spotify*
     rm -rf /root/.config/ncspot
     rm -rf /root/.cache/ncspot
+    rm -rf /root/.config/spotify*
+    rm -rf /root/.cache/spotify*
+    
+    # Remove any temporary files
+    rm -rf /tmp/spotify* 2>/dev/null || true
+    rm -rf /tmp/*touch* 2>/dev/null || true
+    rm -f /tmp/flask_test.log 2>/dev/null || true
+    rm -f /tmp/spotify-startup.log 2>/dev/null || true
+    
+    # Clean up logs
+    rm -rf /var/log/spotify* 2>/dev/null || true
     
     # Clean up Python packages (optional - commented out to avoid removing system packages)
-    # pip3 uninstall -y flask flask-cors flask-socketio werkzeug dbus-python pulsectl 2>/dev/null || true
+    # pip3 uninstall -y flask flask-cors flask-socketio werkzeug dbus-python pulsectl spotipy 2>/dev/null || true
+    
+    # Clean up any leftover X sessions
+    rm -rf /tmp/.X* 2>/dev/null || true
     
     # Reset default runlevel back to graphical if it was changed
     systemctl set-default graphical.target 2>/dev/null || true
     
-    # Reload systemd
+    # Reload systemd and restart nginx
     systemctl daemon-reload
-    systemctl restart nginx 2>/dev/null
+    systemctl reset-failed 2>/dev/null || true
+    systemctl restart nginx 2>/dev/null || true
     
-    log_success "ALL traces of installation removed"
+    log_success "ALL traces of installation removed completely"
 }
 
 # Main installation flow
