@@ -1140,34 +1140,66 @@ HTML_TEMPLATE = '''
             </div>
             
             <!-- Spotify Configuration -->
-            <div class="card">
-                <h2>Spotify Account</h2>
+            <div class="card" style="grid-column: span 2;">
+                <h2>Spotify Configuration</h2>
                 <div id="spotifyStatus">
                     <p>Loading...</p>
                 </div>
-                <form id="spotifyForm">
-                    <div class="form-group">
-                        <label>Configure Spotify for User</label>
-                        <select id="targetUser" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
-                            <option value="spotify-kids">spotify-kids (default)</option>
-                        </select>
+                
+                <!-- API Credentials Section -->
+                <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
+                    <h3 style="font-size: 16px; margin-bottom: 10px;">Step 1: Spotify API Credentials</h3>
+                    <p style="color: #666; font-size: 12px; margin-bottom: 10px;">
+                        Get your API credentials from <a href="https://developer.spotify.com/dashboard" target="_blank" style="color: #667eea;">Spotify Developer Dashboard</a>
+                    </p>
+                    <form id="apiForm">
+                        <div class="form-group">
+                            <label>Client ID</label>
+                            <input type="text" id="clientId" placeholder="Your app's Client ID" style="font-family: monospace;">
+                        </div>
+                        <div class="form-group">
+                            <label>Client Secret</label>
+                            <input type="password" id="clientSecret" placeholder="Your app's Client Secret" style="font-family: monospace;">
+                        </div>
+                        <button type="submit" class="btn">Save API Credentials</button>
+                    </form>
+                </div>
+                
+                <!-- Account Login Section -->
+                <div style="background: #f5f5f5; padding: 15px; border-radius: 5px;">
+                    <h3 style="font-size: 16px; margin-bottom: 10px;">Step 2: Spotify Account Login</h3>
+                    <form id="spotifyForm">
+                        <div class="form-group">
+                            <label>Configure Spotify for User</label>
+                            <select id="targetUser" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                                <option value="spotify-kids">spotify-kids (default)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Spotify Username</label>
+                            <input type="text" id="spotifyUsername" placeholder="Your Spotify username (not email)" required>
+                            <p style="margin-top: 5px; color: #666; font-size: 12px;">
+                                ⚠️ Use your Spotify username, NOT your email address!
+                            </p>
+                        </div>
+                        <div class="form-group">
+                            <label>Spotify Password</label>
+                            <input type="password" id="spotifyPassword" required>
+                            <p style="margin-top: 5px; color: #666; font-size: 12px;">
+                                Requires Spotify Premium account
+                            </p>
+                        </div>
+                        <button type="submit" class="btn success">Configure Account</button>
+                    </form>
+                    
+                    <div style="text-align: center; margin: 15px 0;">
+                        <span style="color: #999;">OR</span>
                     </div>
-                    <div class="form-group">
-                        <label>Spotify Username</label>
-                        <input type="text" id="spotifyUsername" placeholder="Your Spotify username (not email)" required>
-                        <p style="margin-top: 5px; color: #666; font-size: 12px;">
-                            ⚠️ Use your Spotify username, NOT your email address!
-                        </p>
-                    </div>
-                    <div class="form-group">
-                        <label>Spotify Password</label>
-                        <input type="password" id="spotifyPassword" required>
-                        <p style="margin-top: 5px; color: #666; font-size: 12px;">
-                            Requires Spotify Premium account
-                        </p>
-                    </div>
-                    <button type="submit" class="btn success">Configure Spotify</button>
-                </form>
+                    
+                    <button class="btn success" onclick="startOAuth()" style="width: 100%;">
+                        🔐 Login with Spotify OAuth
+                    </button>
+                </div>
             </div>
             
             <!-- Account Settings -->
@@ -1382,18 +1414,92 @@ HTML_TEMPLATE = '''
             const config = await response.json();
             
             const statusDiv = document.getElementById('spotifyStatus');
-            if (config.configured) {
-                statusDiv.innerHTML = `
-                    <p style="color: green;">✓ Configured for: <strong>${config.username}</strong></p>
-                    <p style="color: #666; font-size: 12px;">Using: ${config.backend}</p>
+            let statusHTML = '<div style="padding: 10px; background: #f9f9f9; border-radius: 5px;">';
+            
+            // Show API configuration status
+            if (config.api_configured) {
+                statusHTML += `
+                    <p style="color: green; margin-bottom: 5px;">
+                        ✓ API Configured
+                        <span style="color: #666; font-size: 11px; margin-left: 10px;">
+                            Client ID: ${config.client_id ? config.client_id.substring(0, 8) + '...' : 'Not set'}
+                        </span>
+                    </p>
                 `;
-                document.getElementById('spotifyUsername').value = config.username;
+                // Pre-fill the client ID field if it exists
+                if (config.client_id && document.getElementById('clientId')) {
+                    document.getElementById('clientId').value = config.client_id;
+                }
             } else {
-                statusDiv.innerHTML = `
-                    <p style="color: red;">✗ Not configured</p>
-                    <p style="color: #666; font-size: 12px;">Please enter your Spotify credentials</p>
+                statusHTML += `
+                    <p style="color: orange; margin-bottom: 5px;">
+                        ⚠️ API Credentials Required
+                        <span style="color: #666; font-size: 11px; margin-left: 10px;">
+                            Please configure Step 1 below
+                        </span>
+                    </p>
                 `;
             }
+            
+            // Show account configuration status
+            if (config.configured && config.username) {
+                statusHTML += `
+                    <p style="color: green;">
+                        ✓ Account Connected: <strong>${config.username}</strong>
+                        <span style="color: #666; font-size: 11px; margin-left: 10px;">
+                            via ${config.backend}
+                        </span>
+                    </p>
+                `;
+                // Don't auto-fill username field - let user enter new one if needed
+            } else if (config.configured) {
+                statusHTML += `
+                    <p style="color: green;">
+                        ✓ Backend Configured
+                        <span style="color: #666; font-size: 11px; margin-left: 10px;">
+                            Using ${config.backend}
+                        </span>
+                    </p>
+                `;
+            } else {
+                statusHTML += `
+                    <p style="color: #999;">
+                        ○ No account connected
+                        <span style="color: #666; font-size: 11px; margin-left: 10px;">
+                            Configure Step 2 after API setup
+                        </span>
+                    </p>
+                `;
+            }
+            
+            statusHTML += '</div>';
+            statusDiv.innerHTML = statusHTML;
+        }
+        
+        // API credentials form
+        document.getElementById('apiForm')?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const clientId = document.getElementById('clientId').value;
+            const clientSecret = document.getElementById('clientSecret').value;
+            
+            const response = await fetch('/api/spotify/api-credentials', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({client_id: clientId, client_secret: clientSecret})
+            });
+            
+            if (response.ok) {
+                showAlert('✅ API credentials saved successfully');
+                document.getElementById('clientSecret').value = '';
+                loadSpotifyConfig();
+            } else {
+                showAlert('Failed to save API credentials', 'error');
+            }
+        });
+        
+        // OAuth login (make it global for onclick)
+        window.startOAuth = function() {
+            window.location.href = '/api/spotify/oauth/authorize';
         }
         
         // Spotify configuration
@@ -1759,19 +1865,72 @@ def uninstall():
     subprocess.Popen(['/opt/spotify-terminal/scripts/uninstall.sh'])
     return jsonify({"success": True})
 
+@app.route('/api/spotify/api-credentials', methods=['POST'])
+@login_required
+def set_api_credentials():
+    """Save Spotify API credentials"""
+    data = request.json
+    client_id = data.get('client_id', '').strip()
+    client_secret = data.get('client_secret', '').strip()
+    
+    if not client_id or not client_secret:
+        return jsonify({"error": "Client ID and Secret are required"}), 400
+    
+    config = load_config()
+    config['spotify_client_id'] = client_id
+    config['spotify_client_secret'] = client_secret
+    save_config(config)
+    
+    # Also save to environment for the spotify_server.py to use
+    env_file = '/opt/spotify-terminal/config/spotify.env'
+    os.makedirs(os.path.dirname(env_file), exist_ok=True)
+    with open(env_file, 'w') as f:
+        f.write(f"SPOTIFY_CLIENT_ID={client_id}\n")
+        f.write(f"SPOTIFY_CLIENT_SECRET={client_secret}\n")
+        f.write(f"SPOTIFY_REDIRECT_URI=http://localhost:8888/callback\n")
+    
+    return jsonify({"success": True, "message": "API credentials saved"})
+
+@app.route('/api/spotify/oauth/authorize')
+@login_required
+def spotify_oauth_authorize():
+    """Start OAuth flow"""
+    config = load_config()
+    client_id = config.get('spotify_client_id')
+    
+    if not client_id:
+        return jsonify({"error": "Please configure API credentials first"}), 400
+    
+    # Redirect to Spotify authorization
+    redirect_uri = "http://localhost:8888/callback"
+    scope = "user-read-playback-state user-modify-playback-state user-read-currently-playing playlist-read-private user-library-read streaming"
+    auth_url = f"https://accounts.spotify.com/authorize?client_id={client_id}&response_type=code&redirect_uri={redirect_uri}&scope={scope}"
+    
+    return redirect(auth_url)
+
 @app.route('/api/spotify/config', methods=['GET'])
 @login_required
 def get_spotify_config():
-    # Get current Spotify configuration
-    config_file = "/home/spotify-kids/.config/ncspot/config.toml"
-    spotifyd_config = "/home/spotify-kids/.config/spotifyd/spotifyd.conf"
-    raspotify_config = "/etc/default/raspotify"
+    # Get current configuration from our config file
+    config = load_config()
     
     spotify_config = {
         "configured": False,
-        "username": "",
-        "backend": "ncspot"
+        "username": None,  # Use None instead of empty string
+        "backend": "none",
+        "api_configured": False,
+        "client_id": None
     }
+    
+    # Check if API credentials are configured
+    if config.get('spotify_client_id') and config.get('spotify_client_secret'):
+        spotify_config['api_configured'] = True
+        spotify_config['client_id'] = config.get('spotify_client_id')
+    
+    # Check backend configurations
+    config_file = "/home/spotify-kids/.config/ncspot/config.toml"
+    spotifyd_config = "/home/spotify-kids/.config/spotifyd/spotifyd.conf"
+    raspotify_config = "/etc/default/raspotify"
     
     # Check raspotify first (system-wide config)
     if os.path.exists(raspotify_config):
@@ -1815,6 +1974,13 @@ def get_spotify_config():
                         break
         except:
             pass
+    
+    # Check for OAuth tokens in config
+    if config.get('spotify_oauth_token'):
+        spotify_config['configured'] = True
+        spotify_config['backend'] = 'oauth'
+        if config.get('spotify_username'):
+            spotify_config['username'] = config.get('spotify_username')
     
     return jsonify(spotify_config)
 
