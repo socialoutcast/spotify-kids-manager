@@ -306,5 +306,5 @@ if __name__ == '__main__':
         import threading
         threading.Timer(3, setup_kiosk_browser).start()
     
-    # Run Flask server
-    app.run(host='0.0.0.0', port=8080, debug=False)
+    # Run Flask server on non-standard port
+    app.run(host='0.0.0.0', port=8888, debug=False)
