@@ -128,7 +128,8 @@ install_dependencies() {
         werkzeug \
         python-dotenv \
         dbus-python \
-        pulsectl
+        pulsectl \
+        spotipy
     
     log_success "Dependencies installed"
     
@@ -764,16 +765,57 @@ EOF
     
     # Create Python touch GUI for ncspot
     
-    # Copy web player files
+    # Install web player files
     log_info "Installing web player files..."
-    cp "$INSTALL_DIR/../web/player.html" "$INSTALL_DIR/web/" 2>/dev/null || true
-    cp "$INSTALL_DIR/../web/player.js" "$INSTALL_DIR/web/" 2>/dev/null || true
-    cp "$INSTALL_DIR/../web/spotify_server.py" "$INSTALL_DIR/web/" 2>/dev/null || true
-    cp "$INSTALL_DIR/../scripts/start-web-player.sh" "$INSTALL_DIR/scripts/" 2>/dev/null || true
     
-    # Make scripts executable
-    chmod +x "$INSTALL_DIR/web/spotify_server.py"
-    chmod +x "$INSTALL_DIR/scripts/start-web-player.sh"
+    # Download web player files from GitHub
+    wget -q -O "$INSTALL_DIR/web/player.html" \
+        "https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/main/web/player.html" || {
+        log_warning "Failed to download player.html"
+    }
+    
+    wget -q -O "$INSTALL_DIR/web/player.js" \
+        "https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/main/web/player.js" || {
+        log_warning "Failed to download player.js"
+    }
+    
+    wget -q -O "$INSTALL_DIR/web/spotify_server.py" \
+        "https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/main/web/spotify_server.py" || {
+        log_warning "Failed to download spotify_server.py"
+    }
+    
+    wget -q -O "$INSTALL_DIR/scripts/start-web-player.sh" \
+        "https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/main/scripts/start-web-player.sh" || {
+        log_warning "Failed to download start-web-player.sh"
+    }
+    
+    # Create systemd service for web player
+    cat > "/etc/systemd/system/spotify-web-player.service" <<'EOF'
+[Unit]
+Description=Spotify Kids Web Player
+After=network.target sound.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=spotify-kids
+Group=audio
+Environment="HOME=/home/spotify-kids"
+Environment="USER=spotify-kids"
+WorkingDirectory=/opt/spotify-terminal/web
+ExecStart=/opt/spotify-terminal/scripts/start-web-player.sh
+Restart=always
+RestartSec=5
+StandardOutput=append:/opt/spotify-terminal/data/web-player.log
+StandardError=append:/opt/spotify-terminal/data/web-player-error.log
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    
+    # Make scripts executable if they exist
+    [ -f "$INSTALL_DIR/web/spotify_server.py" ] && chmod +x "$INSTALL_DIR/web/spotify_server.py"
+    [ -f "$INSTALL_DIR/scripts/start-web-player.sh" ] && chmod +x "$INSTALL_DIR/scripts/start-web-player.sh"
     
     
     # Keep multi-user.target as default (no GUI unless touchscreen detected)
