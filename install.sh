@@ -2856,13 +2856,33 @@ install_bootsplash() {
     # Create smaller versions
     convert "$THEME_DIR/logo.png" -resize 128x128 "$THEME_DIR/logo-128.png" 2>/dev/null
     
-    # Create simple spinner frames
+    # Create spinner frames with proper visibility
     for i in {0..11}; do
         angle=$((i * 30))
-        convert -size 64x64 xc:none \
-            -fill '#1db954' -draw "circle 32,12 36,12" \
+        # Create a more visible spinner with multiple dots
+        convert -size 64x64 xc:transparent \
+            -fill '#1db954' \
+            -draw "circle 32,8 36,8" \
+            -fill '#1db954dd' \
+            -draw "circle 32,8 36,8" -distort SRT "30" \
+            -fill '#1db954bb' \
+            -draw "circle 32,8 36,8" -distort SRT "60" \
+            -fill '#1db95499' \
+            -draw "circle 32,8 36,8" -distort SRT "90" \
+            -fill '#1db95466' \
+            -draw "circle 32,8 36,8" -distort SRT "120" \
+            -fill '#1db95444' \
+            -draw "circle 32,8 36,8" -distort SRT "150" \
+            -fill '#1db95422' \
+            -draw "circle 32,8 36,8" -distort SRT "180" \
             -distort SRT "$angle" \
-            "$THEME_DIR/spinner-$(printf "%02d" $i).png" 2>/dev/null || true
+            "$THEME_DIR/spinner-$i.png" 2>/dev/null || {
+                # Fallback to simple dot if complex version fails
+                convert -size 64x64 xc:transparent \
+                    -fill '#1db954' -draw "circle 32,10 37,10" \
+                    -rotate $angle \
+                    "$THEME_DIR/spinner-$i.png" 2>/dev/null || true
+            }
     done
     
     # Create progress bar
@@ -2873,32 +2893,124 @@ install_bootsplash() {
     cat > "$THEME_DIR/spotify-kids.script" <<'EOF'
 # Spotify Kids Manager Plymouth Theme
 
+# Set background gradient
 Window.SetBackgroundTopColor(0.05, 0.05, 0.05);
 Window.SetBackgroundBottomColor(0.0, 0.0, 0.0);
 
+# Logo setup
 logo.image = Image("logo.png");
 logo.sprite = Sprite(logo.image);
 logo.sprite.SetX(Window.GetWidth() / 2 - logo.image.GetWidth() / 2);
-logo.sprite.SetY(Window.GetHeight() / 2 - logo.image.GetHeight() / 2);
+logo.sprite.SetY(Window.GetHeight() / 2 - logo.image.GetHeight() / 2 - 50);
+logo.sprite.SetOpacity(1);
 
-progress_bar_bg.image = Image("progress-bar-bg.png");
-progress_bar_bg.sprite = Sprite(progress_bar_bg.image);
-progress_bar_bg.sprite.SetX(Window.GetWidth() / 2 - 200);
-progress_bar_bg.sprite.SetY(Window.GetHeight() - 100);
+# Message sprite for boot status
+message_sprite = Sprite();
+message_sprite.SetPosition(Window.GetWidth() / 2 - 200, Window.GetHeight() / 2 + 100, 0);
 
-progress_bar_fg.original = Image("progress-bar-fg.png");
-progress_bar_fg.sprite = Sprite();
-progress_bar_fg.sprite.SetX(Window.GetWidth() / 2 - 200);
-progress_bar_fg.sprite.SetY(Window.GetHeight() - 100);
+# Progress bar background
+progress_box.image = Image("progress-bar-bg.png");
+progress_box.sprite = Sprite(progress_box.image);
+progress_box.sprite.SetX(Window.GetWidth() / 2 - 200);
+progress_box.sprite.SetY(Window.GetHeight() / 2 + 150);
 
-fun progress_callback(duration, progress) {
-    if (progress_bar_fg.original) {
-        progress_bar_fg.image = progress_bar_fg.original.Scale(400 * progress, 6);
-        progress_bar_fg.sprite.SetImage(progress_bar_fg.image);
+# Progress bar foreground
+progress_bar.original_image = Image("progress-bar-fg.png");
+progress_bar.sprite = Sprite();
+progress_bar.sprite.SetX(Window.GetWidth() / 2 - 200);
+progress_bar.sprite.SetY(Window.GetHeight() / 2 + 150);
+
+# Spinner animation
+for (i = 0; i < 12; i++)
+    spinner_images[i] = Image("spinner-" + i + ".png");
+spinner = Sprite();
+spinner.SetX(Window.GetWidth() / 2 - 32);
+spinner.SetY(Window.GetHeight() / 2 + 50);
+
+# Animation variables
+global.counter = 0;
+global.progress_value = 0;
+
+# Boot progress callback
+fun boot_progress_callback(time, progress) {
+    global.progress_value = progress;
+    if (progress_bar.original_image) {
+        if (progress > 0) {
+            progress_bar.image = progress_bar.original_image.Scale(400 * progress, 6);
+            progress_bar.sprite.SetImage(progress_bar.image);
+        }
     }
 }
 
-Plymouth.SetBootProgressFunction(progress_callback);
+# Update status callback
+fun update_status_callback(status) {
+    if (status == "normal") {
+        message_sprite.SetOpacity(0);
+    } else if (status == "fsck") {
+        message = Image.Text("Checking disk...", 0.9, 0.9, 0.9);
+        message_sprite.SetImage(message);
+        message_sprite.SetOpacity(1);
+    } else if (status == "systemd") {
+        message = Image.Text("Starting services...", 0.9, 0.9, 0.9);
+        message_sprite.SetImage(message);
+        message_sprite.SetOpacity(1);
+    }
+}
+
+# Display message callback
+fun display_message_callback(text) {
+    message = Image.Text(text, 0.9, 0.9, 0.9);
+    message_sprite.SetImage(message);
+    message_sprite.SetX(Window.GetWidth() / 2 - message.GetWidth() / 2);
+    message_sprite.SetOpacity(1);
+}
+
+# Display password callback
+fun display_password_callback(prompt, bullets) {
+    prompt_sprite.SetImage(Image.Text(prompt, 0.9, 0.9, 0.9));
+    prompt_sprite.SetX(Window.GetWidth() / 2 - prompt_sprite.GetWidth() / 2);
+    prompt_sprite.SetY(Window.GetHeight() / 2 + 200);
+    prompt_sprite.SetOpacity(1);
+}
+
+# Refresh callback for animation
+fun refresh_callback() {
+    global.counter++;
+    
+    # Animate spinner only if we're still booting
+    if (global.progress_value < 1) {
+        spinner_index = Math.Int(global.counter / 3) % 12;
+        spinner.SetImage(spinner_images[spinner_index]);
+        spinner.SetOpacity(1);
+    } else {
+        spinner.SetOpacity(0);
+    }
+    
+    # Pulse logo slightly
+    opacity = 0.8 + 0.2 * Math.Sin(global.counter / 10.0);
+    logo.sprite.SetOpacity(opacity);
+}
+
+# Hide message callback
+fun hide_message_callback() {
+    message_sprite.SetOpacity(0);
+    prompt_sprite.SetOpacity(0);
+}
+
+# Quit callback
+fun quit_callback() {
+    logo.sprite.SetOpacity(1);
+    message_sprite.SetOpacity(0);
+}
+
+# Register callbacks
+Plymouth.SetBootProgressFunction(boot_progress_callback);
+Plymouth.SetUpdateStatusFunction(update_status_callback);
+Plymouth.SetDisplayMessageFunction(display_message_callback);
+Plymouth.SetDisplayPasswordFunction(display_password_callback);
+Plymouth.SetRefreshFunction(refresh_callback);
+Plymouth.SetHideMessageFunction(hide_message_callback);
+Plymouth.SetQuitFunction(quit_callback);
 EOF
     
     # Create the Plymouth theme file
@@ -2926,8 +3038,12 @@ EOF
     if [ -f /boot/cmdline.txt ]; then
         if ! grep -q "splash" /boot/cmdline.txt; then
             cp /boot/cmdline.txt /boot/cmdline.txt.backup
-            sed -i 's/$/ quiet splash plymouth.ignore-serial-consoles/' /boot/cmdline.txt
+            # Add comprehensive Plymouth parameters
+            sed -i 's/$/ quiet splash plymouth.ignore-serial-consoles logo.nologo vt.global_cursor_default=0/' /boot/cmdline.txt
+            # Change console to prevent text output
             sed -i 's/console=tty1/console=tty3/g' /boot/cmdline.txt
+            # Remove any fbcon parameters that might interfere
+            sed -i 's/fbcon=[^ ]*//g' /boot/cmdline.txt
         fi
     fi
     
@@ -2935,10 +3051,45 @@ EOF
     if [ -f /etc/default/grub ]; then
         if ! grep -q "splash" /etc/default/grub; then
             cp /etc/default/grub /etc/default/grub.backup
-            sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="[^"]*"/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"/' /etc/default/grub
+            sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="[^"]*"/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash loglevel=0 rd.udev.log_level=0 vt.global_cursor_default=0"/' /etc/default/grub
+            # Ensure Plymouth doesn't quit early
+            sed -i 's/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=0/' /etc/default/grub
             update-grub >/dev/null 2>&1 || true
         fi
     fi
+    
+    # Configure Plymouth to not quit on boot completion
+    if [ -f /etc/plymouth/plymouthd.conf ]; then
+        if ! grep -q "DeviceTimeout" /etc/plymouth/plymouthd.conf; then
+            echo "DeviceTimeout=10" >> /etc/plymouth/plymouthd.conf
+        fi
+    else
+        mkdir -p /etc/plymouth
+        cat > /etc/plymouth/plymouthd.conf <<EOF
+[Daemon]
+Theme=spotify-kids
+ShowDelay=0
+DeviceTimeout=10
+EOF
+    fi
+    
+    # Create systemd service to properly transition from Plymouth to X
+    cat > /etc/systemd/system/plymouth-quit-wait.service <<EOF
+[Unit]
+Description=Wait for Plymouth to quit before starting display manager
+After=plymouth-quit.service
+Before=display-manager.service getty@tty1.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/plymouth quit --wait
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    
+    systemctl enable plymouth-quit-wait.service 2>/dev/null || true
     
     log_success "Boot splash installed successfully"
 }
