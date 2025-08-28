@@ -1304,8 +1304,8 @@ HTML_TEMPLATE = '''
                         <strong>${user.username}</strong>
                         ${user.auto_login ? '<span style="color: green; margin-left: 10px;">✓ Auto-login</span>' : ''}
                         ${user.is_logged_in ? '<span style="color: #1db954; margin-left: 10px;">● Active</span>' : ''}
-                        ${user.spotify_username ? `<span style="color: #1db954; margin-left: 10px;">♪ ${user.spotify_username}</span>` : 
-                          (user.spotify_configured ? '<span style="color: orange; margin-left: 10px;">♪ Not logged in</span>' : '')}
+                        ${user.spotify_username && user.spotify_username !== '' ? `<span style="color: #1db954; margin-left: 10px;">♪ ${user.spotify_username}</span>` : 
+                          (user.spotify_configured ? '<span style="color: orange; margin-left: 10px;">♪ Configured</span>' : '')}
                     </div>
                     <div>
                         ${!user.auto_login ? `<button class="btn" onclick="setAutoLogin('${user.username}')">Set Auto-login</button>` : ''}
@@ -1905,7 +1905,7 @@ def get_users():
                             'uid': uid,
                             'home': home,
                             'spotify_configured': spotify_configured,
-                            'spotify_username': spotify_username,
+                            'spotify_username': spotify_username if spotify_username else None,  # Ensure None, not empty string
                             'is_logged_in': is_logged_in,
                             'auto_login': auto_login
                         })
