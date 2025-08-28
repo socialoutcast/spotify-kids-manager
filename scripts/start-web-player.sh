@@ -31,15 +31,28 @@ fi
 
 # Kill any existing instances
 pkill -f spotify_server.py 2>/dev/null
+pkill -f app.py 2>/dev/null  # Kill admin panel if running
 pkill -f chromium 2>/dev/null
 sleep 2
 
-# Start the Flask server
-log "Starting web server on port 8080..."
+# Make sure admin panel isn't using port 8080
+if lsof -Pi :8080 -sTCP:LISTEN -t >/dev/null ; then
+    log "Port 8080 is in use, killing process..."
+    lsof -Pi :8080 -sTCP:LISTEN -t | xargs kill -9 2>/dev/null
+    sleep 1
+fi
+
+# Start the Spotify player server (not admin panel)
+log "Starting Spotify web player server on port 8080..."
 cd /opt/spotify-terminal/web
-python3 spotify_server.py >> "$LOG_FILE" 2>&1 &
-SERVER_PID=$!
-log "Server started with PID: $SERVER_PID"
+if [ -f spotify_server.py ]; then
+    python3 spotify_server.py >> "$LOG_FILE" 2>&1 &
+    SERVER_PID=$!
+    log "Spotify player server started with PID: $SERVER_PID"
+else
+    log "ERROR: spotify_server.py not found!"
+    exit 1
+fi
 
 # Wait for server to start
 sleep 3
@@ -122,7 +135,7 @@ if [ -n "$DISPLAY" ] && xset q &>/dev/null; then
     BROWSER_PID=$!
     log "Browser launched with PID: $BROWSER_PID"
     
-    # Monitor processes
+    # Monitor processes (but don't restart browser to prevent flashing)
     while true; do
         # Check if server is still running
         if ! kill -0 $SERVER_PID 2>/dev/null; then
@@ -132,11 +145,20 @@ if [ -n "$DISPLAY" ] && xset q &>/dev/null; then
             SERVER_PID=$!
         fi
         
-        # Check if browser is still running
+        # Don't auto-restart browser to prevent flashing
+        # Just check if it's still running
         if ! kill -0 $BROWSER_PID 2>/dev/null; then
-            log "Browser died, restarting..."
-            chromium-browser "${CHROME_ARGS[@]}" >> "$LOG_FILE" 2>&1 &
-            BROWSER_PID=$!
+            log "Browser closed"
+            # If device is locked, restart it
+            if [ "$LOCKED" = true ]; then
+                log "Device locked, restarting browser..."
+                sleep 2
+                chromium-browser "${CHROME_ARGS[@]}" >> "$LOG_FILE" 2>&1 &
+                BROWSER_PID=$!
+            else
+                # Exit cleanly if browser closes and device not locked
+                break
+            fi
         fi
         
         sleep 10

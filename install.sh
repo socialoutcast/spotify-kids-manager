@@ -784,9 +784,9 @@ EOF
         log_warning "Failed to download spotify_server.py"
     }
     
-    wget -q -O "$INSTALL_DIR/scripts/start-web-player.sh" \
-        "https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/main/scripts/start-web-player.sh" || {
-        log_warning "Failed to download start-web-player.sh"
+    wget -q -O "$INSTALL_DIR/scripts/start-spotify-player.sh" \
+        "https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/main/scripts/start-spotify-player.sh" || {
+        log_warning "Failed to download start-spotify-player.sh"
     }
     
     # Create systemd service for web player
@@ -803,7 +803,7 @@ Group=audio
 Environment="HOME=/home/spotify-kids"
 Environment="USER=spotify-kids"
 WorkingDirectory=/opt/spotify-terminal/web
-ExecStart=/opt/spotify-terminal/scripts/start-web-player.sh
+ExecStart=/opt/spotify-terminal/scripts/start-spotify-player.sh
 Restart=always
 RestartSec=5
 StandardOutput=append:/opt/spotify-terminal/data/web-player.log
@@ -815,7 +815,7 @@ EOF
     
     # Make scripts executable if they exist
     [ -f "$INSTALL_DIR/web/spotify_server.py" ] && chmod +x "$INSTALL_DIR/web/spotify_server.py"
-    [ -f "$INSTALL_DIR/scripts/start-web-player.sh" ] && chmod +x "$INSTALL_DIR/scripts/start-web-player.sh"
+    [ -f "$INSTALL_DIR/scripts/start-spotify-player.sh" ] && chmod +x "$INSTALL_DIR/scripts/start-spotify-player.sh"
     
     
     # Keep multi-user.target as default (no GUI unless touchscreen detected)
