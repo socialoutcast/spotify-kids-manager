@@ -1,16 +1,18 @@
-# Spotify Kids Terminal Manager
+# Spotify Kids Manager
 
-A terminal-based Spotify client for Raspberry Pi with parental controls and web-based administration.
+A touchscreen-friendly Spotify player designed for Raspberry Pi, perfect for creating a kid-safe music device with parental controls and web-based administration.
 
 ## Features
 
-- **Terminal Spotify Client**: Full-screen ncspot client optimized for touchscreen
-- **Parental Controls**: Lock device to prevent kids from exiting the player
-- **Web Admin Panel**: Manage everything from any device on your network
-- **Bluetooth Management**: Connect and manage Bluetooth speakers/headphones
-- **Auto-start**: Dedicated user account that automatically starts Spotify on boot
-- **Security**: No sudo access for the Spotify user, locked down environment
-- **Easy Install**: Single command installation with web-based setup
+- 🎵 **Full Spotify Web Player**: Beautiful web interface with album art and playlists
+- 🔒 **Device Lock**: Prevents kids from exiting the player or accessing system
+- 📱 **Touchscreen Optimized**: Designed for Raspberry Pi touchscreens
+- 🎨 **Kid-Friendly Interface**: Clean, colorful design that's easy to navigate
+- 👤 **Multi-user Support**: Each family member can have their own account
+- 🔐 **Web Admin Panel**: Manage everything from any device on your network
+- 🎧 **Bluetooth Support**: Connect wireless speakers and headphones
+- 📶 **Spotify Connect**: Use as a Spotify Connect device from your phone
+- 🚫 **No Video Content**: Music only - no podcasts or video content accessible
 
 ## Requirements
 
@@ -62,40 +64,85 @@ sudo ./install.sh --reset    # Complete reset
 sudo ./install.sh --diagnose # Run diagnostics
 ```
 
-## Post-Installation
+## Setting Up Spotify (Required)
+
+### Step 1: Create a Spotify App
+
+1. Go to [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
+2. Log in with your Spotify account
+3. Click **"Create app"**
+4. Fill in the app details:
+   - **App name**: `Spotify Kids Player` (or any name you prefer)
+   - **App description**: `Personal Spotify player for Raspberry Pi`
+   - **Website**: Leave blank or use `http://localhost`
+   - **Redirect URI**: Click "Add" and enter: `http://localhost:8888/callback`
+   - ⚠️ **Important**: If accessing from another device, also add: `http://[your-pi-ip]:8888/callback`
+5. Check **"Web API"** under "Which API/SDKs are you planning to use?"
+6. Check the agreement checkbox
+7. Click **"Save"**
+
+### Step 2: Get Your Credentials
+
+1. In your app's dashboard, you'll see your **Client ID** (a 32-character string)
+2. Click **"View client secret"** to reveal your **Client Secret** (another 32-character string)
+3. **Copy both values** - you'll need them for configuration
+
+### Step 3: Configure in Admin Panel
 
 After installation:
 
-1. The device will reboot automatically
-2. Access the web admin panel at: `http://[your-pi-ip]:8080`
-3. Default credentials:
-   - Username: `admin`
+1. Access the web admin panel at: `http://[your-pi-ip]:8080`
+2. Default login credentials:
+   - Username: `admin` 
    - Password: `changeme`
-4. **IMPORTANT**: Change the password immediately!
-5. Configure your Spotify credentials through the terminal on first run
+3. **IMMEDIATELY change the admin password!**
+4. Go to **Spotify Configuration** section
+5. In **Step 1: Spotify API Credentials**:
+   - Paste your **Client ID**
+   - Paste your **Client Secret**  
+   - Click **"Save API Credentials"**
+6. In **Step 2: Spotify Account Login**:
+   - **Option A (Recommended)**: Click **"Login with Spotify OAuth"**
+     - You'll be redirected to Spotify
+     - Authorize the app
+     - You'll return to the player automatically
+   - **Option B**: Enter username/password for backend authentication
 
-## Web Admin Features
+## Using the Player
 
-- **Device Control**: Lock/unlock the device to prevent exit
-- **Spotify Access**: Enable/disable Spotify completely
-- **Bluetooth Management**: Scan, pair, and connect Bluetooth devices
-- **Account Settings**: Change admin password
-- **System Info**: View system status, logs, and restart services
+### Web Player Interface
 
-## Usage
+The player automatically launches on boot at `http://localhost:8888` (or `http://[pi-ip]:8888` from another device)
 
-### For Kids
-- Device boots directly into Spotify player
-- Full touchscreen support
-- Cannot exit when device is locked
-- Only music content available (no video/podcasts)
+**Main Features:**
+- 🔍 **Search**: Tap search icon to find songs, artists, albums
+- 📚 **Library**: Your playlists appear in the sidebar
+- 🎵 **Now Playing**: Shows current track with large album art
+- ⏯️ **Controls**: Play/pause, skip, shuffle, repeat, like
+- ⌨️ **Touch Keyboard**: Automatically appears when searching (touchscreen only)
 
-### For Parents
-- Access web panel from any device: `http://[pi-ip]:8080`
-- Lock/unlock device remotely
-- Disable Spotify access during homework time
-- Manage Bluetooth speakers
-- View system status and logs
+### Admin Panel Controls
+
+Access at `http://[your-pi-ip]:8080`
+
+**Device Control:**
+- **Device Lock Toggle**:
+  - **ON**: Locks screen, disables touchscreen input, blanks display
+  - **OFF**: Unlocks screen, re-enables touch, restarts player
+  
+- **Spotify Access Toggle**:
+  - **ON**: Launches Spotify player in kiosk mode
+  - **OFF**: Closes player, shows desktop for admin tasks
+
+**User Management:**
+- Create non-admin users for each child
+- Configure auto-login for selected user
+- Each user can have separate Spotify settings
+
+**Bluetooth Devices:**
+- Scan for available devices
+- Connect/disconnect speakers and headphones
+- Manage paired devices
 
 ## Architecture
 
@@ -121,34 +168,68 @@ This will:
 
 ## Troubleshooting
 
-### No Audio
+### "Authentication Required" or Blank Player Screen
+
+This means Spotify API credentials haven't been configured:
+1. Go to admin panel (`http://[pi-ip]:8080`)
+2. Follow the Spotify setup steps above
+3. Make sure to save both Client ID and Secret
+4. Use OAuth login for best results
+
+### "INVALID_CLIENT: Invalid redirect URI"
+
+The redirect URI doesn't match what's in your Spotify app:
+1. Go to [Spotify App Settings](https://developer.spotify.com/dashboard)
+2. Add these redirect URIs:
+   - `http://localhost:8888/callback`
+   - `http://[your-pi-ip]:8888/callback` (replace with actual IP)
+3. Save changes and try again
+
+### Cannot Find Spotify Username
+
+Your username is NOT your email. To find it:
+1. Open Spotify (app or web)
+2. Click your profile → Account
+3. Your username is shown in account overview
+4. It's usually a random string like "31xyzabc123"
+
+### Player Works But No Sound
+
 ```bash
-# Test speakers
+# Test audio output
 speaker-test -c 2
 
-# Check audio devices
-aplay -l
+# Check selected audio device
+amixer
+alsamixer  # Use F6 to select sound card
 
-# Restart PulseAudio
-pulseaudio -k && pulseaudio --start
+# For Bluetooth speakers, check connection
+bluetoothctl info [device-mac]
 ```
 
-### Cannot Access Web Panel
+### 502 Bad Gateway Error
+
 ```bash
-# Check service status
-sudo systemctl status spotify-terminal-admin
+# Restart services
+sudo systemctl restart spotify-web
+sudo systemctl restart spotify-terminal-admin
+sudo systemctl restart nginx
 
-# Check nginx
-sudo systemctl status nginx
-
-# View logs
-sudo journalctl -u spotify-terminal-admin -f
+# Check logs
+sudo journalctl -u spotify-web -f
 ```
 
-### Spotify Not Working
-- Verify you have a Premium account
-- Check credentials (username, not email!)
-- First-time setup requires configuration in terminal
+### Device Lock Not Working
+
+Touchscreen might not be detected properly:
+```bash
+# List input devices
+xinput list
+
+# Test touchscreen manually
+xinput disable [device-id]
+xinput enable [device-id]
+```
 
 ### Bluetooth Issues
 ```bash
