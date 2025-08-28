@@ -3043,21 +3043,14 @@ EOF
     # Update initramfs
     update-initramfs -u >/dev/null 2>&1 || true
     
-    # Configure boot parameters for Raspberry Pi
+    # Configure boot parameters for Raspberry Pi (SIMPLE)
     if [ -f /boot/cmdline.txt ]; then
         cp /boot/cmdline.txt /boot/cmdline.txt.backup
         
-        # Clean up existing parameters first
-        sed -i 's/ quiet//g; s/ splash//g; s/ plymouth[^ ]*//g; s/ logo[^ ]*//g; s/ vt[^ ]*//g; s/ loglevel=[^ ]*//g; s/ rd\.[^ ]*//g; s/ fsck\.[^ ]*//g' /boot/cmdline.txt
-        
-        # Add comprehensive Plymouth parameters for persistent splash
-        sed -i 's/$/ quiet splash plymouth.enable=1 plymouth.ignore-serial-consoles logo.nologo vt.global_cursor_default=0 loglevel=0 rd.systemd.show_status=0 rd.udev.log_level=0 fsck.mode=skip/' /boot/cmdline.txt
-        
-        # Change console to prevent text output
-        sed -i 's/console=tty1/console=tty3/g' /boot/cmdline.txt
-        
-        # Remove any fbcon parameters that might interfere
-        sed -i 's/fbcon=[^ ]*//g' /boot/cmdline.txt
+        # Just add basic splash parameters if not present
+        if ! grep -q "splash" /boot/cmdline.txt; then
+            sed -i 's/$/ quiet splash plymouth.ignore-serial-consoles/' /boot/cmdline.txt
+        fi
     fi
     
     # Configure GRUB for standard systems
@@ -3086,38 +3079,16 @@ DeviceTimeout=10
 EOF
     fi
     
-    # Keep Plymouth running until X starts
-    systemctl disable plymouth-quit.service 2>/dev/null || true
-    systemctl disable plymouth-quit-wait.service 2>/dev/null || true
+    # Simple Plymouth configuration - let it work normally
+    log_info "Configuring Plymouth services..."
     
-    # Create service to quit Plymouth only when X starts
-    cat > /etc/systemd/system/plymouth-quit-on-x.service <<EOF
-[Unit]
-Description=Quit Plymouth when X server starts
-After=multi-user.target
-Before=getty@tty1.service
-
-[Service]
-Type=oneshot
-ExecStart=/bin/bash -c 'while ! pgrep -x "Xorg" > /dev/null; do sleep 1; done; sleep 2; /usr/bin/plymouth quit'
-RemainAfterExit=yes
-TimeoutSec=60
-
-[Install]
-WantedBy=graphical.target
-EOF
+    # Ensure standard Plymouth services are enabled
+    systemctl unmask plymouth.service plymouth-quit.service plymouth-quit-wait.service 2>/dev/null || true
+    systemctl enable plymouth.service plymouth-quit.service plymouth-quit-wait.service 2>/dev/null || true
     
-    systemctl enable plymouth-quit-on-x.service 2>/dev/null || true
-    
-    # Override getty to wait for Plymouth
-    mkdir -p /etc/systemd/system/getty@tty1.service.d
-    cat > /etc/systemd/system/getty@tty1.service.d/plymouth.conf <<EOF
-[Unit]
-After=plymouth-quit-on-x.service
-
-[Service]
-ExecStartPre=-/bin/bash -c 'while [ -f /run/plymouth/pid ]; do sleep 1; done'
-EOF
+    # Clean up any custom overrides from previous installs
+    rm -rf /etc/systemd/system/getty@*.service.d/
+    rm -f /etc/systemd/system/plymouth-*.service 2>/dev/null || true
     
     # Ensure Plymouth modules in initramfs
     if [ -f /etc/initramfs-tools/modules ]; then
@@ -3373,16 +3344,23 @@ uninstall_all() {
     # Restore original boot splash
     log_info "Restoring original boot splash..."
     
-    # Restore original Plymouth theme
+    # Restore original Plymouth theme if we have backup
     if [ -f "$INSTALL_DIR/config/original-plymouth-theme.conf" ]; then
         ORIGINAL_THEME=$(cat "$INSTALL_DIR/config/original-plymouth-theme.conf" 2>/dev/null || echo "bgrt")
         plymouth-set-default-theme "$ORIGINAL_THEME" 2>/dev/null || true
-        update-initramfs -u >/dev/null 2>&1 || true
     fi
     
     # Remove our custom theme
     rm -rf /usr/share/plymouth/themes/spotify-kids 2>/dev/null || true
     update-alternatives --remove default.plymouth /usr/share/plymouth/themes/spotify-kids/spotify-kids.plymouth 2>/dev/null || true
+    
+    # Remove any Plymouth service overrides we created
+    rm -f /etc/systemd/system/plymouth-*.service 2>/dev/null || true
+    rm -rf /etc/systemd/system/getty@*.service.d/ 2>/dev/null || true
+    
+    # Restore Plymouth services to defaults
+    systemctl unmask plymouth.service plymouth-quit.service plymouth-quit-wait.service 2>/dev/null || true
+    systemctl enable plymouth.service plymouth-quit.service plymouth-quit-wait.service 2>/dev/null || true
     
     # Restore boot configuration files
     if [ -f "$INSTALL_DIR/config/cmdline.txt.backup" ]; then
@@ -3398,6 +3376,9 @@ uninstall_all() {
         cp /etc/default/grub.backup /etc/default/grub 2>/dev/null || true
         update-grub >/dev/null 2>&1 || true
     fi
+    
+    # Update initramfs to remove our theme
+    update-initramfs -u >/dev/null 2>&1 || true
     
     # Reset default runlevel back to graphical if it was changed
     systemctl set-default graphical.target 2>/dev/null || true
