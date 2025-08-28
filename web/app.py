@@ -369,8 +369,12 @@ HTML_TEMPLATE = '''
     <script>
         function showAlert(message, type = 'success') {
             const alertDiv = document.getElementById('alerts');
-            alertDiv.innerHTML = `<div class="alert ${type}">${message}</div>`;
-            setTimeout(() => alertDiv.innerHTML = '', 5000);
+            // Convert newlines to <br> for multi-line messages
+            const formattedMessage = message.replace(/\n/g, '<br>');
+            alertDiv.innerHTML = `<div class="alert ${type}">${formattedMessage}</div>`;
+            // Keep error messages visible longer
+            const timeout = type === 'error' ? 10000 : 5000;
+            setTimeout(() => alertDiv.innerHTML = '', timeout);
         }
         
         // Login form
@@ -393,25 +397,55 @@ HTML_TEMPLATE = '''
         
         // Device lock toggle
         document.getElementById('deviceLock')?.addEventListener('change', async (e) => {
-            const response = await fetch('/api/device/lock', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({locked: e.target.checked})
-            });
-            if (response.ok) {
-                showAlert(`Device ${e.target.checked ? 'locked' : 'unlocked'}`);
+            const checkbox = e.target;
+            checkbox.disabled = true; // Disable during operation
+            
+            try {
+                const response = await fetch('/api/device/lock', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({locked: e.target.checked})
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    showAlert(result.message || `Device ${e.target.checked ? 'locked' : 'unlocked'}`);
+                } else {
+                    showAlert('Failed to change device lock state', 'error');
+                    checkbox.checked = !checkbox.checked; // Revert on error
+                }
+            } catch (err) {
+                showAlert('Error communicating with device', 'error');
+                checkbox.checked = !checkbox.checked;
+            } finally {
+                checkbox.disabled = false;
             }
         });
         
         // Spotify access toggle
         document.getElementById('spotifyAccess')?.addEventListener('change', async (e) => {
-            const response = await fetch('/api/spotify/access', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({enabled: e.target.checked})
-            });
-            if (response.ok) {
-                showAlert(`Spotify ${e.target.checked ? 'enabled' : 'disabled'}`);
+            const checkbox = e.target;
+            checkbox.disabled = true; // Disable during operation
+            
+            try {
+                const response = await fetch('/api/spotify/access', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({enabled: e.target.checked})
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    showAlert(result.message || `Spotify ${e.target.checked ? 'enabled' : 'disabled'}`);
+                } else {
+                    showAlert('Failed to change Spotify access', 'error');
+                    checkbox.checked = !checkbox.checked; // Revert on error
+                }
+            } catch (err) {
+                showAlert('Error communicating with service', 'error');
+                checkbox.checked = !checkbox.checked;
+            } finally {
+                checkbox.disabled = false;
             }
         });
         
@@ -562,20 +596,43 @@ HTML_TEMPLATE = '''
             const password = document.getElementById('spotifyPassword').value;
             const target_user = document.getElementById('targetUser').value;
             
-            const response = await fetch('/api/spotify/config', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({username, password, target_user})
-            });
+            // Show loading state
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            const originalText = submitBtn.textContent;
+            submitBtn.textContent = 'Testing credentials...';
+            submitBtn.disabled = true;
             
-            if (response.ok) {
+            try {
+                const response = await fetch('/api/spotify/config', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({username, password, target_user})
+                });
+                
                 const result = await response.json();
-                showAlert(`Spotify configured successfully! Using ${result.backend}`);
-                loadSpotifyConfig();
-                document.getElementById('spotifyPassword').value = '';
-            } else {
-                const error = await response.json();
-                showAlert(error.error || 'Failed to configure Spotify', 'error');
+                
+                if (response.ok) {
+                    // Success message
+                    let message = `✅ Spotify configured successfully! Using ${result.backend}`;
+                    if (result.warning) {
+                        message += `\n⚠️ ${result.warning}`;
+                    }
+                    showAlert(message);
+                    loadSpotifyConfig();
+                    document.getElementById('spotifyPassword').value = '';
+                } else {
+                    // Error with details
+                    let errorMsg = result.error || 'Failed to configure Spotify';
+                    if (result.details) {
+                        errorMsg += '\n\n' + result.details;
+                    }
+                    showAlert(errorMsg, 'error');
+                }
+            } catch (err) {
+                showAlert('Network error: Could not connect to server', 'error');
+            } finally {
+                submitBtn.textContent = originalText;
+                submitBtn.disabled = false;
             }
         });
         
@@ -744,11 +801,67 @@ def device_lock():
     # Create or remove lock file
     if data['locked']:
         open(LOCK_FILE, 'a').close()
+        
+        # Lock the screen by:
+        # 1. Kill any running browser/GUI
+        subprocess.run(['pkill', '-f', 'chromium'], capture_output=True)
+        subprocess.run(['pkill', '-f', 'spotify_server.py'], capture_output=True)
+        
+        # 2. Disable touchscreen input - find the actual touchscreen device
+        # Get list of input devices and find touchscreen
+        xinput_result = subprocess.run(['xinput', 'list'], capture_output=True, text=True)
+        touchscreen_id = None
+        if xinput_result.returncode == 0:
+            for line in xinput_result.stdout.splitlines():
+                if 'touchscreen' in line.lower() or 'touch' in line.lower():
+                    # Extract device ID
+                    import re
+                    match = re.search(r'id=(\d+)', line)
+                    if match:
+                        touchscreen_id = match.group(1)
+                        break
+        
+        if touchscreen_id:
+            subprocess.run(['xinput', 'disable', touchscreen_id], capture_output=True)
+        
+        # 3. Black out the screen with a lock message
+        lock_display_cmd = '''
+DISPLAY=:0 xset dpms force off
+'''
+        subprocess.run(lock_display_cmd, shell=True, capture_output=True)
+        
+        message = "Device locked - touchscreen disabled"
     else:
         if os.path.exists(LOCK_FILE):
             os.remove(LOCK_FILE)
+        
+        # Unlock the screen by:
+        # 1. Re-enable touchscreen - find the actual touchscreen device
+        xinput_result = subprocess.run(['xinput', 'list'], capture_output=True, text=True)
+        touchscreen_id = None
+        if xinput_result.returncode == 0:
+            for line in xinput_result.stdout.splitlines():
+                if 'touchscreen' in line.lower() or 'touch' in line.lower():
+                    import re
+                    match = re.search(r'id=(\d+)', line)
+                    if match:
+                        touchscreen_id = match.group(1)
+                        break
+        
+        if touchscreen_id:
+            subprocess.run(['xinput', 'enable', touchscreen_id], capture_output=True)
+        
+        # 2. Wake the display
+        subprocess.run(['DISPLAY=:0 xset dpms force on'], shell=True, capture_output=True)
+        
+        # 3. Restart the Spotify web player
+        subprocess.Popen(['/opt/spotify-terminal/scripts/start-web-player.sh'], 
+                        stdout=subprocess.DEVNULL, 
+                        stderr=subprocess.DEVNULL)
+        
+        message = "Device unlocked - restarting Spotify player"
     
-    return jsonify({"success": True})
+    return jsonify({"success": True, "message": message})
 
 @app.route('/api/spotify/access', methods=['POST'])
 @login_required
@@ -762,11 +875,36 @@ def spotify_access():
     with open(CLIENT_CONFIG, 'w') as f:
         f.write(f"SPOTIFY_DISABLED={'false' if data['enabled'] else 'true'}\n")
     
-    # Restart client if disabled
-    if not data['enabled']:
+    if data['enabled']:
+        # Enable Spotify - Launch the web player
+        # 1. Kill any existing desktop sessions to clean up
+        subprocess.run(['pkill', '-f', 'lxsession'], capture_output=True)
+        subprocess.run(['pkill', '-f', 'pcmanfm'], capture_output=True)
+        
+        # 2. Start the Spotify web player in kiosk mode
+        subprocess.Popen(['/opt/spotify-terminal/scripts/start-web-player.sh'], 
+                        stdout=subprocess.DEVNULL, 
+                        stderr=subprocess.DEVNULL)
+        
+        message = "Spotify enabled - launching player"
+    else:
+        # Disable Spotify - Close web app and show desktop
+        # 1. Kill the web player and browser
+        subprocess.run(['pkill', '-f', 'chromium'], capture_output=True)
+        subprocess.run(['pkill', '-f', 'spotify_server.py'], capture_output=True)
         subprocess.run(['pkill', '-f', 'ncspot'], capture_output=True)
+        subprocess.run(['pkill', 'raspotify'], capture_output=True)
+        subprocess.run(['pkill', 'spotifyd'], capture_output=True)
+        
+        # 2. Start desktop environment for the spotify-kids user
+        desktop_cmd = '''
+su - spotify-kids -c "DISPLAY=:0 startlxde" &
+'''
+        subprocess.run(desktop_cmd, shell=True, capture_output=True)
+        
+        message = "Spotify disabled - desktop available"
     
-    return jsonify({"success": True})
+    return jsonify({"success": True, "message": message})
 
 @app.route('/api/bluetooth/scan')
 @login_required
@@ -1269,6 +1407,136 @@ ExecStart=-/sbin/agetty --autologin {username} --noclear %I \$TERM
     subprocess.run(['systemctl', 'daemon-reload'])
     subprocess.run(['systemctl', 'restart', 'getty@tty1.service'])
 
+def test_spotify_auth(username, password, backend):
+    """Test Spotify authentication with the given credentials"""
+    import tempfile
+    import time
+    from datetime import datetime
+    
+    # Log the authentication attempt
+    log_dir = "/opt/spotify-terminal/data"
+    os.makedirs(log_dir, exist_ok=True)
+    log_file = f"{log_dir}/spotify-auth.log"
+    
+    with open(log_file, 'a') as f:
+        f.write(f"\n[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Testing auth for user: {username}, backend: {backend}\n")
+    
+    if backend == "raspotify":
+        # Test with librespot (raspotify's backend)
+        test_cmd = [
+            'timeout', '10',
+            'librespot',
+            '--username', username,
+            '--password', password,
+            '--backend', 'alsa',
+            '--name', 'AuthTest',
+            '--disable-audio-cache',
+            '--onevent', 'echo'
+        ]
+        
+        result = subprocess.run(test_cmd, capture_output=True, text=True)
+        
+        with open(log_file, 'a') as f:
+            f.write(f"Raspotify test result: {result.returncode}\n")
+            f.write(f"Stdout: {result.stdout[:500]}\n")
+            f.write(f"Stderr: {result.stderr[:500]}\n")
+        
+        # Check for specific error messages
+        if "Bad credentials" in result.stderr or "Authentication failed" in result.stderr:
+            return {
+                'success': False,
+                'error': 'Invalid Spotify credentials',
+                'details': 'Username or password is incorrect. Make sure to use your Spotify username (not email) and correct password.'
+            }
+        elif "Premium account is required" in result.stderr:
+            return {
+                'success': False,
+                'error': 'Spotify Premium required',
+                'details': 'This account does not have Spotify Premium. A Premium subscription is required.'
+            }
+        elif result.returncode == 124:  # Timeout
+            # Timeout might mean it was trying to connect, which is actually good
+            return {'success': True}
+        elif result.returncode == 0 or "authenticated as" in result.stderr.lower():
+            return {'success': True}
+        else:
+            return {
+                'success': False,
+                'error': 'Authentication test failed',
+                'details': f'Unable to verify credentials. Error: {result.stderr[:200] if result.stderr else "Unknown error"}'
+            }
+            
+    elif backend == "spotifyd":
+        # Create a temporary config file for spotifyd test
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.conf', delete=False) as f:
+            f.write(f'''[global]
+username = {username}
+password = {password}
+backend = alsa
+device_name = AuthTest
+''')
+            temp_config = f.name
+        
+        try:
+            test_cmd = [
+                'timeout', '10',
+                '/usr/local/bin/spotifyd',
+                '--config-path', temp_config,
+                '--no-daemon'
+            ]
+            
+            result = subprocess.run(test_cmd, capture_output=True, text=True)
+            
+            with open(log_file, 'a') as f:
+                f.write(f"Spotifyd test result: {result.returncode}\n")
+                f.write(f"Stdout: {result.stdout[:500]}\n")
+                f.write(f"Stderr: {result.stderr[:500]}\n")
+            
+            if "Bad credentials" in result.stderr or "Authentication failed" in result.stderr:
+                return {
+                    'success': False,
+                    'error': 'Invalid Spotify credentials',
+                    'details': 'Username or password is incorrect.'
+                }
+            elif "Premium" in result.stderr:
+                return {
+                    'success': False,
+                    'error': 'Spotify Premium required',
+                    'details': 'A Premium subscription is required.'
+                }
+            elif result.returncode == 124:  # Timeout means it was running
+                return {'success': True}
+            else:
+                return {'success': True}
+        finally:
+            os.unlink(temp_config)
+    
+    else:  # ncspot or unknown
+        # For ncspot, we can't easily test without interactive mode
+        # Just do basic validation
+        if '@' in username:
+            return {
+                'success': False,
+                'error': 'Invalid username format',
+                'details': 'Please use your Spotify username, not your email address. You can find your username in Spotify account settings.'
+            }
+        
+        # Basic check that credentials aren't empty
+        if len(password) < 4:
+            return {
+                'success': False,
+                'error': 'Password too short',
+                'details': 'Please enter your Spotify password.'
+            }
+        
+        with open(log_file, 'a') as f:
+            f.write(f"Ncspot backend - basic validation passed\n")
+        
+        return {
+            'success': True,
+            'warning': 'Credentials saved but could not be fully verified with ncspot. They will be tested on first login.'
+        }
+
 @app.route('/api/spotify/config', methods=['POST'])
 @login_required
 def set_spotify_config():
@@ -1296,6 +1564,14 @@ def set_spotify_config():
         backend = "raspotify"
     elif os.path.exists("/usr/local/bin/spotifyd"):
         backend = "spotifyd"
+    
+    # Test authentication with Spotify before saving
+    auth_test_result = test_spotify_auth(username, password, backend)
+    if not auth_test_result['success']:
+        return jsonify({
+            "error": auth_test_result['error'],
+            "details": auth_test_result.get('details', '')
+        }), 401
     
     if backend == "ncspot":
         # Configure ncspot for target user
@@ -1421,7 +1697,18 @@ normalisation_pregain = -10
     # Restart the target user's session to apply changes
     subprocess.run(['pkill', '-u', target_user], capture_output=True)
     
-    return jsonify({"success": True, "message": f"Spotify configured for {target_user} with username {username}", "backend": backend, "user": target_user})
+    response_data = {
+        "success": True, 
+        "message": f"Spotify configured for {target_user} with username {username}", 
+        "backend": backend, 
+        "user": target_user
+    }
+    
+    # Add warning if present from auth test
+    if auth_test_result.get('warning'):
+        response_data['warning'] = auth_test_result['warning']
+    
+    return jsonify(response_data)
 
 @app.route('/api/system/reboot', methods=['POST'])
 @login_required
