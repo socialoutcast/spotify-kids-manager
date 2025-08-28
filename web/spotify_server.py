@@ -5,6 +5,7 @@ Handles OAuth, serves the web interface, and bridges to raspotify/spotifyd
 """
 
 from flask import Flask, request, jsonify, session, redirect, render_template, send_file
+from flask_cors import CORS
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import os
@@ -16,8 +17,20 @@ from datetime import datetime, timedelta
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 
+# Enable CORS for all routes
+CORS(app)
+
+# Determine base directory - use system path if writable, otherwise user home
+BASE_DIR = '/opt/spotify-terminal'
+if not os.access('/opt', os.W_OK):
+    # Fallback to user directory if system directory isn't writable
+    BASE_DIR = os.path.expanduser('~/.spotify-terminal')
+
+CONFIG_DIR = os.path.join(BASE_DIR, 'config')
+DATA_DIR = os.path.join(BASE_DIR, 'data')
+
 # Load Spotify OAuth Configuration from env file if it exists
-env_file = '/opt/spotify-terminal/config/spotify.env'
+env_file = os.path.join(CONFIG_DIR, 'spotify.env')
 if os.path.exists(env_file):
     with open(env_file) as f:
         for line in f:
@@ -44,8 +57,8 @@ SCOPE = '''
 '''
 
 # Configuration file paths
-CONFIG_FILE = '/opt/spotify-terminal/config/spotify.json'
-LOCK_FILE = '/opt/spotify-terminal/data/device.lock'
+CONFIG_FILE = os.path.join(CONFIG_DIR, 'spotify.json')
+LOCK_FILE = os.path.join(DATA_DIR, 'device.lock')
 
 def load_config():
     """Load Spotify configuration"""
@@ -56,9 +69,14 @@ def load_config():
 
 def save_config(config):
     """Save Spotify configuration"""
-    os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
-    with open(CONFIG_FILE, 'w') as f:
-        json.dump(config, f, indent=2)
+    try:
+        os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
+        with open(CONFIG_FILE, 'w') as f:
+            json.dump(config, f, indent=2)
+    except (OSError, PermissionError) as e:
+        print(f"Warning: Could not save configuration: {e}")
+        return False
+    return True
 
 def get_spotify_client():
     """Get authenticated Spotify client"""
@@ -577,7 +595,7 @@ def setup_kiosk_browser():
         '--enable-touch-events',
         '--touch-events=enabled',
         '--disable-dev-tools',
-        f'http://localhost:8080'
+        f'http://localhost:8888'
     ]
     
     # Set display if running with X
@@ -588,8 +606,13 @@ def setup_kiosk_browser():
 
 if __name__ == '__main__':
     # Ensure directories exist
-    os.makedirs('/opt/spotify-terminal/config', exist_ok=True)
-    os.makedirs('/opt/spotify-terminal/data', exist_ok=True)
+    try:
+        os.makedirs(CONFIG_DIR, exist_ok=True)
+        os.makedirs(DATA_DIR, exist_ok=True)
+        print(f"Using directory: {BASE_DIR}")
+    except PermissionError as e:
+        print(f"Warning: Could not create directories in {BASE_DIR}: {e}")
+        print("Server will continue but some features may not work properly")
     
     # Check if running on touchscreen
     if os.path.exists('/dev/input/touchscreen') or 'DISPLAY' in os.environ:
