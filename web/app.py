@@ -529,8 +529,8 @@ HTML_TEMPLATE = '''
                         <strong>${user.username}</strong>
                         ${user.auto_login ? '<span style="color: green; margin-left: 10px;">✓ Auto-login</span>' : ''}
                         ${user.is_logged_in ? '<span style="color: #1db954; margin-left: 10px;">● Active</span>' : ''}
-                        ${user.spotify_username ? `<span style="color: #1db954; margin-left: 10px;">♪ ${user.spotify_username}</span>` : 
-                          (user.spotify_configured ? '<span style="color: orange; margin-left: 10px;">♪ Not logged in</span>' : '')}
+                        ${user.spotify_username && user.spotify_username !== '' ? `<span style="color: #1db954; margin-left: 10px;">♪ ${user.spotify_username}</span>` : 
+                          (user.spotify_configured ? '<span style="color: orange; margin-left: 10px;">♪ Configured</span>' : '')}
                     </div>
                     <div>
                         ${!user.auto_login ? `<button class="btn" onclick="setAutoLogin('${user.username}')">Set Auto-login</button>` : ''}
@@ -607,18 +607,66 @@ HTML_TEMPLATE = '''
             const config = await response.json();
             
             const statusDiv = document.getElementById('spotifyStatus');
-            if (config.configured) {
-                statusDiv.innerHTML = `
-                    <p style="color: green;">✓ Configured for: <strong>${config.username}</strong></p>
-                    <p style="color: #666; font-size: 12px;">Using: ${config.backend}</p>
+            let statusHTML = '<div style="padding: 10px; background: #f9f9f9; border-radius: 5px;">';
+            
+            // Show API configuration status
+            if (config.api_configured) {
+                statusHTML += `
+                    <p style="color: green; margin-bottom: 5px;">
+                        ✓ API Configured
+                        <span style="color: #666; font-size: 11px; margin-left: 10px;">
+                            Client ID: ${config.client_id ? config.client_id.substring(0, 8) + '...' : 'Not set'}
+                        </span>
+                    </p>
                 `;
-                document.getElementById('spotifyUsername').value = config.username;
+                // Pre-fill the client ID field if it exists
+                if (config.client_id && document.getElementById('clientId')) {
+                    document.getElementById('clientId').value = config.client_id;
+                }
             } else {
-                statusDiv.innerHTML = `
-                    <p style="color: red;">✗ Not configured</p>
-                    <p style="color: #666; font-size: 12px;">Please enter your Spotify credentials</p>
+                statusHTML += `
+                    <p style="color: orange; margin-bottom: 5px;">
+                        ⚠️ API Credentials Required
+                        <span style="color: #666; font-size: 11px; margin-left: 10px;">
+                            Please configure Step 1 below
+                        </span>
+                    </p>
                 `;
             }
+            
+            // Show account configuration status
+            if (config.configured && config.username) {
+                statusHTML += `
+                    <p style="color: green;">
+                        ✓ Account Connected: <strong>${config.username}</strong>
+                        <span style="color: #666; font-size: 11px; margin-left: 10px;">
+                            via ${config.backend}
+                        </span>
+                    </p>
+                `;
+                // Don't auto-fill username field - let user enter new one if needed
+            } else if (config.configured) {
+                statusHTML += `
+                    <p style="color: green;">
+                        ✓ Backend Configured
+                        <span style="color: #666; font-size: 11px; margin-left: 10px;">
+                            Using ${config.backend}
+                        </span>
+                    </p>
+                `;
+            } else {
+                statusHTML += `
+                    <p style="color: #999;">
+                        ○ No account connected
+                        <span style="color: #666; font-size: 11px; margin-left: 10px;">
+                            Configure Step 2 after API setup
+                        </span>
+                    </p>
+                `;
+            }
+            
+            statusHTML += '</div>';
+            statusDiv.innerHTML = statusHTML;
         }
         
         // API credentials form
@@ -642,8 +690,8 @@ HTML_TEMPLATE = '''
             }
         });
         
-        // OAuth login
-        function startOAuth() {
+        // OAuth login (make it global for onclick)
+        window.startOAuth = function() {
             window.location.href = '/api/spotify/oauth/authorize';
         }
         
@@ -1160,16 +1208,26 @@ def spotify_oauth_authorize():
 @app.route('/api/spotify/config', methods=['GET'])
 @login_required
 def get_spotify_config():
-    # Get current Spotify configuration
-    config_file = "/home/spotify-kids/.config/ncspot/config.toml"
-    spotifyd_config = "/home/spotify-kids/.config/spotifyd/spotifyd.conf"
-    raspotify_config = "/etc/default/raspotify"
+    # Get current configuration from our config file
+    config = load_config()
     
     spotify_config = {
         "configured": False,
-        "username": "",
-        "backend": "ncspot"
+        "username": None,  # Use None instead of empty string
+        "backend": "none",
+        "api_configured": False,
+        "client_id": None
     }
+    
+    # Check if API credentials are configured
+    if config.get('spotify_client_id') and config.get('spotify_client_secret'):
+        spotify_config['api_configured'] = True
+        spotify_config['client_id'] = config.get('spotify_client_id')
+    
+    # Check backend configurations
+    config_file = "/home/spotify-kids/.config/ncspot/config.toml"
+    spotifyd_config = "/home/spotify-kids/.config/spotifyd/spotifyd.conf"
+    raspotify_config = "/etc/default/raspotify"
     
     # Check raspotify first (system-wide config)
     if os.path.exists(raspotify_config):
@@ -1213,6 +1271,13 @@ def get_spotify_config():
                         break
         except:
             pass
+    
+    # Check for OAuth tokens in config
+    if config.get('spotify_oauth_token'):
+        spotify_config['configured'] = True
+        spotify_config['backend'] = 'oauth'
+        if config.get('spotify_username'):
+            spotify_config['username'] = config.get('spotify_username')
     
     return jsonify(spotify_config)
 
@@ -1303,7 +1368,7 @@ def get_users():
                             'uid': uid,
                             'home': home,
                             'spotify_configured': spotify_configured,
-                            'spotify_username': spotify_username,
+                            'spotify_username': spotify_username if spotify_username else None,  # Ensure None, not empty string
                             'is_logged_in': is_logged_in,
                             'auto_login': auto_login
                         })
