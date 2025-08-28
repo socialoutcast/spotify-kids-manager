@@ -2856,38 +2856,11 @@ install_bootsplash() {
     # Create smaller versions
     convert "$THEME_DIR/logo.png" -resize 128x128 "$THEME_DIR/logo-128.png" 2>/dev/null
     
-    # Create spinner frames with proper visibility
-    for i in {0..11}; do
-        angle=$((i * 30))
-        # Create a more visible spinner with multiple dots
-        convert -size 64x64 xc:transparent \
-            -fill '#1db954' \
-            -draw "circle 32,8 36,8" \
-            -fill '#1db954dd' \
-            -draw "circle 32,8 36,8" -distort SRT "30" \
-            -fill '#1db954bb' \
-            -draw "circle 32,8 36,8" -distort SRT "60" \
-            -fill '#1db95499' \
-            -draw "circle 32,8 36,8" -distort SRT "90" \
-            -fill '#1db95466' \
-            -draw "circle 32,8 36,8" -distort SRT "120" \
-            -fill '#1db95444' \
-            -draw "circle 32,8 36,8" -distort SRT "150" \
-            -fill '#1db95422' \
-            -draw "circle 32,8 36,8" -distort SRT "180" \
-            -distort SRT "$angle" \
-            "$THEME_DIR/spinner-$i.png" 2>/dev/null || {
-                # Fallback to simple dot if complex version fails
-                convert -size 64x64 xc:transparent \
-                    -fill '#1db954' -draw "circle 32,10 37,10" \
-                    -rotate $angle \
-                    "$THEME_DIR/spinner-$i.png" 2>/dev/null || true
-            }
-    done
+    # No spinner needed - we have the progress bar
     
-    # Create progress bar
-    convert -size 400x6 xc:'#333333' "$THEME_DIR/progress-bar-bg.png" 2>/dev/null
-    convert -size 400x6 xc:'#1db954' "$THEME_DIR/progress-bar-fg.png" 2>/dev/null
+    # Create progress bar (larger and more visible)
+    convert -size 400x10 xc:'#333333' -bordercolor '#555555' -border 1 "$THEME_DIR/progress-bar-bg.png" 2>/dev/null
+    convert -size 400x10 xc:'#1db954' "$THEME_DIR/progress-bar-fg.png" 2>/dev/null
     
     # Create the Plymouth theme script
     cat > "$THEME_DIR/spotify-kids.script" <<'EOF'
@@ -2920,13 +2893,6 @@ progress_bar.sprite = Sprite();
 progress_bar.sprite.SetX(Window.GetWidth() / 2 - 200);
 progress_bar.sprite.SetY(Window.GetHeight() / 2 + 150);
 
-# Spinner animation
-for (i = 0; i < 12; i++)
-    spinner_images[i] = Image("spinner-" + i + ".png");
-spinner = Sprite();
-spinner.SetX(Window.GetWidth() / 2 - 32);
-spinner.SetY(Window.GetHeight() / 2 + 50);
-
 # Animation variables
 global.counter = 0;
 global.progress_value = 0;
@@ -2936,7 +2902,7 @@ fun boot_progress_callback(time, progress) {
     global.progress_value = progress;
     if (progress_bar.original_image) {
         if (progress > 0) {
-            progress_bar.image = progress_bar.original_image.Scale(400 * progress, 6);
+            progress_bar.image = progress_bar.original_image.Scale(400 * progress, 10);
             progress_bar.sprite.SetImage(progress_bar.image);
         }
     }
@@ -2977,17 +2943,8 @@ fun display_password_callback(prompt, bullets) {
 fun refresh_callback() {
     global.counter++;
     
-    # Animate spinner only if we're still booting
-    if (global.progress_value < 1) {
-        spinner_index = Math.Int(global.counter / 3) % 12;
-        spinner.SetImage(spinner_images[spinner_index]);
-        spinner.SetOpacity(1);
-    } else {
-        spinner.SetOpacity(0);
-    }
-    
-    # Pulse logo slightly
-    opacity = 0.8 + 0.2 * Math.Sin(global.counter / 10.0);
+    # Pulse logo gently
+    opacity = 0.9 + 0.1 * Math.Sin(global.counter / 10.0);
     logo.sprite.SetOpacity(opacity);
 }
 
