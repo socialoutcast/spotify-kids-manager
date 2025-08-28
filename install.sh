@@ -763,6 +763,107 @@ EOF
     
     chmod +x "$INSTALL_DIR/scripts/start-touchscreen.sh"
     
+    # Create web player startup script
+    cat > "$INSTALL_DIR/scripts/start-web-player.sh" <<'EOF'
+#!/bin/bash
+#
+# Spotify Kids Web Player Launcher
+# Starts the web server and opens browser in kiosk mode
+#
+
+export DISPLAY=:0
+export HOME=/home/spotify-kids
+export USER=spotify-kids
+
+LOG_FILE="/opt/spotify-terminal/data/web-player.log"
+
+# Ensure log file exists and is writable
+touch "$LOG_FILE" 2>/dev/null || true
+chmod 666 "$LOG_FILE" 2>/dev/null || true
+
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG_FILE"
+}
+
+log "Starting Spotify Kids Web Player..."
+
+# Kill any existing instances
+pkill -f spotify_server.py 2>/dev/null
+pkill -f chromium 2>/dev/null
+sleep 2
+
+# Start the Spotify player server
+log "Starting Spotify web player server on port 8888..."
+cd /opt/spotify-terminal/web
+if [ -f spotify_server.py ]; then
+    python3 spotify_server.py >> "$LOG_FILE" 2>&1 &
+    SERVER_PID=$!
+    log "Spotify player server started with PID: $SERVER_PID"
+else
+    log "ERROR: spotify_server.py not found!"
+    # Try to copy from project directory if available
+    if [ -f /home/bkrause/Projects/spotify-kids-manager/web/spotify_server.py ]; then
+        cp -r /home/bkrause/Projects/spotify-kids-manager/web/* /opt/spotify-terminal/web/
+        python3 spotify_server.py >> "$LOG_FILE" 2>&1 &
+        SERVER_PID=$!
+        log "Copied and started server from project directory"
+    fi
+fi
+
+# Wait for server to start
+sleep 3
+
+# Check if running with X server (graphical mode)
+if [ -n "$DISPLAY" ] && xset q &>/dev/null; then
+    log "X server detected, starting browser in kiosk mode..."
+    
+    # Disable screen blanking
+    xset s off
+    xset -dpms
+    xset s noblank
+    
+    # Hide cursor
+    unclutter -idle 0.1 -root &
+    
+    # Launch Chromium in kiosk mode
+    log "Launching Chromium in kiosk mode..."
+    
+    chromium-browser \
+        --kiosk \
+        --no-first-run \
+        --noerrdialogs \
+        --disable-infobars \
+        --disable-features=TranslateUI \
+        --disable-pinch \
+        --overscroll-history-navigation=disabled \
+        --disable-dev-tools \
+        --check-for-update-interval=31536000 \
+        --disable-component-update \
+        --autoplay-policy=no-user-gesture-required \
+        --window-size=1920,1080 \
+        --window-position=0,0 \
+        --touch-events=enabled \
+        --enable-touch-events \
+        --enable-touch-drag-drop \
+        --app=http://localhost:8888 \
+        >> "$LOG_FILE" 2>&1 &
+    
+    BROWSER_PID=$!
+    log "Browser launched with PID: $BROWSER_PID"
+    
+    # Keep running
+    wait $BROWSER_PID
+else
+    log "No X server detected, running in headless mode"
+    log "Web interface available at http://$(hostname -I | awk '{print $1}'):8888"
+    
+    # Just keep the server running
+    wait $SERVER_PID
+fi
+EOF
+    
+    chmod +x "$INSTALL_DIR/scripts/start-web-player.sh"
+    
     # Create Python touch GUI for ncspot
     
     # Install web player files
