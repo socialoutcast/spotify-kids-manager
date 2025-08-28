@@ -845,6 +845,23 @@ log() {
 
 log "Starting Spotify Kids Web Player..."
 
+# Check for rapid restarts (crash loop protection)
+CRASH_FILE="/tmp/spotify-player-crashes"
+CURRENT_TIME=$(date +%s)
+
+if [ -f "$CRASH_FILE" ]; then
+    LAST_CRASH=$(cat "$CRASH_FILE")
+    TIME_DIFF=$((CURRENT_TIME - LAST_CRASH))
+    
+    if [ $TIME_DIFF -lt 30 ]; then
+        log "ERROR: Detected rapid restart (crash loop). Waiting 30 seconds..."
+        echo "Crash loop detected. Waiting 30 seconds before retry..." >&2
+        sleep 30
+    fi
+fi
+
+echo "$CURRENT_TIME" > "$CRASH_FILE"
+
 # Kill any existing instances
 pkill -f spotify_server.py 2>/dev/null
 pkill -f chromium 2>/dev/null
@@ -868,8 +885,32 @@ else
     fi
 fi
 
-# Wait for server to start
+# Wait for server to start and verify it's running
 sleep 3
+
+# Check if server actually started
+if [ ! -z "$SERVER_PID" ] && kill -0 "$SERVER_PID" 2>/dev/null; then
+    log "Server is running on PID $SERVER_PID"
+    
+    # Wait for port to be ready
+    for i in {1..10}; do
+        if curl -s -o /dev/null -w "%{http_code}" "http://localhost:8888" | grep -q "200\|302"; then
+            log "Server is responding on port 8888"
+            break
+        fi
+        log "Waiting for server to respond... ($i/10)"
+        sleep 1
+    done
+else
+    log "ERROR: Server failed to start!"
+    # Try to start the admin panel as fallback
+    if [ -f /opt/spotify-terminal/web/app.py ]; then
+        log "Starting admin panel as fallback..."
+        python3 /opt/spotify-terminal/web/app.py >> "$LOG_FILE" 2>&1 &
+        SERVER_PID=$!
+        sleep 3
+    fi
+fi
 
 # Check if running with X server (graphical mode)
 if [ -n "$DISPLAY" ] && xset q &>/dev/null; then
@@ -885,6 +926,13 @@ if [ -n "$DISPLAY" ] && xset q &>/dev/null; then
     
     # Launch Chromium in kiosk mode
     log "Launching Chromium in kiosk mode..."
+    
+    # Determine which port to use
+    PORT=8888
+    if ! curl -s -o /dev/null -w "%{http_code}" "http://localhost:8888" | grep -q "200\|302"; then
+        log "WARNING: Port 8888 not responding, trying port 8080"
+        PORT=8080
+    fi
     
     chromium-browser \
         --kiosk \
@@ -903,14 +951,26 @@ if [ -n "$DISPLAY" ] && xset q &>/dev/null; then
         --touch-events=enabled \
         --enable-touch-events \
         --enable-touch-drag-drop \
-        --app=http://localhost:8888 \
+        --app=http://localhost:$PORT \
         >> "$LOG_FILE" 2>&1 &
     
     BROWSER_PID=$!
-    log "Browser launched with PID: $BROWSER_PID"
+    log "Browser launched with PID: $BROWSER_PID on port $PORT"
     
-    # Keep running
-    wait $BROWSER_PID
+    # Monitor and restart if needed
+    while true; do
+        if ! kill -0 "$BROWSER_PID" 2>/dev/null; then
+            log "Browser crashed, waiting before restart..."
+            sleep 10
+            
+            # Clean restart flag
+            rm -f "$CRASH_FILE"
+            
+            # Restart the script
+            exec "$0"
+        fi
+        sleep 5
+    done
 else
     log "No X server detected, running in headless mode"
     log "Web interface available at http://$(hostname -I | awk '{print $1}'):8888"
