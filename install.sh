@@ -2698,6 +2698,19 @@ install_bootsplash() {
         return
     }
     
+    # Backup original Plymouth theme
+    log_info "Backing up original boot splash..."
+    ORIGINAL_THEME=$(plymouth-set-default-theme 2>/dev/null || echo "bgrt")
+    echo "$ORIGINAL_THEME" > "$INSTALL_DIR/config/original-plymouth-theme.conf"
+    
+    # Backup boot configuration files
+    if [ -f /boot/cmdline.txt ]; then
+        cp /boot/cmdline.txt "$INSTALL_DIR/config/cmdline.txt.backup" 2>/dev/null || true
+    fi
+    if [ -f /etc/default/grub ]; then
+        cp /etc/default/grub "$INSTALL_DIR/config/grub.backup" 2>/dev/null || true
+    fi
+    
     # Create theme directory
     THEME_DIR="/usr/share/plymouth/themes/spotify-kids"
     mkdir -p "$THEME_DIR"
@@ -3048,6 +3061,35 @@ uninstall_all() {
     
     # Clean up any leftover X sessions
     rm -rf /tmp/.X* 2>/dev/null || true
+    
+    # Restore original boot splash
+    log_info "Restoring original boot splash..."
+    
+    # Restore original Plymouth theme
+    if [ -f "$INSTALL_DIR/config/original-plymouth-theme.conf" ]; then
+        ORIGINAL_THEME=$(cat "$INSTALL_DIR/config/original-plymouth-theme.conf" 2>/dev/null || echo "bgrt")
+        plymouth-set-default-theme "$ORIGINAL_THEME" 2>/dev/null || true
+        update-initramfs -u >/dev/null 2>&1 || true
+    fi
+    
+    # Remove our custom theme
+    rm -rf /usr/share/plymouth/themes/spotify-kids 2>/dev/null || true
+    update-alternatives --remove default.plymouth /usr/share/plymouth/themes/spotify-kids/spotify-kids.plymouth 2>/dev/null || true
+    
+    # Restore boot configuration files
+    if [ -f "$INSTALL_DIR/config/cmdline.txt.backup" ]; then
+        cp "$INSTALL_DIR/config/cmdline.txt.backup" /boot/cmdline.txt 2>/dev/null || true
+    elif [ -f /boot/cmdline.txt.backup ]; then
+        cp /boot/cmdline.txt.backup /boot/cmdline.txt 2>/dev/null || true
+    fi
+    
+    if [ -f "$INSTALL_DIR/config/grub.backup" ]; then
+        cp "$INSTALL_DIR/config/grub.backup" /etc/default/grub 2>/dev/null || true
+        update-grub >/dev/null 2>&1 || true
+    elif [ -f /etc/default/grub.backup ]; then
+        cp /etc/default/grub.backup /etc/default/grub 2>/dev/null || true
+        update-grub >/dev/null 2>&1 || true
+    fi
     
     # Reset default runlevel back to graphical if it was changed
     systemctl set-default graphical.target 2>/dev/null || true

@@ -14,6 +14,23 @@ fi
 
 echo "Setting up Spotify Kids Manager boot splash..."
 
+# Create backup directory
+BACKUP_DIR="/opt/spotify-terminal/config/bootsplash-backup"
+mkdir -p "$BACKUP_DIR"
+
+# Backup original Plymouth theme
+echo "Backing up original boot splash..."
+ORIGINAL_THEME=$(plymouth-set-default-theme 2>/dev/null || echo "bgrt")
+echo "$ORIGINAL_THEME" > "$BACKUP_DIR/original-theme.conf"
+
+# Backup boot configuration files
+if [ -f /boot/cmdline.txt ]; then
+    cp /boot/cmdline.txt "$BACKUP_DIR/cmdline.txt.backup"
+fi
+if [ -f /etc/default/grub ]; then
+    cp /etc/default/grub "$BACKUP_DIR/grub.backup"
+fi
+
 # Install required packages
 apt-get update
 apt-get install -y plymouth plymouth-themes imagemagick
