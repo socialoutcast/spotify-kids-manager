@@ -873,22 +873,36 @@ pkill -f spotify_server.py 2>/dev/null
 pkill -f chromium 2>/dev/null
 sleep 2
 
+# Ensure web files exist
+if [ ! -f /opt/spotify-terminal/web/spotify_server.py ]; then
+    log "Web files missing, downloading from GitHub..."
+    mkdir -p /opt/spotify-terminal/web
+    cd /opt/spotify-terminal/web
+    
+    # Download the web files from GitHub
+    for file in spotify_server.py player.html player.js; do
+        wget -q -O "$file" "https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/main/web/$file" || {
+            log "ERROR: Failed to download $file"
+        }
+    done
+    
+    # Ensure permissions
+    chown -R spotify-kids:spotify-kids /opt/spotify-terminal/web
+fi
+
 # Start the Spotify player server
 log "Starting Spotify web player server on port 8888..."
 cd /opt/spotify-terminal/web
 if [ -f spotify_server.py ]; then
+    # Install required Python modules if missing
+    python3 -c "import flask" 2>/dev/null || pip3 install flask flask-cors spotipy
+    
     python3 spotify_server.py >> "$LOG_FILE" 2>&1 &
     SERVER_PID=$!
     log "Spotify player server started with PID: $SERVER_PID"
 else
-    log "ERROR: spotify_server.py not found!"
-    # Try to copy from project directory if available
-    if [ -f /home/bkrause/Projects/spotify-kids-manager/web/spotify_server.py ]; then
-        cp -r /home/bkrause/Projects/spotify-kids-manager/web/* /opt/spotify-terminal/web/
-        python3 spotify_server.py >> "$LOG_FILE" 2>&1 &
-        SERVER_PID=$!
-        log "Copied and started server from project directory"
-    fi
+    log "CRITICAL ERROR: Could not start Spotify server!"
+    exit 1
 fi
 
 # Wait for server to start and verify it's running
@@ -2067,13 +2081,19 @@ def login_logs():
     
     # Check if ncspot is running
     try:
-        result = subprocess.run(['pgrep', '-f', 'ncspot'], capture_output=True)
+        # Check for web player server or ncspot
+        result = subprocess.run(['pgrep', '-f', 'spotify_server.py|ncspot'], capture_output=True, shell=True)
         if result.returncode == 0:
             logs["status"] = "running"
         else:
-            logs["status"] = "not_running"
+            # Check if Chromium is running (indicates GUI mode)
+            result = subprocess.run(['pgrep', '-f', 'chromium'], capture_output=True)
+            if result.returncode == 0:
+                logs["status"] = "gui_running"
+            else:
+                logs["status"] = "not_running"
     except:
-        pass
+        logs["status"] = "error"
     
     return jsonify(logs)
 
@@ -2706,6 +2726,32 @@ EOF
     [ -f "$INSTALL_DIR/web/app.py" ] && chmod +x "$INSTALL_DIR/web/app.py"
     
     log_success "Web admin panel created"
+    
+    # Copy web player files
+    log_info "Installing web player files..."
+    
+    # Download from GitHub if local files don't exist
+    if [ -d "$SCRIPT_DIR/web" ]; then
+        log_info "Copying web player files from local directory..."
+        cp "$SCRIPT_DIR/web/spotify_server.py" "$INSTALL_DIR/web/" 2>/dev/null || true
+        cp "$SCRIPT_DIR/web/player.html" "$INSTALL_DIR/web/" 2>/dev/null || true
+        cp "$SCRIPT_DIR/web/player.js" "$INSTALL_DIR/web/" 2>/dev/null || true
+    else
+        log_info "Downloading web player files from GitHub..."
+        for file in spotify_server.py player.html player.js; do
+            wget -q -O "$INSTALL_DIR/web/$file" \
+                "https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/main/web/$file" || {
+                    log_warning "Could not download $file"
+                }
+        done
+    fi
+    
+    # Ensure permissions
+    chown -R root:root "$INSTALL_DIR/web"
+    chmod 755 "$INSTALL_DIR/web"
+    chmod 644 "$INSTALL_DIR/web/"*.py "$INSTALL_DIR/web/"*.html "$INSTALL_DIR/web/"*.js 2>/dev/null || true
+    
+    log_success "Web player files installed"
 }
 
 # Create systemd service
