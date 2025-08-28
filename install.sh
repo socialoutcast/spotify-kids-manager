@@ -2688,6 +2688,130 @@ EOF
     log_success "Uninstall script created"
 }
 
+# Install custom boot splash screen
+install_bootsplash() {
+    log_info "Installing custom boot splash screen..."
+    
+    # Install required packages
+    apt-get install -y plymouth plymouth-themes imagemagick >/dev/null 2>&1 || {
+        log_warning "Could not install Plymouth, skipping boot splash"
+        return
+    }
+    
+    # Create theme directory
+    THEME_DIR="/usr/share/plymouth/themes/spotify-kids"
+    mkdir -p "$THEME_DIR"
+    
+    # Create the logo PNG directly using ImageMagick
+    log_info "Creating boot logo..."
+    
+    # Create a green circle with music note
+    convert -size 256x256 xc:none \
+        -fill '#1db954' -draw "circle 128,128 128,8" \
+        -fill white -font DejaVu-Sans-Bold -pointsize 120 \
+        -gravity center -annotate +0+0 '♪' \
+        -fill white -font DejaVu-Sans-Bold -pointsize 32 \
+        -gravity south -annotate +0+20 'KIDS' \
+        "$THEME_DIR/logo.png" 2>/dev/null || {
+            # Fallback: create a simple text logo if fonts are missing
+            convert -size 256x256 xc:'#1db954' \
+                -fill white -font Helvetica -pointsize 48 \
+                -gravity center -annotate +0-20 'Spotify' \
+                -fill white -font Helvetica -pointsize 32 \
+                -gravity center -annotate +0+20 'Kids' \
+                "$THEME_DIR/logo.png" 2>/dev/null
+        }
+    
+    # Create smaller versions
+    convert "$THEME_DIR/logo.png" -resize 128x128 "$THEME_DIR/logo-128.png" 2>/dev/null
+    
+    # Create simple spinner frames
+    for i in {0..11}; do
+        angle=$((i * 30))
+        convert -size 64x64 xc:none \
+            -fill '#1db954' -draw "circle 32,12 36,12" \
+            -distort SRT "$angle" \
+            "$THEME_DIR/spinner-$(printf "%02d" $i).png" 2>/dev/null || true
+    done
+    
+    # Create progress bar
+    convert -size 400x6 xc:'#333333' "$THEME_DIR/progress-bar-bg.png" 2>/dev/null
+    convert -size 400x6 xc:'#1db954' "$THEME_DIR/progress-bar-fg.png" 2>/dev/null
+    
+    # Create the Plymouth theme script
+    cat > "$THEME_DIR/spotify-kids.script" <<'EOF'
+# Spotify Kids Manager Plymouth Theme
+
+Window.SetBackgroundTopColor(0.05, 0.05, 0.05);
+Window.SetBackgroundBottomColor(0.0, 0.0, 0.0);
+
+logo.image = Image("logo.png");
+logo.sprite = Sprite(logo.image);
+logo.sprite.SetX(Window.GetWidth() / 2 - logo.image.GetWidth() / 2);
+logo.sprite.SetY(Window.GetHeight() / 2 - logo.image.GetHeight() / 2);
+
+progress_bar_bg.image = Image("progress-bar-bg.png");
+progress_bar_bg.sprite = Sprite(progress_bar_bg.image);
+progress_bar_bg.sprite.SetX(Window.GetWidth() / 2 - 200);
+progress_bar_bg.sprite.SetY(Window.GetHeight() - 100);
+
+progress_bar_fg.original = Image("progress-bar-fg.png");
+progress_bar_fg.sprite = Sprite();
+progress_bar_fg.sprite.SetX(Window.GetWidth() / 2 - 200);
+progress_bar_fg.sprite.SetY(Window.GetHeight() - 100);
+
+fun progress_callback(duration, progress) {
+    if (progress_bar_fg.original) {
+        progress_bar_fg.image = progress_bar_fg.original.Scale(400 * progress, 6);
+        progress_bar_fg.sprite.SetImage(progress_bar_fg.image);
+    }
+}
+
+Plymouth.SetBootProgressFunction(progress_callback);
+EOF
+    
+    # Create the Plymouth theme file
+    cat > "$THEME_DIR/spotify-kids.plymouth" <<EOF
+[Plymouth Theme]
+Name=Spotify Kids Manager
+Description=Boot splash for Spotify Kids Manager
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/spotify-kids
+ScriptFile=/usr/share/plymouth/themes/spotify-kids/spotify-kids.script
+EOF
+    
+    # Install and set as default theme
+    update-alternatives --install /usr/share/plymouth/themes/default.plymouth default.plymouth \
+        /usr/share/plymouth/themes/spotify-kids/spotify-kids.plymouth 100 2>/dev/null
+    
+    plymouth-set-default-theme spotify-kids 2>/dev/null || true
+    
+    # Update initramfs
+    update-initramfs -u >/dev/null 2>&1 || true
+    
+    # Configure boot parameters for Raspberry Pi
+    if [ -f /boot/cmdline.txt ]; then
+        if ! grep -q "splash" /boot/cmdline.txt; then
+            cp /boot/cmdline.txt /boot/cmdline.txt.backup
+            sed -i 's/$/ quiet splash plymouth.ignore-serial-consoles/' /boot/cmdline.txt
+            sed -i 's/console=tty1/console=tty3/g' /boot/cmdline.txt
+        fi
+    fi
+    
+    # Configure GRUB for standard systems
+    if [ -f /etc/default/grub ]; then
+        if ! grep -q "splash" /etc/default/grub; then
+            cp /etc/default/grub /etc/default/grub.backup
+            sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="[^"]*"/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"/' /etc/default/grub
+            update-grub >/dev/null 2>&1 || true
+        fi
+    fi
+    
+    log_success "Boot splash installed successfully"
+}
+
 # Test and repair web admin panel
 test_and_repair_web() {
     log_info "Testing web admin panel..."
@@ -3171,6 +3295,7 @@ MINIMAL_APP
     }
     create_systemd_service
     create_uninstall_script
+    install_bootsplash
     
     # Test and fix web panel if needed
     test_and_repair_web
