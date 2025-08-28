@@ -3086,27 +3086,38 @@ DeviceTimeout=10
 EOF
     fi
     
-    # Don't mess with Plymouth quit - let it work normally
-    # Just ensure it quits after a reasonable time
-    cat > /etc/systemd/system/plymouth-force-quit.service <<EOF
+    # Keep Plymouth running until X starts
+    systemctl disable plymouth-quit.service 2>/dev/null || true
+    systemctl disable plymouth-quit-wait.service 2>/dev/null || true
+    
+    # Create service to quit Plymouth only when X starts
+    cat > /etc/systemd/system/plymouth-quit-on-x.service <<EOF
 [Unit]
-Description=Force quit Plymouth if still running
+Description=Quit Plymouth when X server starts
 After=multi-user.target
+Before=getty@tty1.service
 
 [Service]
 Type=oneshot
-ExecStartPre=/bin/sleep 15
-ExecStart=/bin/bash -c 'plymouth quit 2>/dev/null; pkill plymouthd 2>/dev/null'
+ExecStart=/bin/bash -c 'while ! pgrep -x "Xorg" > /dev/null; do sleep 1; done; sleep 2; /usr/bin/plymouth quit'
 RemainAfterExit=yes
+TimeoutSec=60
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=graphical.target
 EOF
     
-    systemctl enable plymouth-force-quit.service 2>/dev/null || true
+    systemctl enable plymouth-quit-on-x.service 2>/dev/null || true
     
-    # Remove any getty overrides that might interfere
-    rm -rf /etc/systemd/system/getty@tty1.service.d/
+    # Override getty to wait for Plymouth
+    mkdir -p /etc/systemd/system/getty@tty1.service.d
+    cat > /etc/systemd/system/getty@tty1.service.d/plymouth.conf <<EOF
+[Unit]
+After=plymouth-quit-on-x.service
+
+[Service]
+ExecStartPre=-/bin/bash -c 'while [ -f /run/plymouth/pid ]; do sleep 1; done'
+EOF
     
     # Ensure Plymouth modules in initramfs
     if [ -f /etc/initramfs-tools/modules ]; then
