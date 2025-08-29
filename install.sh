@@ -94,14 +94,19 @@ if [ "$RESET_MODE" = true ]; then
     # Remove ANY user with spotify in the name
     for user in spotify-kids spotify-admin spotify-terminal; do
         if id "$user" &>/dev/null; then
-            pkill -u "$user" 2>/dev/null || true
-            sleep 1
-            userdel -r "$user" 2>/dev/null || true
+            # Kill all processes for this user
+            pkill -9 -u "$user" 2>/dev/null || true
+            sleep 2
+            # Force remove user without removing home (we'll do that manually)
+            userdel "$user" 2>/dev/null || true
         fi
     done
     
-    # Clean up home directories
-    rm -rf /home/spotify*
+    # Force clean up home directories
+    rm -rf /home/spotify-kids 2>/dev/null || true
+    rm -rf /home/spotify-admin 2>/dev/null || true
+    rm -rf /home/spotify-terminal 2>/dev/null || true
+    rm -rf /home/spotify* 2>/dev/null || true
     
     # Clean up logs
     rm -rf /var/log/spotify*
