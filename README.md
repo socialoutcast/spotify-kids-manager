@@ -1,19 +1,19 @@
 # Spotify Kids Manager
 
-A dedicated Spotify player for Raspberry Pi with parental controls, designed for kids' use with a touchscreen display.
+A secure, touchscreen-optimized Spotify player for Raspberry Pi with full parental controls via web admin panel.
 
 ## Quick Install
 
 Run this single command to install everything:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/yourusername/spotify-kids-manager/main/install.sh | sudo bash
+curl -sSL https://github.com/socialoutcast/spotify-kids-manager/raw/main/install.sh | sudo bash
 ```
 
 Or if you want to review the script first:
 
 ```bash
-wget https://raw.githubusercontent.com/yourusername/spotify-kids-manager/main/install.sh
+wget https://github.com/socialoutcast/spotify-kids-manager/raw/main/install.sh
 chmod +x install.sh
 sudo ./install.sh
 ```
@@ -23,7 +23,7 @@ sudo ./install.sh
 To completely reset and reinstall from scratch:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/yourusername/spotify-kids-manager/main/install.sh | sudo bash -s -- --reset
+curl -sSL https://github.com/socialoutcast/spotify-kids-manager/raw/main/install.sh | sudo bash -s -- --reset
 ```
 
 ## Features
@@ -42,20 +42,30 @@ curl -sSL https://raw.githubusercontent.com/yourusername/spotify-kids-manager/ma
 - 🔐 Password protected admin interface
 - 🎮 Remote control of playback
 - 📊 System monitoring (CPU, memory, disk)
-- 🔄 One-click system updates
+- 🔄 One-click system updates with live progress
 - ⚙️ Configure Spotify API credentials
 - 🕒 Set time restrictions
 - 🔊 Set maximum volume limits
 - 🔒 Device lock to disable local controls
+- 🎧 **Bluetooth Management**:
+  - Scan for Bluetooth speakers/headphones
+  - Pair and connect devices
+  - Manage paired devices
+  - Enable/disable Bluetooth
 
 ## Requirements
 
+### Hardware
 - Raspberry Pi (3B+ or newer recommended)
-- Raspberry Pi OS (32-bit or 64-bit)
 - LCD touchscreen display (optional but recommended)
-- Internet connection
-- Spotify Premium account
-- Spotify App registration (for API credentials)
+- Optional: Bluetooth speakers/headphones
+- SD card (8GB minimum, 16GB recommended)
+- Internet connection (WiFi or Ethernet)
+
+### Software
+- Raspberry Pi OS (32-bit or 64-bit)
+- Spotify Premium account (required for API)
+- Spotify App registration (free developer account)
 
 ## Setting up Spotify API
 
@@ -81,17 +91,18 @@ curl -sSL https://raw.githubusercontent.com/yourusername/spotify-kids-manager/ma
 ```
 spotify-kids-manager/
 ├── install.sh           # Installer with reset option
-├── spotify_player.py    # Native Python/Tkinter player
+├── spotify_player.py    # Native Python/Tkinter player (NO BROWSER)
 ├── web/                 # Admin web interface
-│   └── app.py          # Flask admin panel
+│   └── app.py          # Flask admin panel with Bluetooth control
 └── README.md           # This file
 ```
 
 ### Services
 
-- **spotify-player.service** - Main player application (auto-starts on boot)
+- **spotify-player.service** - Native Python player (auto-starts on boot, fullscreen)
 - **spotify-admin.service** - Web admin panel (port 5001, proxied through nginx on 8080)
 - **nginx** - Reverse proxy for admin panel
+- **bluetooth.service** - Bluetooth audio support
 
 ### User Accounts
 
@@ -144,11 +155,29 @@ sudo rm /etc/nginx/sites-*/spotify-admin
 sudo rm /etc/systemd/system/spotify-*.service
 ```
 
-## Updates
+## Bluetooth Audio
+
+The admin panel provides complete Bluetooth management:
+
+### Setup Bluetooth Speakers
+1. Open admin panel at `http://pi-ip:8080`
+2. Navigate to "Bluetooth Devices" section
+3. Click "Scan for Devices" 
+4. Select your speaker/headphones and click "Pair"
+5. Device will auto-connect when available
+
+### Managing Devices
+- **Connect/Disconnect** - Control active audio output
+- **Remove** - Delete paired devices
+- **Enable/Disable** - Turn Bluetooth on/off completely
+
+All Bluetooth audio devices work seamlessly with the Spotify player. The `spotify-kids` user has audio permissions but NO admin access.
+
+## System Updates
 
 The admin panel includes a System Updates section where you can:
 1. Check for available updates
-2. Run system updates with live progress
+2. Run system updates with live terminal output
 3. All prompts are automatically answered (no interaction needed)
 
 ## Security Notes
