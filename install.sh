@@ -14,7 +14,7 @@ NC='\033[0m' # No Color
 
 # Configuration
 INSTALL_DIR="/opt/spotify-terminal"
-WEB_PORT=5001
+WEB_PORT=8080
 ADMIN_PORT=5001
 SPOTIFY_USER="spotify-kids"
 ADMIN_USER="admin"
@@ -283,7 +283,7 @@ EOF
 #
 
 # Start admin panel
-echo "Starting admin panel on port 5001..."
+echo "Starting admin panel on port 5001 (proxied through nginx on 8080)..."
 python3 /opt/spotify-terminal/web/app.py &
 
 # Wait a moment
@@ -425,6 +425,42 @@ EOF
     log_success "Initial configuration created"
 }
 
+# Configure nginx
+configure_nginx() {
+    log_info "Configuring nginx proxy..."
+    
+    # Create nginx configuration
+    cat > "/etc/nginx/sites-available/spotify-admin" <<EOF
+server {
+    listen $WEB_PORT;
+    server_name localhost;
+    
+    location / {
+        proxy_pass http://127.0.0.1:$ADMIN_PORT;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_cache_bypass \$http_upgrade;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+}
+EOF
+    
+    # Enable the site
+    ln -sf /etc/nginx/sites-available/spotify-admin /etc/nginx/sites-enabled/
+    
+    # Remove default site if it exists
+    rm -f /etc/nginx/sites-enabled/default
+    
+    # Test nginx configuration
+    nginx -t && systemctl reload nginx
+    
+    log_success "Nginx configured"
+}
+
 # Enable services
 enable_services() {
     log_info "Enabling services..."
@@ -465,6 +501,7 @@ main() {
     install_application
     create_startup_scripts
     create_systemd_services
+    configure_nginx
     configure_autologin
     configure_user_profile
     create_initial_config
@@ -473,7 +510,7 @@ main() {
     
     log_success "=== Installation Complete ==="
     echo ""
-    log_info "Admin Panel: http://localhost:$ADMIN_PORT"
+    log_info "Admin Panel: http://localhost:$WEB_PORT"
     log_info "Default credentials: admin / changeme"
     echo ""
     log_info "The native Spotify player will start automatically on boot"
