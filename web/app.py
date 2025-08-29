@@ -21,6 +21,8 @@ CORS(app)
 
 # Configuration
 CONFIG_DIR = os.environ.get('SPOTIFY_CONFIG_DIR', '/opt/spotify-kids/config')
+LOG_DIR = '/var/log/spotify-kids'
+APP_USER = 'spotify-kids'
 CONFIG_FILE = os.path.join(CONFIG_DIR, 'admin_config.json')
 SPOTIFY_CONFIG_FILE = os.path.join(CONFIG_DIR, 'spotify_config.json')
 PARENTAL_CONFIG_FILE = os.path.join(CONFIG_DIR, 'parental_controls.json')
