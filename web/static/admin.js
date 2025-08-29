@@ -361,24 +361,71 @@ async function toggleBluetooth() {
 }
 
 async function enableBluetooth() {
+    showBluetoothStatus('Enabling Bluetooth...', false);
     const result = await apiCall('/api/bluetooth/enable', 'POST');
     
     if (result.success) {
-        alert('Bluetooth enabled');
-        location.reload();
+        showBluetoothStatus('Bluetooth enabled successfully!', false);
+        setTimeout(() => updateBluetoothStatus(), 1000);
     } else {
-        alert('Failed to enable Bluetooth: ' + (result.error || 'Unknown error'));
+        showBluetoothStatus('Failed to enable: ' + (result.error || 'Unknown error'), true);
     }
 }
 
 async function disableBluetooth() {
+    showBluetoothStatus('Disabling Bluetooth...', false);
     const result = await apiCall('/api/bluetooth/disable', 'POST');
     
     if (result.success) {
-        alert('Bluetooth disabled');
-        location.reload();
+        showBluetoothStatus('Bluetooth disabled successfully!', false);
+        setTimeout(() => updateBluetoothStatus(), 1000);
     } else {
-        alert('Failed to disable Bluetooth: ' + (result.error || 'Unknown error'));
+        showBluetoothStatus('Failed to disable: ' + (result.error || 'Unknown error'), true);
+    }
+}
+
+async function checkBluetoothStatus() {
+    await updateBluetoothStatus();
+}
+
+async function updateBluetoothStatus() {
+    const result = await apiCall('/api/bluetooth/status');
+    
+    if (result.success) {
+        const stateElement = document.getElementById('bluetoothState');
+        const statusText = document.getElementById('bluetoothStatusText');
+        const enableBtn = document.getElementById('enableBtBtn');
+        const disableBtn = document.getElementById('disableBtBtn');
+        
+        if (stateElement) {
+            stateElement.textContent = result.enabled ? 'Enabled' : 'Disabled';
+        }
+        
+        if (statusText) {
+            statusText.className = 'status ' + (result.enabled ? 'online' : 'offline');
+        }
+        
+        if (enableBtn) {
+            enableBtn.disabled = result.enabled;
+        }
+        
+        if (disableBtn) {
+            disableBtn.disabled = !result.enabled;
+        }
+    }
+}
+
+function showBluetoothStatus(message, isError = false) {
+    const statusMsg = document.getElementById('bluetoothStatusMessage');
+    if (statusMsg) {
+        statusMsg.style.display = 'block';
+        statusMsg.style.background = isError ? '#ef4444' : '#10b981';
+        statusMsg.style.color = 'white';
+        statusMsg.innerHTML = message;
+        
+        if (!message.includes('...')) {
+            setTimeout(() => { statusMsg.style.display = 'none'; }, 3000);
+        }
     }
 }
 
@@ -516,6 +563,11 @@ document.addEventListener('DOMContentLoaded', function() {
             const display = document.getElementById('volumeValue');
             if (display) display.textContent = e.target.value + '%';
         });
+    }
+    
+    // Check Bluetooth status on page load
+    if (document.getElementById('bluetoothState')) {
+        updateBluetoothStatus();
     }
     
     // Close modals on ESC
