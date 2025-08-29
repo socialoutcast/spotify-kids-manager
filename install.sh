@@ -13,7 +13,7 @@ NC='\033[0m' # No Color
 APP_USER="spotify-kids"
 APP_DIR="/opt/spotify-kids"
 CONFIG_DIR="$APP_DIR/config"
-REPO_URL="https://raw.githubusercontent.com/yourusername/spotify-kids-manager/main"
+REPO_URL="https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/main"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Parse arguments
