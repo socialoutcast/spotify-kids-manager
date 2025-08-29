@@ -664,43 +664,25 @@ EOF
     
     chmod +x "$INSTALL_DIR/scripts/spotify-client.sh"
     
-    # Create auto-start scripts with minimal X for touchscreen support
+    # Create auto-start script for native player ONLY (admin panel runs as service)
     cat > "/home/$SPOTIFY_USER/.bash_profile" <<'EOF'
 #!/bin/bash
-# Auto-start Spotify client on login
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] User spotify-kids logged in on $(tty)" >> /opt/spotify-terminal/data/login.log
+# Auto-start native Spotify player on login (NOT the admin panel)
 if [[ "$(tty)" == "/dev/tty1" ]]; then
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting Spotify Kids Manager for user spotify-kids..." >> /opt/spotify-terminal/data/login.log
-    echo "Starting Spotify Kids Manager..." > /tmp/spotify-startup.log
-    chmod 666 /tmp/spotify-startup.log 2>/dev/null || true
+    # Kill any leftover fbi from boot splash
+    killall fbi 2>/dev/null
+    
+    # Start X server with a simple xinitrc that runs the player
+    echo "#!/bin/sh" > /tmp/xinitrc
+    echo "exec python3 /opt/spotify-terminal/spotify_player.py" >> /tmp/xinitrc
+    chmod +x /tmp/xinitrc
+    
+    export XINITRC=/tmp/xinitrc
     export HOME=/home/spotify-kids
     export USER=spotify-kids
     
-    # Log environment
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] HOME=$HOME, USER=$USER, TTY=$(tty)" >> /opt/spotify-terminal/data/login.log
-    
-    # Check for touchscreen
-    if ls /dev/input/by-path/*event* 2>/dev/null | xargs -I{} udevadm info --query=property --name={} | grep -q "ID_INPUT_TOUCHSCREEN=1"; then
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Touchscreen detected, starting GUI mode" >> /opt/spotify-terminal/data/login.log
-        echo "Touchscreen detected, starting with GUI support..." >> /tmp/spotify-startup.log
-        # Start minimal X with touchscreen support
-        exec startx /opt/spotify-terminal/scripts/start-touchscreen.sh -- -nocursor 2>> /tmp/spotify-startup.log
-    else
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] No touchscreen, starting terminal mode" >> /opt/spotify-terminal/data/login.log
-        echo "No touchscreen, starting in terminal mode..." >> /tmp/spotify-startup.log
-        # Check if spotify-client.sh exists
-        if [ -f /opt/spotify-terminal/scripts/spotify-client.sh ]; then
-            echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting spotify-client.sh" >> /opt/spotify-terminal/data/login.log
-            exec /opt/spotify-terminal/scripts/spotify-client.sh 2>> /tmp/spotify-startup.log
-        else
-            echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: spotify-client.sh not found!" >> /opt/spotify-terminal/data/login.log
-            echo "ERROR: Spotify client script not found at /opt/spotify-terminal/scripts/spotify-client.sh" >> /tmp/spotify-startup.log
-            echo "Please check installation. Press any key to continue..."
-            read -n 1
-        fi
-    fi
-else
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] User on $(tty) - not tty1, skipping auto-start" >> /opt/spotify-terminal/data/login.log
+    # Start X with the player
+    exec startx -- :0 -nocursor
 fi
 EOF
     
