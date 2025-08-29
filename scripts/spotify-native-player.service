@@ -1,0 +1,31 @@
+[Unit]
+Description=Spotify Kids Manager - Native Player
+After=graphical-session.target
+Wants=graphical-session.target
+Requisite=graphical-session.target
+
+[Service]
+Type=forking
+User=spotify-kids
+Group=spotify-kids
+Environment=DISPLAY=:0
+Environment=HOME=/home/spotify-kids
+Environment=USER=spotify-kids
+WorkingDirectory=/home/bkrause/Projects/spotify-kids-manager
+ExecStartPre=/bin/bash -c 'mkdir -p /opt/spotify-terminal/config /opt/spotify-terminal/data || mkdir -p $HOME/.spotify-terminal/config $HOME/.spotify-terminal/data'
+ExecStart=/home/bkrause/Projects/spotify-kids-manager/scripts/start-native-player.sh
+ExecStop=/bin/bash -c 'pkill -f spotify_player.py; pkill -f app.py'
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Security settings
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=read-only
+ProtectSystem=strict
+ReadWritePaths=/opt/spotify-terminal /home/spotify-kids/.spotify-terminal /tmp
+
+[Install]
+WantedBy=graphical-session.target
