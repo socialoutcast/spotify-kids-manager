@@ -21,7 +21,7 @@ class SpotifyKidsDiagnostics:
         self.report = {
             'timestamp': datetime.now().isoformat(),
             'hostname': socket.gethostname(),
-            'summary': {'total_issues': 0, 'critical': 0, 'warnings': 0, 'info': 0},
+            'summary': {'total_issues': 0, 'critical': 0, 'warning': 0, 'info': 0},
             'boot_splash': {},
             'player_app': {},
             'admin_panel': {},
