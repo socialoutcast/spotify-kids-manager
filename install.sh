@@ -261,10 +261,23 @@ echo -e "${YELLOW}Installing application files...${NC}"
 if [ -f "$SCRIPT_DIR/spotify_player.py" ]; then
     echo "Installing from local files..."
     cp "$SCRIPT_DIR/spotify_player.py" "$APP_DIR/"
+    cp "$SCRIPT_DIR/parental_controls.py" "$APP_DIR/" 2>/dev/null || true
+    cp "$SCRIPT_DIR/full_diagnostics.py" "$APP_DIR/" 2>/dev/null || true
+    cp "$SCRIPT_DIR/remote_fix.py" "$APP_DIR/" 2>/dev/null || true
+    cp "$SCRIPT_DIR/debug_web.py" "$APP_DIR/" 2>/dev/null || true
     cp -r "$SCRIPT_DIR/web" "$APP_DIR/"
 else
     echo "Downloading files from GitHub..."
+    # Main application files
     wget -q "$REPO_URL/spotify_player.py" -O "$APP_DIR/spotify_player.py"
+    wget -q "$REPO_URL/parental_controls.py" -O "$APP_DIR/parental_controls.py" || echo "parental_controls.py not found"
+    
+    # Diagnostic and fix tools
+    wget -q "$REPO_URL/full_diagnostics.py" -O "$APP_DIR/full_diagnostics.py" || echo "full_diagnostics.py not found"
+    wget -q "$REPO_URL/remote_fix.py" -O "$APP_DIR/remote_fix.py" || echo "remote_fix.py not found"
+    wget -q "$REPO_URL/debug_web.py" -O "$APP_DIR/debug_web.py" || echo "debug_web.py not found"
+    
+    # Web admin panel
     mkdir -p "$APP_DIR/web"
     wget -q "$REPO_URL/web/app.py" -O "$APP_DIR/web/app.py"
 fi
