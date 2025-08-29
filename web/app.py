@@ -379,6 +379,47 @@ ADMIN_TEMPLATE = '''
                     </div>
                 </div>
             </div>
+            
+            <!-- Bluetooth Devices -->
+            <div class="card">
+                <h2>🎧 Bluetooth Devices</h2>
+                <p style="color: #666; font-size: 12px; margin-bottom: 15px;">
+                    Manage Bluetooth speakers and headphones for audio output.
+                </p>
+                <div id="bluetoothStatus" style="margin-bottom: 15px;">
+                    <span class="status {{ 'online' if bluetooth_enabled else 'offline' }}" style="font-size: 12px;">
+                        Bluetooth: {{ 'Enabled' if bluetooth_enabled else 'Disabled' }}
+                    </span>
+                </div>
+                <div id="pairedDevices" style="margin-bottom: 15px;">
+                    <label style="font-size: 14px; margin-bottom: 10px; display: block;">Paired Devices:</label>
+                    <div id="pairedList" style="max-height: 150px; overflow-y: auto; border: 1px solid #ddd; border-radius: 5px; padding: 10px;">
+                        {% for device in paired_devices %}
+                        <div class="device-item" style="padding: 8px; background: #f3f4f6; border-radius: 3px; margin-bottom: 5px; display: flex; justify-content: space-between; align-items: center;">
+                            <span>{{ device.name }} ({{ device.address }})</span>
+                            <div>
+                                {% if device.connected %}
+                                <button onclick="disconnectBluetooth('{{ device.address }}')" style="font-size: 12px; padding: 5px 10px;">Disconnect</button>
+                                {% else %}
+                                <button onclick="connectBluetooth('{{ device.address }}')" style="font-size: 12px; padding: 5px 10px;">Connect</button>
+                                {% endif %}
+                                <button onclick="removeBluetooth('{{ device.address }}')" class="danger" style="font-size: 12px; padding: 5px 10px; margin-left: 5px;">Remove</button>
+                            </div>
+                        </div>
+                        {% else %}
+                        <p style="color: #999; font-size: 12px;">No paired devices</p>
+                        {% endfor %}
+                    </div>
+                </div>
+                <button onclick="scanBluetooth()">Scan for Devices</button>
+                <button onclick="toggleBluetooth()" style="margin-left: 10px;">{{ 'Disable' if bluetooth_enabled else 'Enable' }} Bluetooth</button>
+                <div id="scanResults" style="margin-top: 15px; display: none;">
+                    <label style="font-size: 14px; margin-bottom: 10px; display: block;">Available Devices:</label>
+                    <div id="scanList" style="max-height: 150px; overflow-y: auto; border: 1px solid #ddd; border-radius: 5px; padding: 10px;">
+                        <p style="color: #999; font-size: 12px;">Scanning...</p>
+                    </div>
+                </div>
+            </div>
         </div>
         
         <!-- Update Progress Modal -->
@@ -521,6 +562,112 @@ ADMIN_TEMPLATE = '''
             location.reload();
         }
         
+        // Bluetooth functions
+        function scanBluetooth() {
+            document.getElementById('scanResults').style.display = 'block';
+            document.getElementById('scanList').innerHTML = '<p style="color: #999; font-size: 12px;">Scanning for devices...</p>';
+            
+            fetch('/api/bluetooth/scan')
+                .then(r => r.json())
+                .then(data => {
+                    let html = '';
+                    if (data.devices && data.devices.length > 0) {
+                        data.devices.forEach(device => {
+                            html += `
+                                <div style="padding: 8px; background: #f3f4f6; border-radius: 3px; margin-bottom: 5px; display: flex; justify-content: space-between; align-items: center;">
+                                    <span>${device.name || 'Unknown'} (${device.address})</span>
+                                    <button onclick="pairBluetooth('${device.address}')" style="font-size: 12px; padding: 5px 10px;">Pair</button>
+                                </div>
+                            `;
+                        });
+                    } else {
+                        html = '<p style="color: #999; font-size: 12px;">No devices found</p>';
+                    }
+                    document.getElementById('scanList').innerHTML = html;
+                })
+                .catch(err => {
+                    document.getElementById('scanList').innerHTML = '<p style="color: red; font-size: 12px;">Error: ' + err + '</p>';
+                });
+        }
+        
+        function pairBluetooth(address) {
+            if (!confirm('Pair with device ' + address + '?')) return;
+            
+            fetch('/api/bluetooth/pair', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({address: address})
+            })
+            .then(r => r.json())
+            .then(data => {
+                alert(data.message || 'Pairing initiated');
+                if (data.success) {
+                    location.reload();
+                }
+            })
+            .catch(err => alert('Error: ' + err));
+        }
+        
+        function connectBluetooth(address) {
+            fetch('/api/bluetooth/connect', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({address: address})
+            })
+            .then(r => r.json())
+            .then(data => {
+                alert(data.message || 'Connection initiated');
+                if (data.success) {
+                    location.reload();
+                }
+            })
+            .catch(err => alert('Error: ' + err));
+        }
+        
+        function disconnectBluetooth(address) {
+            fetch('/api/bluetooth/disconnect', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({address: address})
+            })
+            .then(r => r.json())
+            .then(data => {
+                alert(data.message || 'Disconnected');
+                if (data.success) {
+                    location.reload();
+                }
+            })
+            .catch(err => alert('Error: ' + err));
+        }
+        
+        function removeBluetooth(address) {
+            if (!confirm('Remove device ' + address + '?')) return;
+            
+            fetch('/api/bluetooth/remove', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({address: address})
+            })
+            .then(r => r.json())
+            .then(data => {
+                alert(data.message || 'Device removed');
+                if (data.success) {
+                    location.reload();
+                }
+            })
+            .catch(err => alert('Error: ' + err));
+        }
+        
+        function toggleBluetooth() {
+            fetch('/api/bluetooth/toggle', {method: 'POST'})
+                .then(r => r.json())
+                .then(data => {
+                    alert(data.message || 'Bluetooth toggled');
+                    location.reload();
+                })
+                .catch(err => alert('Error: ' + err));
+        }
+        
         {% else %}
         function login() {
             fetch('/api/login', {
@@ -548,6 +695,41 @@ ADMIN_TEMPLATE = '''
 </html>
 '''
 
+def get_bluetooth_status():
+    """Get Bluetooth status and paired devices"""
+    try:
+        # Check if Bluetooth is enabled
+        result = subprocess.run(['sudo', 'systemctl', 'is-active', 'bluetooth'], 
+                              capture_output=True, text=True)
+        bluetooth_enabled = result.stdout.strip() == 'active'
+        
+        # Get paired devices
+        paired_devices = []
+        result = subprocess.run(['sudo', 'bluetoothctl', 'paired-devices'], 
+                              capture_output=True, text=True, timeout=5)
+        
+        for line in result.stdout.split('\n'):
+            if 'Device' in line:
+                parts = line.split(' ', 2)
+                if len(parts) >= 3:
+                    address = parts[1]
+                    name = parts[2] if len(parts) > 2 else 'Unknown'
+                    
+                    # Check if connected
+                    info_result = subprocess.run(['sudo', 'bluetoothctl', 'info', address],
+                                               capture_output=True, text=True, timeout=5)
+                    connected = 'Connected: yes' in info_result.stdout
+                    
+                    paired_devices.append({
+                        'address': address,
+                        'name': name,
+                        'connected': connected
+                    })
+        
+        return bluetooth_enabled, paired_devices
+    except:
+        return False, []
+
 @app.route('/')
 def index():
     """Main admin panel page"""
@@ -568,6 +750,9 @@ def index():
     uptime_seconds = time.time() - psutil.boot_time()
     uptime = f"{int(uptime_seconds // 3600)}h {int((uptime_seconds % 3600) // 60)}m"
     
+    # Get Bluetooth status
+    bluetooth_enabled, paired_devices = get_bluetooth_status()
+    
     return render_template_string(ADMIN_TEMPLATE,
                                  logged_in='logged_in' in session,
                                  config=config,
@@ -576,7 +761,9 @@ def index():
                                  cpu_usage=cpu_usage,
                                  memory_usage=memory_usage,
                                  disk_usage=disk_usage,
-                                 uptime=uptime)
+                                 uptime=uptime,
+                                 bluetooth_enabled=bluetooth_enabled,
+                                 paired_devices=paired_devices)
 
 @app.route('/api/login', methods=['POST'])
 def login():
@@ -744,6 +931,184 @@ def update_stream():
     return Response(generate(), mimetype='text/event-stream',
                    headers={'Cache-Control': 'no-cache',
                            'X-Accel-Buffering': 'no'})
+
+@app.route('/api/bluetooth/scan')
+def bluetooth_scan():
+    """Scan for Bluetooth devices"""
+    if 'logged_in' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    try:
+        # Enable scanning
+        subprocess.run(['sudo', 'bluetoothctl', 'scan', 'on'], 
+                      capture_output=True, timeout=1)
+        
+        # Wait for devices to be discovered
+        time.sleep(10)
+        
+        # Get devices
+        result = subprocess.run(['sudo', 'bluetoothctl', 'devices'], 
+                              capture_output=True, text=True, timeout=5)
+        
+        # Stop scanning
+        subprocess.run(['sudo', 'bluetoothctl', 'scan', 'off'], 
+                      capture_output=True, timeout=1)
+        
+        devices = []
+        paired_addresses = set()
+        
+        # Get already paired devices to exclude them
+        paired_result = subprocess.run(['sudo', 'bluetoothctl', 'paired-devices'],
+                                      capture_output=True, text=True, timeout=5)
+        for line in paired_result.stdout.split('\n'):
+            if 'Device' in line:
+                parts = line.split(' ', 2)
+                if len(parts) >= 2:
+                    paired_addresses.add(parts[1])
+        
+        # Parse discovered devices
+        for line in result.stdout.split('\n'):
+            if 'Device' in line:
+                parts = line.split(' ', 2)
+                if len(parts) >= 3:
+                    address = parts[1]
+                    if address not in paired_addresses:
+                        name = parts[2] if len(parts) > 2 else 'Unknown'
+                        devices.append({'address': address, 'name': name})
+        
+        return jsonify({'success': True, 'devices': devices})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/bluetooth/pair', methods=['POST'])
+def bluetooth_pair():
+    """Pair with a Bluetooth device"""
+    if 'logged_in' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    data = request.json
+    address = data.get('address')
+    
+    if not address:
+        return jsonify({'error': 'No address provided'}), 400
+    
+    try:
+        # Trust the device
+        subprocess.run(['sudo', 'bluetoothctl', 'trust', address], 
+                      capture_output=True, check=False)
+        
+        # Pair with the device
+        result = subprocess.run(['sudo', 'bluetoothctl', 'pair', address],
+                              capture_output=True, text=True, timeout=30)
+        
+        if 'successful' in result.stdout.lower():
+            # Connect to the device
+            subprocess.run(['sudo', 'bluetoothctl', 'connect', address],
+                         capture_output=True, timeout=10)
+            return jsonify({'success': True, 'message': 'Device paired and connected'})
+        else:
+            return jsonify({'success': False, 'message': 'Pairing failed: ' + result.stdout})
+    except subprocess.TimeoutExpired:
+        return jsonify({'error': 'Pairing timeout'}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/bluetooth/connect', methods=['POST'])
+def bluetooth_connect():
+    """Connect to a paired Bluetooth device"""
+    if 'logged_in' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    data = request.json
+    address = data.get('address')
+    
+    if not address:
+        return jsonify({'error': 'No address provided'}), 400
+    
+    try:
+        result = subprocess.run(['sudo', 'bluetoothctl', 'connect', address],
+                              capture_output=True, text=True, timeout=10)
+        
+        if 'successful' in result.stdout.lower():
+            return jsonify({'success': True, 'message': 'Device connected'})
+        else:
+            return jsonify({'success': False, 'message': 'Connection failed'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/bluetooth/disconnect', methods=['POST'])
+def bluetooth_disconnect():
+    """Disconnect from a Bluetooth device"""
+    if 'logged_in' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    data = request.json
+    address = data.get('address')
+    
+    if not address:
+        return jsonify({'error': 'No address provided'}), 400
+    
+    try:
+        subprocess.run(['sudo', 'bluetoothctl', 'disconnect', address],
+                      capture_output=True, timeout=5)
+        return jsonify({'success': True, 'message': 'Device disconnected'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/bluetooth/remove', methods=['POST'])
+def bluetooth_remove():
+    """Remove a paired Bluetooth device"""
+    if 'logged_in' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    data = request.json
+    address = data.get('address')
+    
+    if not address:
+        return jsonify({'error': 'No address provided'}), 400
+    
+    try:
+        # Disconnect first if connected
+        subprocess.run(['sudo', 'bluetoothctl', 'disconnect', address],
+                      capture_output=True, timeout=5)
+        
+        # Remove the device
+        subprocess.run(['sudo', 'bluetoothctl', 'remove', address],
+                      capture_output=True, timeout=5)
+        
+        return jsonify({'success': True, 'message': 'Device removed'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/bluetooth/toggle', methods=['POST'])
+def bluetooth_toggle():
+    """Enable or disable Bluetooth"""
+    if 'logged_in' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    try:
+        # Check current status
+        result = subprocess.run(['sudo', 'systemctl', 'is-active', 'bluetooth'],
+                              capture_output=True, text=True)
+        is_active = result.stdout.strip() == 'active'
+        
+        if is_active:
+            # Disable Bluetooth
+            subprocess.run(['sudo', 'systemctl', 'stop', 'bluetooth'], check=False)
+            subprocess.run(['sudo', 'rfkill', 'block', 'bluetooth'], check=False)
+            return jsonify({'success': True, 'message': 'Bluetooth disabled'})
+        else:
+            # Enable Bluetooth
+            subprocess.run(['sudo', 'rfkill', 'unblock', 'bluetooth'], check=False)
+            subprocess.run(['sudo', 'systemctl', 'start', 'bluetooth'], check=False)
+            time.sleep(2)
+            # Set up audio sink
+            subprocess.run(['sudo', 'bluetoothctl', 'power', 'on'], check=False)
+            subprocess.run(['sudo', 'bluetoothctl', 'agent', 'on'], check=False)
+            subprocess.run(['sudo', 'bluetoothctl', 'default-agent'], check=False)
+            return jsonify({'success': True, 'message': 'Bluetooth enabled'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 import time
 
