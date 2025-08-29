@@ -563,22 +563,22 @@ ADMIN_TEMPLATE = '''
                         </div>
                         <div class="form-group" style="margin-top: 15px;">
                             <label>Blocked Artists (one per line)</label>
-                            <textarea id="blockedArtists" rows="3" style="font-size: 12px;">{{ '\\n'.join(parental_config.content_filter.blocked_artists) }}</textarea>
+                            <textarea id="blockedArtists" rows="3" style="font-size: 12px;">{{ parental_config.content_filter.blocked_artists|join('\n') }}</textarea>
                         </div>
                         <div class="form-group">
                             <label>Blocked Genres (comma separated)</label>
-                            <input type="text" id="blockedGenres" value="{{ ', '.join(parental_config.content_filter.genre_blacklist) }}">
+                            <input type="text" id="blockedGenres" value="{{ parental_config.content_filter.genre_blacklist|join(', ') }}">
                         </div>
                     </div>
                     <div>
                         <h3 style="font-size: 16px; margin-bottom: 10px;">Approved Content</h3>
                         <div class="form-group">
                             <label>Allowed Playlists (Spotify URIs)</label>
-                            <textarea id="allowedPlaylists" rows="4" style="font-size: 12px;" placeholder="spotify:playlist:xxxxx">{{ '\\n'.join(parental_config.content_filter.allowed_playlists) }}</textarea>
+                            <textarea id="allowedPlaylists" rows="4" style="font-size: 12px;" placeholder="spotify:playlist:xxxxx">{{ parental_config.content_filter.allowed_playlists|join('\n') }}</textarea>
                         </div>
                         <div class="form-group">
                             <label>Allowed Genres (comma separated)</label>
-                            <input type="text" id="allowedGenres" value="{{ ', '.join(parental_config.content_filter.genre_whitelist) }}" placeholder="pop, kids, disney">
+                            <input type="text" id="allowedGenres" value="{{ parental_config.content_filter.genre_whitelist|join(', ') }}" placeholder="pop, kids, disney">
                         </div>
                         <button onclick="saveContentFilter()" style="margin-top: 10px;">Save Content Settings</button>
                     </div>
