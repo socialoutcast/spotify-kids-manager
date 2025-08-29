@@ -38,6 +38,39 @@ check_root() {
     fi
 }
 
+# Uninstall existing installation
+uninstall_existing() {
+    log_info "Removing any existing installation..."
+    
+    # Stop services
+    systemctl stop $SERVICE_NAME 2>/dev/null || true
+    systemctl stop $PLAYER_SERVICE 2>/dev/null || true
+    systemctl stop nginx 2>/dev/null || true
+    
+    # Disable services
+    systemctl disable $SERVICE_NAME 2>/dev/null || true
+    systemctl disable $PLAYER_SERVICE 2>/dev/null || true
+    
+    # Kill any running processes
+    pkill -f spotify_player.py 2>/dev/null || true
+    pkill -f app.py 2>/dev/null || true
+    
+    # Remove installation directory
+    rm -rf "$INSTALL_DIR"
+    
+    # Remove systemd services
+    rm -f "/etc/systemd/system/$SERVICE_NAME.service"
+    rm -f "/etc/systemd/system/$PLAYER_SERVICE.service"
+    
+    # Remove nginx config
+    rm -f /etc/nginx/sites-enabled/spotify-admin
+    rm -f /etc/nginx/sites-available/spotify-admin
+    
+    systemctl daemon-reload
+    
+    log_success "Existing installation removed"
+}
+
 # Detect system information
 detect_system() {
     log_info "Detecting system information..."
@@ -245,6 +278,7 @@ export USER=spotify-kids
 LOG_FILE="/opt/spotify-terminal/data/player.log"
 
 # Ensure log file exists and is writable
+mkdir -p /opt/spotify-terminal/data
 touch "$LOG_FILE" 2>/dev/null || true
 chmod 666 "$LOG_FILE" 2>/dev/null || true
 
@@ -256,21 +290,19 @@ log "Starting Spotify Kids Native Player..."
 
 # Kill any existing instances
 pkill -f spotify_player.py 2>/dev/null
-sleep 2
+sleep 1
 
-# Start X server if not running
-if ! xset q &>/dev/null; then
-    log "Starting X server..."
-    xinit -- :0 -nocursor &
-    sleep 5
-fi
+# Hide cursor
+unclutter -idle 0 &
 
-# Start the native player
+# Start the native player (fullscreen on LCD)
 if [ -f /opt/spotify-terminal/spotify_player.py ]; then
-    log "Launching native player..."
-    python3 /opt/spotify-terminal/spotify_player.py >> "$LOG_FILE" 2>&1
+    log "Launching native player in fullscreen..."
+    exec python3 /opt/spotify-terminal/spotify_player.py >> "$LOG_FILE" 2>&1
 else
     log "ERROR: spotify_player.py not found!"
+    # Show error on screen
+    xmessage -center "Spotify Player not found! Please reinstall."
     exit 1
 fi
 EOF
@@ -369,24 +401,32 @@ EOF
 
 # Configure user profile
 configure_user_profile() {
-    log_info "Configuring user profile..."
+    log_info "Configuring user profile for auto-start..."
     
     # Create .bash_profile for auto-start
     cat > "/home/$SPOTIFY_USER/.bash_profile" <<'EOF'
 #!/bin/bash
 
-# Auto-start Spotify Kids Manager on login
+# Auto-start Spotify Kids Manager on tty1 login
 if [[ "$(tty)" == "/dev/tty1" ]]; then
-    echo "Starting Spotify Kids Manager..."
+    # Clear the screen
+    clear
     
-    # Start admin panel if not running
+    # Start admin panel in background (web only, no display)
     if ! pgrep -f "app.py" > /dev/null; then
-        python3 /opt/spotify-terminal/web/app.py &
-        sleep 3
+        python3 /opt/spotify-terminal/web/app.py > /dev/null 2>&1 &
     fi
     
-    # Start native player
-    exec /opt/spotify-terminal/scripts/start-native-player.sh
+    # Give admin panel time to start
+    sleep 2
+    
+    # Start X server if not running
+    if ! pidof Xorg > /dev/null; then
+        startx /opt/spotify-terminal/scripts/start-native-player.sh -- :0 -nocursor
+    else
+        # X already running, just start the player
+        DISPLAY=:0 exec /opt/spotify-terminal/scripts/start-native-player.sh
+    fi
 fi
 EOF
     
@@ -494,6 +534,13 @@ main() {
     
     check_root
     detect_system
+    
+    # Clean uninstall first if anything exists
+    if [[ -d "$INSTALL_DIR" ]] || systemctl list-units --all | grep -q "$SERVICE_NAME\|$PLAYER_SERVICE"; then
+        log_warning "Existing installation detected - removing it first"
+        uninstall_existing
+    fi
+    
     install_dependencies
     install_spotify_backend
     create_user
@@ -506,22 +553,21 @@ main() {
     configure_user_profile
     create_initial_config
     enable_services
-    start_services
     
     log_success "=== Installation Complete ==="
     echo ""
-    log_info "Admin Panel: http://localhost:$WEB_PORT"
+    log_info "Admin Panel will be available at: http://localhost:$WEB_PORT"
     log_info "Default credentials: admin / changeme"
     echo ""
-    log_info "The native Spotify player will start automatically on boot"
+    log_info "The Spotify player will display on the LCD after reboot"
     log_info "Configure Spotify API credentials through the admin panel"
     echo ""
-    log_warning "Please reboot to ensure all services start correctly"
-    echo ""
-    read -p "Reboot now? (y/n): " -r
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        reboot
-    fi
+    log_warning "System will reboot in 5 seconds to complete installation..."
+    sleep 5
+    
+    # Force reboot to ensure clean start
+    log_info "Rebooting system..."
+    reboot
 }
 
 # Run main function

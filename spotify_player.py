@@ -23,12 +23,14 @@ class SpotifyPlayer:
     def __init__(self):
         self.root = tk.Tk()
         self.root.title("Spotify Kids Player")
-        self.root.geometry("1024x768")
         self.root.configure(bg="#191414")
         
-        # Make fullscreen on touchscreen devices
-        if os.path.exists('/dev/input/touchscreen'):
-            self.root.attributes('-fullscreen', True)
+        # Always start fullscreen for kiosk mode
+        self.root.attributes('-fullscreen', True)
+        
+        # Bind F11 to toggle fullscreen (for testing)
+        self.root.bind('<F11>', lambda e: self.root.attributes('-fullscreen', 
+                                         not self.root.attributes('-fullscreen')))
         
         # Configuration
         self.base_dir = '/opt/spotify-terminal'
@@ -986,11 +988,16 @@ class SpotifyPlayer:
     def check_lock_status(self):
         """Check if device is locked and adjust UI"""
         if os.path.exists(self.lock_file):
-            # Disable admin access and make fullscreen
+            # Force fullscreen and prevent exit
             self.root.attributes('-fullscreen', True)
             
-            # Bind escape key to do nothing
+            # Disable all exit keys
             self.root.bind('<Escape>', lambda e: None)
+            self.root.bind('<Alt-F4>', lambda e: None)
+            self.root.protocol('WM_DELETE_WINDOW', lambda: None)
+            
+            # Remove window manager decorations
+            self.root.overrideredirect(True)
     
     def run(self):
         """Start the application"""
