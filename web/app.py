@@ -897,9 +897,10 @@ ADMIN_TEMPLATE = '''
                     Manage Bluetooth speakers and headphones for audio output.
                 </p>
                 <div id="bluetoothStatus" style="margin-bottom: 15px;">
-                    <span class="status {{ 'online' if bluetooth_enabled else 'offline' }}" style="font-size: 12px;">
-                        Bluetooth: {{ 'Enabled' if bluetooth_enabled else 'Disabled' }}
+                    <span id="bluetoothStatusText" class="status {{ 'online' if bluetooth_enabled else 'offline' }}" style="font-size: 12px;">
+                        Bluetooth: <span id="bluetoothState">{{ 'Enabled' if bluetooth_enabled else 'Disabled' }}</span>
                     </span>
+                    <div id="bluetoothStatusMessage" style="display: none; margin-top: 10px; padding: 10px; border-radius: 5px;"></div>
                 </div>
                 <div id="pairedDevices" style="margin-bottom: 15px;">
                     <label style="font-size: 14px; margin-bottom: 10px; display: block;">Paired Devices:</label>
@@ -921,8 +922,12 @@ ADMIN_TEMPLATE = '''
                         {% endfor %}
                     </div>
                 </div>
-                <button onclick="scanBluetooth()">Scan for Devices</button>
-                <button onclick="toggleBluetooth()" style="margin-left: 10px;">{{ 'Disable' if bluetooth_enabled else 'Enable' }} Bluetooth</button>
+                <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                    <button onclick="enableBluetooth()" id="enableBtBtn" style="background: #10b981;" {{ 'disabled' if bluetooth_enabled else '' }}>Enable Bluetooth</button>
+                    <button onclick="disableBluetooth()" id="disableBtBtn" class="danger" {{ 'disabled' if not bluetooth_enabled else '' }}>Disable Bluetooth</button>
+                    <button onclick="checkBluetoothStatus()">Refresh Status</button>
+                </div>
+                <button onclick="scanBluetooth()" id="scanBtBtn">Scan for Devices</button>
                 <div id="scanResults" style="margin-top: 15px; display: none;">
                     <label style="font-size: 14px; margin-bottom: 10px; display: block;">Available Devices:</label>
                     <div id="scanList" style="max-height: 150px; overflow-y: auto; border: 1px solid #ddd; border-radius: 5px; padding: 10px;">
@@ -1962,6 +1967,34 @@ def bluetooth_toggle():
             subprocess.run(['sudo', 'bluetoothctl', 'agent', 'on'], check=False)
             subprocess.run(['sudo', 'bluetoothctl', 'default-agent'], check=False)
             return jsonify({'success': True, 'message': 'Bluetooth enabled'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/bluetooth/status')
+def bluetooth_status():
+    """Get Bluetooth status"""
+    if 'logged_in' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    try:
+        # Check if Bluetooth service is active
+        result = subprocess.run(['sudo', 'systemctl', 'is-active', 'bluetooth'],
+                              capture_output=True, text=True)
+        is_active = result.stdout.strip() == 'active'
+        
+        # Check if Bluetooth is unblocked
+        rfkill_result = subprocess.run(['sudo', 'rfkill', 'list', 'bluetooth'],
+                                      capture_output=True, text=True)
+        is_unblocked = 'Soft blocked: no' in rfkill_result.stdout
+        
+        enabled = is_active and is_unblocked
+        
+        return jsonify({
+            'success': True,
+            'enabled': enabled,
+            'service_active': is_active,
+            'rfkill_unblocked': is_unblocked
+        })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
