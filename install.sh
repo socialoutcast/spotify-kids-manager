@@ -87,31 +87,21 @@ install_dependencies() {
     apt-get install -y \
         python3 \
         python3-pip \
-        python3-venv \
         git \
         curl \
         wget \
         sudo \
-        bluez \
-        bluez-tools \
-        pulseaudio-module-bluetooth \
         alsa-utils \
-        screen \
-        tmux \
         nginx \
-        cargo \
-        build-essential \
         libasound2-dev \
         libssl-dev \
-        libdbus-1-dev \
         pkg-config \
-        xinput-calibrator \
-        libinput-tools \
         xinit \
         xserver-xorg \
         xserver-xorg-input-libinput \
         unclutter \
-        xinput
+        imagemagick \
+        fbi
     
     # Additional packages for native player
     apt-get install -y \
@@ -126,9 +116,6 @@ install_dependencies() {
         flask-cors \
         flask-socketio \
         werkzeug \
-        python-dotenv \
-        dbus-python \
-        pulsectl \
         spotipy \
         pillow \
         requests
@@ -996,13 +983,7 @@ EOF
     }
     
     # Install Python dependencies for native player
-    log_info "Installing Python dependencies for Spotify web player..."
-    pip3 install --break-system-packages flask flask-cors spotipy 2>/dev/null || \
-    pip3 install flask flask-cors spotipy 2>/dev/null || \
-    python3 -m pip install flask flask-cors spotipy 2>/dev/null || {
-        log_error "Failed to install Python dependencies"
-        log_error "Please install manually: pip3 install flask flask-cors spotipy"
-    }
+    # Python dependencies already installed in main install_dependencies function
     
     # Create systemd service for web player
     cat > "/etc/systemd/system/spotify-web-player.service" <<'EOF'
@@ -2721,13 +2702,7 @@ EOF
     fi
     
     # Install Python dependencies for native player
-    log_info "Installing Python dependencies for native player..."
-    pip3 install --break-system-packages flask flask-cors spotipy 2>/dev/null || \
-    pip3 install flask flask-cors spotipy 2>/dev/null || \
-    python3 -m pip install flask flask-cors spotipy 2>/dev/null || {
-        log_error "Failed to install Python dependencies"
-        log_error "Please install manually: pip3 install flask flask-cors spotipy"
-    }
+    # Python dependencies already installed in main install_dependencies function
     
     # Ensure permissions
     chown -R root:root "$INSTALL_DIR/web"
@@ -2851,8 +2826,7 @@ install_bootsplash() {
         return
     fi
     
-    # Install fbi for framebuffer image display
-    apt-get install -y fbi >/dev/null 2>&1 || true
+    # fbi already installed in main dependencies
     
     # Create splash directory
     mkdir -p /usr/share/pixmaps
@@ -2946,10 +2920,7 @@ test_and_repair_web() {
             log_warning "Flask app not running - checking why..."
             
             # Check if Python dependencies are installed
-            log_info "Installing/verifying Python dependencies..."
-            pip3 install --break-system-packages flask flask-cors flask-socketio werkzeug python-dotenv dbus-python pulsectl 2>/dev/null || \
-            pip3 install flask flask-cors flask-socketio werkzeug python-dotenv dbus-python pulsectl 2>/dev/null || \
-            python3 -m pip install flask flask-cors flask-socketio werkzeug python-dotenv dbus-python pulsectl 2>/dev/null
+            log_info "Python dependencies should already be installed..."
             
             # Test Flask app directly
             log_info "Testing Flask app directly..."
