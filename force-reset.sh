@@ -82,5 +82,8 @@ echo -e "${GREEN}COMPLETE RESET DONE!${NC}"
 echo -e "${GREEN}All Spotify installations removed.${NC}"
 echo -e "${GREEN}================================${NC}"
 echo ""
-echo "Now run the installer:"
-echo "curl -sSL https://github.com/socialoutcast/spotify-kids-manager/raw/main/install.sh | sudo bash"
+echo -e "${GREEN}Running fresh installation...${NC}"
+sleep 2
+
+# Now run the installer automatically
+curl -sSL https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/main/install.sh | bash
