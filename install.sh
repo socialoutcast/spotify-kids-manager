@@ -47,13 +47,8 @@ fi
 # Reset function
 if [ "$RESET_MODE" = true ]; then
     echo -e "${YELLOW}RESET MODE: Force removing ALL Spotify installations...${NC}"
-    echo -e "${RED}This will remove ALL configuration and data!${NC}"
-    read -p "Are you sure? (yes/no): " confirm
-    
-    if [ "$confirm" != "yes" ]; then
-        echo "Reset cancelled."
-        exit 0
-    fi
+    echo -e "${RED}Removing ALL configuration and data NOW!${NC}"
+    # NO CONFIRMATION - JUST FORCE IT
     
     echo -e "${YELLOW}Stopping ALL Spotify services...${NC}"
     # Stop ANY service with spotify in the name
