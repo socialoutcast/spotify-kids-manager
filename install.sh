@@ -179,6 +179,12 @@ pip3 install --break-system-packages \
 # Create application user (NO SUDO PRIVILEGES)
 echo -e "${YELLOW}Creating application user...${NC}"
 if ! id "$APP_USER" &>/dev/null; then
+    # User doesn't exist, but group might - clean it up
+    if getent group "$APP_USER" >/dev/null 2>&1; then
+        echo "Cleaning up existing group $APP_USER from previous installation..."
+        groupdel "$APP_USER" 2>/dev/null || true
+    fi
+    # Now create fresh user and group
     useradd -m -s /bin/bash "$APP_USER"
     usermod -aG audio,video,input "$APP_USER"
 else
@@ -192,15 +198,16 @@ chown $APP_USER:$APP_USER /home/$APP_USER
 # Create admin user for the web panel
 ADMIN_USER="spotify-admin"
 echo -e "${YELLOW}Creating admin user for web panel...${NC}"
+
+# Clean up any partial state first
 if ! id "$ADMIN_USER" &>/dev/null; then
-    # Check if group exists first
+    # User doesn't exist, but group might - clean it up
     if getent group "$ADMIN_USER" >/dev/null 2>&1; then
-        # Group exists, use it
-        useradd -r -M -s /bin/false -g "$ADMIN_USER" "$ADMIN_USER"
-    else
-        # Create both group and user
-        useradd -r -M -s /bin/false "$ADMIN_USER"
+        echo "Cleaning up existing group $ADMIN_USER from previous installation..."
+        groupdel "$ADMIN_USER" 2>/dev/null || true
     fi
+    # Now create fresh user and group
+    useradd -r -M -s /bin/false "$ADMIN_USER"
 else
     echo "User $ADMIN_USER already exists"
 fi
