@@ -57,7 +57,7 @@ rm -f /usr/local/bin/spotify*
 # Remove X11 configs we may have added
 rm -f /etc/X11/xorg.conf.d/99-calibration.conf
 
-echo -e "${YELLOW}Removing ALL Spotify users...${NC}"
+echo -e "${YELLOW}Removing ALL Spotify users and groups...${NC}"
 # Remove ANY user with spotify in the name
 for user in spotify-kids spotify-admin spotify-terminal; do
     if id "$user" &>/dev/null; then
@@ -66,6 +66,14 @@ for user in spotify-kids spotify-admin spotify-terminal; do
         sleep 2
         # Force remove user without removing home (we'll do that manually)
         userdel "$user" 2>/dev/null || true
+    fi
+done
+
+# Remove groups (after users are removed)
+for group in spotify-kids spotify-admin spotify-terminal; do
+    if getent group "$group" >/dev/null 2>&1; then
+        echo "Removing group: $group"
+        groupdel "$group" 2>/dev/null || true
     fi
 done
 
