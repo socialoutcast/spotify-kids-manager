@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from flask import Flask, request, jsonify, session, redirect, url_for, render_template_string
+from flask import Flask, request, jsonify, session, redirect, url_for, render_template_string, Response
 from flask_cors import CORS
 from werkzeug.security import check_password_hash, generate_password_hash
 import os
@@ -8,6 +8,8 @@ import json
 import subprocess
 import psutil
 from datetime import datetime
+import threading
+import queue
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.urandom(24)
@@ -362,6 +364,32 @@ ADMIN_TEMPLATE = '''
                 <button onclick="saveAdminSettings()">Update Settings</button>
                 <button onclick="logout()" class="danger" style="margin-left: 10px;">Logout</button>
             </div>
+            
+            <!-- System Updates -->
+            <div class="card">
+                <h2>🔄 System Updates</h2>
+                <p style="color: #666; font-size: 12px; margin-bottom: 15px;">
+                    Keep your system up to date with the latest security patches and improvements.
+                </p>
+                <button onclick="checkUpdates()">Check for Updates</button>
+                <button onclick="runUpdate()" style="margin-left: 10px;">Update System</button>
+                <div id="updateStatus" style="margin-top: 15px; display: none;">
+                    <div style="padding: 10px; background: #f3f4f6; border-radius: 5px;">
+                        <div id="updateMessage" style="font-size: 12px; color: #666;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Update Progress Modal -->
+        <div id="updateModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border-radius: 10px; padding: 30px; width: 600px; max-height: 80vh; overflow-y: auto;">
+                <h2 style="margin-bottom: 20px;">System Update Progress</h2>
+                <div id="updateOutput" style="background: #1e1e1e; color: #00ff00; font-family: 'Courier New', monospace; font-size: 12px; padding: 15px; border-radius: 5px; height: 300px; overflow-y: auto; white-space: pre-wrap;"></div>
+                <div style="margin-top: 20px; text-align: right;">
+                    <button id="closeUpdateModal" onclick="closeUpdateModal()" style="display: none;">Close</button>
+                </div>
+            </div>
         </div>
         
         {% else %}
@@ -444,6 +472,54 @@ ADMIN_TEMPLATE = '''
         // Auto-save toggles
         document.getElementById('deviceLock').addEventListener('change', saveAdminSettings);
         document.getElementById('timeRestrictions').addEventListener('change', saveAdminSettings);
+        
+        // System update functions
+        function checkUpdates() {
+            document.getElementById('updateStatus').style.display = 'block';
+            document.getElementById('updateMessage').textContent = 'Checking for updates...';
+            
+            fetch('/api/system/check-updates')
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('updateMessage').innerHTML = data.message;
+                })
+                .catch(err => {
+                    document.getElementById('updateMessage').textContent = 'Error checking updates: ' + err;
+                });
+        }
+        
+        function runUpdate() {
+            if (!confirm('This will update the system packages. The process may take several minutes. Continue?')) {
+                return;
+            }
+            
+            // Show modal
+            document.getElementById('updateModal').style.display = 'block';
+            document.getElementById('updateOutput').textContent = 'Starting system update...\n';
+            document.getElementById('closeUpdateModal').style.display = 'none';
+            
+            // Start SSE connection for live updates
+            const eventSource = new EventSource('/api/system/update-stream');
+            
+            eventSource.onmessage = function(event) {
+                const output = document.getElementById('updateOutput');
+                output.textContent += event.data + '\n';
+                output.scrollTop = output.scrollHeight;
+            };
+            
+            eventSource.onerror = function(error) {
+                eventSource.close();
+                const output = document.getElementById('updateOutput');
+                output.textContent += '\n=== Update Complete ===\n';
+                document.getElementById('closeUpdateModal').style.display = 'inline-block';
+            };
+        }
+        
+        function closeUpdateModal() {
+            document.getElementById('updateModal').style.display = 'none';
+            // Refresh page to show any changes
+            location.reload();
+        }
         
         {% else %}
         function login() {
@@ -578,6 +654,96 @@ def control_player(action):
         return jsonify({'error': str(e)}), 500
     
     return jsonify({'error': 'Unknown action'}), 400
+
+@app.route('/api/system/check-updates')
+def check_updates():
+    """Check for available system updates"""
+    if 'logged_in' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    try:
+        # Update package list
+        subprocess.run(['sudo', 'apt-get', 'update'], capture_output=True, text=True, check=False)
+        
+        # Check for upgradable packages
+        result = subprocess.run(['apt', 'list', '--upgradable'], 
+                              capture_output=True, text=True, check=False)
+        
+        lines = result.stdout.strip().split('\n')
+        upgradable = [line for line in lines if '/' in line and not line.startswith('Listing')]
+        
+        if upgradable:
+            message = f"<strong>{len(upgradable)} updates available:</strong><br>"
+            for pkg in upgradable[:10]:  # Show first 10
+                pkg_name = pkg.split('/')[0]
+                message += f"• {pkg_name}<br>"
+            if len(upgradable) > 10:
+                message += f"<em>...and {len(upgradable) - 10} more</em>"
+        else:
+            message = "System is up to date!"
+        
+        return jsonify({'success': True, 'message': message, 'count': len(upgradable)})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/system/update-stream')
+def update_stream():
+    """Stream system update progress"""
+    if 'logged_in' not in session:
+        return Response("Error: Not authenticated", status=401)
+    
+    def generate():
+        # Create a queue for output
+        output_queue = queue.Queue()
+        
+        def run_update():
+            try:
+                # Run apt update
+                yield "data: Running apt update...\n\n"
+                proc = subprocess.Popen(['sudo', 'apt-get', 'update', '-y'],
+                                      stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                      text=True, bufsize=1)
+                for line in proc.stdout:
+                    yield f"data: {line.strip()}\n\n"
+                proc.wait()
+                
+                # Run apt upgrade with auto-yes
+                yield "data: \n\n"
+                yield "data: Running system upgrade (this may take a while)...\n\n"
+                proc = subprocess.Popen(['sudo', 'DEBIAN_FRONTEND=noninteractive', 'apt-get', 
+                                       'upgrade', '-y', '--force-yes', '-o', 
+                                       'Dpkg::Options::=--force-confdef', '-o',
+                                       'Dpkg::Options::=--force-confold'],
+                                      stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                      text=True, bufsize=1, env={**os.environ, 'DEBIAN_FRONTEND': 'noninteractive'})
+                
+                for line in proc.stdout:
+                    cleaned_line = line.strip()
+                    if cleaned_line:
+                        yield f"data: {cleaned_line}\n\n"
+                
+                proc.wait()
+                
+                # Clean up
+                yield "data: \n\n"
+                yield "data: Cleaning up...\n\n"
+                subprocess.run(['sudo', 'apt-get', 'autoremove', '-y'], 
+                             capture_output=True, check=False)
+                subprocess.run(['sudo', 'apt-get', 'autoclean', '-y'], 
+                             capture_output=True, check=False)
+                
+                yield "data: \n\n"
+                yield "data: ✓ Update completed successfully!\n\n"
+                
+            except Exception as e:
+                yield f"data: Error: {str(e)}\n\n"
+        
+        # Return the generator
+        return run_update()
+    
+    return Response(generate(), mimetype='text/event-stream',
+                   headers={'Cache-Control': 'no-cache',
+                           'X-Accel-Buffering': 'no'})
 
 import time
 

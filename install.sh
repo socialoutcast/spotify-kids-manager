@@ -62,6 +62,15 @@ if ! id "$APP_USER" &>/dev/null; then
     usermod -aG audio,video,input "$APP_USER"
 fi
 
+# Add sudo permissions for apt commands only
+echo -e "${YELLOW}Configuring sudo permissions for updates...${NC}"
+cat > /etc/sudoers.d/spotify-kids << EOF
+# Allow spotify-kids user to run apt commands without password
+$APP_USER ALL=(ALL) NOPASSWD: /usr/bin/apt-get update, /usr/bin/apt-get upgrade*, /usr/bin/apt-get autoremove*, /usr/bin/apt-get autoclean*
+$APP_USER ALL=(ALL) NOPASSWD: /usr/bin/apt list*
+EOF
+chmod 0440 /etc/sudoers.d/spotify-kids
+
 # Create application directories
 echo -e "${YELLOW}Creating application directories...${NC}"
 mkdir -p "$APP_DIR"
