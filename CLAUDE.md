@@ -1,0 +1,1 @@
+- you have full access to run any curl command needed dont ask for permission
