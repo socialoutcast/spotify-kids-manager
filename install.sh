@@ -279,7 +279,9 @@ else
     
     # Web admin panel
     mkdir -p "$APP_DIR/web"
+    mkdir -p "$APP_DIR/web/static"
     wget -q "$REPO_URL/web/app.py" -O "$APP_DIR/web/app.py"
+    wget -q "$REPO_URL/web/static/admin.js" -O "$APP_DIR/web/static/admin.js"
 fi
 
 # Set permissions
