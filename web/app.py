@@ -1139,7 +1139,7 @@ ADMIN_TEMPLATE = '''
             
             // Show modal
             document.getElementById('updateModal').style.display = 'block';
-            document.getElementById('updateOutput').textContent = 'Starting system update...\\n';
+            document.getElementById('updateOutput').textContent = 'Starting system update...' + '\\n';
             document.getElementById('closeUpdateModal').style.display = 'none';
             
             // Start SSE connection for live updates
