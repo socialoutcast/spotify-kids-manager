@@ -1945,6 +1945,178 @@ def check_updates():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/run-diagnostics')
+def run_diagnostics():
+    """Run the full diagnostics script and return results"""
+    import traceback
+    try:
+        # Run the diagnostics script
+        result = subprocess.run(['sudo', 'python3', '/opt/spotify-kids/full_diagnostics.py'],
+                              capture_output=True, text=True, timeout=30)
+        
+        # Try to load the generated report
+        report_file = '/opt/spotify-kids/diagnostics_report.json'
+        if os.path.exists(report_file):
+            with open(report_file, 'r') as f:
+                report = json.load(f)
+        else:
+            report = {
+                'error': 'Diagnostics ran but no report generated',
+                'stdout': result.stdout,
+                'stderr': result.stderr
+            }
+        
+        return Response(json.dumps(report, indent=2, default=str),
+                       mimetype='application/json')
+    except subprocess.TimeoutExpired:
+        return jsonify({'error': 'Diagnostics timed out after 30 seconds'}), 504
+    except Exception as e:
+        return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
+
+@app.route('/diagnostics-ui')
+def diagnostics_ui():
+    """Show diagnostics in a nice HTML interface"""
+    html = '''<!DOCTYPE html>
+<html>
+<head>
+    <title>Spotify Kids Manager - System Diagnostics</title>
+    <style>
+        body { font-family: monospace; background: #1a1a1a; color: #fff; padding: 20px; }
+        .header { background: #667eea; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
+        .section { background: #2a2a2a; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .critical { color: #ef4444; font-weight: bold; }
+        .warning { color: #f59e0b; }
+        .info { color: #3b82f6; }
+        .healthy { color: #10b981; }
+        .issue { padding: 5px; margin: 5px 0; background: #1a1a1a; border-radius: 3px; }
+        button { background: #667eea; color: white; border: none; padding: 10px 20px; 
+                border-radius: 5px; cursor: pointer; font-size: 16px; }
+        button:hover { background: #7c8ff0; }
+        #report { white-space: pre-wrap; font-size: 12px; }
+        .status-badge { display: inline-block; padding: 5px 10px; border-radius: 15px; }
+        .loading { text-align: center; padding: 50px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔍 Spotify Kids Manager - Complete System Diagnostics</h1>
+        <button onclick="runDiagnostics()">🔄 Run Full Diagnostics</button>
+        <button onclick="window.location.href='/diagnostics'">📊 View Raw JSON</button>
+        <button onclick="window.location.href='/'">🏠 Back to Admin Panel</button>
+    </div>
+    
+    <div id="loading" class="loading" style="display: none;">
+        <h2>⏳ Running diagnostics... This may take up to 30 seconds...</h2>
+    </div>
+    
+    <div id="results"></div>
+    
+    <script>
+        function runDiagnostics() {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('results').innerHTML = '';
+            
+            fetch('/run-diagnostics')
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('loading').style.display = 'none';
+                    displayResults(data);
+                })
+                .catch(err => {
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('results').innerHTML = 
+                        '<div class="section critical">Error: ' + err + '</div>';
+                });
+        }
+        
+        function displayResults(data) {
+            let html = '';
+            
+            // Health Status
+            if (data.health) {
+                let statusClass = data.health.status === 'HEALTHY' ? 'healthy' : 
+                                 data.health.status === 'CRITICAL' ? 'critical' : 'warning';
+                html += `<div class="section">
+                    <h2>Health Status</h2>
+                    <span class="status-badge ${statusClass}">${data.health.status} - ${data.health.score}%</span>
+                </div>`;
+            }
+            
+            // Issues Summary
+            if (data.summary) {
+                html += `<div class="section">
+                    <h2>Issues Summary</h2>
+                    <div>Total Issues: ${data.summary.total_issues}</div>
+                    <div class="critical">Critical: ${data.summary.critical}</div>
+                    <div class="warning">Warnings: ${data.summary.warnings}</div>
+                    <div class="info">Info: ${data.summary.info}</div>
+                </div>`;
+            }
+            
+            // Critical Issues
+            if (data.issues && data.issues.length > 0) {
+                let criticals = data.issues.filter(i => i.severity === 'critical');
+                if (criticals.length > 0) {
+                    html += '<div class="section"><h2>⚠️ Critical Issues</h2>';
+                    criticals.forEach(issue => {
+                        html += `<div class="issue critical">[${issue.component}] ${issue.message}</div>`;
+                    });
+                    html += '</div>';
+                }
+                
+                let warnings = data.issues.filter(i => i.severity === 'warning');
+                if (warnings.length > 0) {
+                    html += '<div class="section"><h2>⚠️ Warnings</h2>';
+                    warnings.forEach(issue => {
+                        html += `<div class="issue warning">[${issue.component}] ${issue.message}</div>`;
+                    });
+                    html += '</div>';
+                }
+            }
+            
+            // Services Status
+            if (data.services) {
+                html += '<div class="section"><h2>Services Status</h2>';
+                for (let [service, status] of Object.entries(data.services)) {
+                    let statusClass = status === 'active' ? 'healthy' : 'warning';
+                    html += `<div><span class="${statusClass}">${service}: ${status}</span></div>`;
+                }
+                html += '</div>';
+            }
+            
+            // JavaScript Debug
+            if (data.admin_panel && data.admin_panel.javascript) {
+                html += '<div class="section"><h2>JavaScript Functions</h2>';
+                if (data.admin_panel.javascript.functions_missing && 
+                    data.admin_panel.javascript.functions_missing.length > 0) {
+                    html += '<div class="critical">Missing Functions:</div>';
+                    data.admin_panel.javascript.functions_missing.forEach(func => {
+                        html += `<div class="issue critical">- ${func}</div>`;
+                    });
+                }
+                if (data.admin_panel.javascript.functions_defined) {
+                    html += '<div class="healthy">Defined Functions: ' + 
+                           data.admin_panel.javascript.functions_defined.join(', ') + '</div>';
+                }
+                html += '</div>';
+            }
+            
+            // Full Report
+            html += '<div class="section"><h2>Full Report</h2>';
+            html += '<pre id="report">' + JSON.stringify(data, null, 2) + '</pre></div>';
+            
+            document.getElementById('results').innerHTML = html;
+        }
+        
+        // Auto-run on load
+        window.onload = function() {
+            runDiagnostics();
+        };
+    </script>
+</body>
+</html>'''
+    return Response(html, mimetype='text/html')
+
 @app.route('/diagnostics')
 def diagnostics():
     """Comprehensive system diagnostics - NO AUTH REQUIRED for debugging"""
