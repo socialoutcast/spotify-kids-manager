@@ -6,13 +6,21 @@ set -e
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
 APP_USER="spotify-kids"
 APP_DIR="/opt/spotify-kids"
 CONFIG_DIR="$APP_DIR/config"
-REPO_URL="https://github.com/yourusername/spotify-kids-manager.git"
+REPO_URL="https://raw.githubusercontent.com/yourusername/spotify-kids-manager/main"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Parse arguments
+RESET_MODE=false
+if [[ "$1" == "--reset" ]]; then
+    RESET_MODE=true
+fi
 
 echo -e "${GREEN}Spotify Kids Manager Installer${NC}"
 echo "================================"
@@ -21,6 +29,62 @@ echo "================================"
 if [[ $EUID -ne 0 ]]; then
    echo -e "${RED}This script must be run as root${NC}"
    exit 1
+fi
+
+# Reset function
+if [ "$RESET_MODE" = true ]; then
+    echo -e "${YELLOW}RESET MODE: Removing existing installation...${NC}"
+    echo -e "${RED}This will remove all configuration and data!${NC}"
+    read -p "Are you sure? (yes/no): " confirm
+    
+    if [ "$confirm" != "yes" ]; then
+        echo "Reset cancelled."
+        exit 0
+    fi
+    
+    # Stop services
+    echo -e "${YELLOW}Stopping services...${NC}"
+    systemctl stop spotify-player 2>/dev/null || true
+    systemctl stop spotify-admin 2>/dev/null || true
+    systemctl disable spotify-player 2>/dev/null || true
+    systemctl disable spotify-admin 2>/dev/null || true
+    
+    # Remove files
+    echo -e "${YELLOW}Removing files...${NC}"
+    rm -rf "$APP_DIR"
+    rm -f /etc/systemd/system/spotify-player.service
+    rm -f /etc/systemd/system/spotify-admin.service
+    rm -f /etc/systemd/system/getty@tty1.service.d/autologin.conf
+    rm -f /etc/nginx/sites-available/spotify-admin
+    rm -f /etc/nginx/sites-enabled/spotify-admin
+    rm -f /etc/sudoers.d/spotify-admin
+    rm -f /usr/local/bin/spotify-kids-uninstall
+    rm -f /etc/X11/xorg.conf.d/99-calibration.conf
+    
+    # Remove users
+    echo -e "${YELLOW}Removing users...${NC}"
+    if id "$APP_USER" &>/dev/null; then
+        # Kill all processes owned by the user
+        pkill -u "$APP_USER" 2>/dev/null || true
+        sleep 2
+        userdel "$APP_USER" 2>/dev/null || true
+        rm -rf "/home/$APP_USER"
+    fi
+    
+    if id "spotify-admin" &>/dev/null; then
+        pkill -u "spotify-admin" 2>/dev/null || true
+        sleep 2
+        userdel "spotify-admin" 2>/dev/null || true
+    fi
+    
+    # Clean up logs
+    rm -rf /var/log/spotify-kids
+    
+    systemctl daemon-reload
+    
+    echo -e "${GREEN}Reset complete. Starting fresh installation...${NC}"
+    echo ""
+    sleep 2
 fi
 
 # Update system
@@ -55,21 +119,33 @@ pip3 install --break-system-packages \
     requests \
     psutil
 
-# Create application user
+# Create application user (NO SUDO PRIVILEGES)
 echo -e "${YELLOW}Creating application user...${NC}"
 if ! id "$APP_USER" &>/dev/null; then
     useradd -m -s /bin/bash "$APP_USER"
     usermod -aG audio,video,input "$APP_USER"
 fi
 
-# Add sudo permissions for apt commands only
-echo -e "${YELLOW}Configuring sudo permissions for updates...${NC}"
-cat > /etc/sudoers.d/spotify-kids << EOF
-# Allow spotify-kids user to run apt commands without password
-$APP_USER ALL=(ALL) NOPASSWD: /usr/bin/apt-get update, /usr/bin/apt-get upgrade*, /usr/bin/apt-get autoremove*, /usr/bin/apt-get autoclean*
-$APP_USER ALL=(ALL) NOPASSWD: /usr/bin/apt list*
+# Create admin user for the web panel
+ADMIN_USER="spotify-admin"
+echo -e "${YELLOW}Creating admin user for web panel...${NC}"
+if ! id "$ADMIN_USER" &>/dev/null; then
+    useradd -r -s /bin/false "$ADMIN_USER"
+    usermod -aG sudo "$ADMIN_USER"
+fi
+
+# Add sudo permissions for admin user only
+echo -e "${YELLOW}Configuring sudo permissions for admin...${NC}"
+cat > /etc/sudoers.d/spotify-admin << EOF
+# Allow spotify-admin user to run system commands without password
+$ADMIN_USER ALL=(ALL) NOPASSWD: /usr/bin/apt-get update, /usr/bin/apt-get upgrade*, /usr/bin/apt-get autoremove*, /usr/bin/apt-get autoclean*
+$ADMIN_USER ALL=(ALL) NOPASSWD: /usr/bin/apt list*
+$ADMIN_USER ALL=(ALL) NOPASSWD: /bin/systemctl restart spotify-player
+$ADMIN_USER ALL=(ALL) NOPASSWD: /bin/systemctl stop spotify-player
+$ADMIN_USER ALL=(ALL) NOPASSWD: /bin/systemctl start spotify-player
+$ADMIN_USER ALL=(ALL) NOPASSWD: /bin/systemctl status spotify-player
 EOF
-chmod 0440 /etc/sudoers.d/spotify-kids
+chmod 0440 /etc/sudoers.d/spotify-admin
 
 # Create application directories
 echo -e "${YELLOW}Creating application directories...${NC}"
@@ -77,16 +153,29 @@ mkdir -p "$APP_DIR"
 mkdir -p "$CONFIG_DIR"
 mkdir -p "/var/log/spotify-kids"
 
-# Copy application files
+# Copy or download application files
 echo -e "${YELLOW}Installing application files...${NC}"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-cp "$SCRIPT_DIR/spotify_player.py" "$APP_DIR/"
-cp -r "$SCRIPT_DIR/web" "$APP_DIR/"
+# Check if running from local directory or curl
+if [ -f "$SCRIPT_DIR/spotify_player.py" ]; then
+    echo "Installing from local files..."
+    cp "$SCRIPT_DIR/spotify_player.py" "$APP_DIR/"
+    cp -r "$SCRIPT_DIR/web" "$APP_DIR/"
+else
+    echo "Downloading files from GitHub..."
+    wget -q "$REPO_URL/spotify_player.py" -O "$APP_DIR/spotify_player.py"
+    mkdir -p "$APP_DIR/web"
+    wget -q "$REPO_URL/web/app.py" -O "$APP_DIR/web/app.py"
+fi
 
 # Set permissions
 chown -R "$APP_USER:$APP_USER" "$APP_DIR"
-chown -R "$APP_USER:$APP_USER" "/var/log/spotify-kids"
+chown -R "$ADMIN_USER:$ADMIN_USER" "$APP_DIR/web"
+chown -R "$ADMIN_USER:$ADMIN_USER" "$CONFIG_DIR"
+chown -R "$ADMIN_USER:$ADMIN_USER" "/var/log/spotify-kids"
+# Player needs read access to config
+chmod 755 "$CONFIG_DIR"
+chmod 644 "$CONFIG_DIR"/* 2>/dev/null || true
 
 # Configure auto-login
 echo -e "${YELLOW}Configuring auto-login...${NC}"
@@ -127,12 +216,17 @@ After=network.target
 
 [Service]
 Type=simple
-User=$APP_USER
+User=$ADMIN_USER
+Group=$ADMIN_USER
 Environment="SPOTIFY_CONFIG_DIR=$CONFIG_DIR"
 WorkingDirectory=$APP_DIR/web
 ExecStart=/usr/bin/python3 $APP_DIR/web/app.py
 Restart=always
 RestartSec=10
+# Admin user needs to run commands
+PrivateDevices=no
+ProtectSystem=no
+ProtectHome=no
 
 [Install]
 WantedBy=multi-user.target
@@ -235,8 +329,10 @@ rm -f /etc/systemd/system/spotify-player.service
 rm -f /etc/systemd/system/spotify-admin.service
 rm -f /etc/nginx/sites-available/spotify-admin
 rm -f /etc/nginx/sites-enabled/spotify-admin
+rm -f /etc/sudoers.d/spotify-admin
 rm -rf $APP_DIR
 userdel -r $APP_USER 2>/dev/null
+userdel spotify-admin 2>/dev/null
 rm -f /usr/local/bin/spotify-kids-uninstall
 echo "Uninstall complete"
 EOF
