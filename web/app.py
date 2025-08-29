@@ -380,18 +380,82 @@ ADMIN_TEMPLATE = '''
     <div class="container">
         {% if logged_in %}
         <div class="header">
-            <h1>🎵 Spotify Kids Admin Panel</h1>
-            <span class="status {{ 'online' if player_status else 'offline' }}">
-                Player: {{ 'Online' if player_status else 'Offline' }}
-            </span>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h1>🎵 Spotify Kids Admin Panel</h1>
+                <div style="display: flex; gap: 15px; align-items: center;">
+                    <span class="status {{ 'online' if player_status else 'offline' }}">
+                        Player: {{ 'Online' if player_status else 'Offline' }}
+                    </span>
+                    <span class="status {{ 'online' if spotify_configured else 'offline' }}">
+                        Spotify API: {{ 'Configured' if spotify_configured else 'Not Configured' }}
+                    </span>
+                    <button onclick="logout()" style="padding: 5px 15px; background: #ef4444;">Logout</button>
+                </div>
+            </div>
         </div>
         
+        <!-- Essential Configuration Section -->
+        <h2 style="color: white; margin: 20px 0 10px 0;">⚙️ Essential Configuration</h2>
+        <div class="grid">
+            <!-- Spotify Configuration -->
+            <div class="card">
+                <h2>🎵 Spotify Configuration</h2>
+                <div class="form-group">
+                    <label>Client ID</label>
+                    <input type="text" id="clientId" value="{{ spotify_config.get('client_id', '') }}" placeholder="Enter Spotify Client ID">
+                </div>
+                <div class="form-group">
+                    <label>Client Secret</label>
+                    <input type="password" id="clientSecret" value="{{ spotify_config.get('client_secret', '') }}" placeholder="Enter Spotify Client Secret">
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button onclick="saveSpotifyConfig()" style="flex: 1;">Save Configuration</button>
+                    <button onclick="testSpotifyConfig()" style="flex: 1; background: #10b981;">Test Connection</button>
+                </div>
+                <div id="spotifyStatus" style="margin-top: 10px; display: none;">
+                    <div style="padding: 10px; border-radius: 5px;" id="spotifyStatusBox">
+                        <div id="spotifyStatusMessage" style="font-size: 12px;"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Player Control -->
+            <div class="card">
+                <h2>🎮 Player Control</h2>
+                <div style="margin-bottom: 15px;">
+                    <button onclick="controlPlayer('play')">▶ Play</button>
+                    <button onclick="controlPlayer('pause')">⏸ Pause</button>
+                    <button onclick="controlPlayer('next')">⏭ Next</button>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <button onclick="controlPlayer('restart')" style="background: #667eea;">Restart Player</button>
+                    <button onclick="controlPlayer('stop')" class="danger">Stop Player</button>
+                </div>
+            </div>
+            
+            <!-- Admin Settings -->
+            <div class="card">
+                <h2>🔐 Admin Settings</h2>
+                <div class="form-group">
+                    <label>Admin Username</label>
+                    <input type="text" id="adminUser" value="{{ config.admin_user }}">
+                </div>
+                <div class="form-group">
+                    <label>New Password (leave blank to keep current)</label>
+                    <input type="password" id="adminPass" placeholder="Enter new password">
+                </div>
+                <button onclick="saveAdminSettings()">Update Credentials</button>
+            </div>
+        </div>
+        
+        <!-- Basic Controls Section -->
+        <h2 style="color: white; margin: 20px 0 10px 0;">🎛️ Basic Controls</h2>
         <div class="grid">
             <!-- Device Control -->
             <div class="card">
-                <h2>🔒 Device Control</h2>
+                <h2>🔒 Device Lock</h2>
                 <div class="toggle">
-                    <label>Device Lock</label>
+                    <label>Lock Device Controls</label>
                     <label class="switch">
                         <input type="checkbox" id="deviceLock" {{ 'checked' if config.device_locked else '' }}>
                         <span class="slider"></span>
@@ -404,9 +468,9 @@ ADMIN_TEMPLATE = '''
             
             <!-- Volume Control -->
             <div class="card">
-                <h2>🔊 Volume Control</h2>
+                <h2>🔊 Volume Limit</h2>
                 <div class="form-group">
-                    <label>Maximum Volume Limit</label>
+                    <label>Maximum Volume</label>
                     <input type="range" id="volumeLimit" min="0" max="100" value="{{ config.volume_limit }}">
                     <span id="volumeValue">{{ config.volume_limit }}%</span>
                 </div>
@@ -416,144 +480,27 @@ ADMIN_TEMPLATE = '''
             <div class="card">
                 <h2>⏰ Time Restrictions</h2>
                 <div class="toggle">
-                    <label>Enable Time Restrictions</label>
+                    <label>Enable Time Limits</label>
                     <label class="switch">
                         <input type="checkbox" id="timeRestrictions" {{ 'checked' if config.time_restrictions.enabled else '' }}>
                         <span class="slider"></span>
                     </label>
                 </div>
                 <div class="form-group">
-                    <label>Start Time</label>
-                    <input type="time" id="startTime" value="{{ config.time_restrictions.start_time }}">
-                </div>
-                <div class="form-group">
-                    <label>End Time</label>
-                    <input type="time" id="endTime" value="{{ config.time_restrictions.end_time }}">
-                </div>
-            </div>
-            
-            <!-- Spotify Configuration -->
-            <div class="card">
-                <h2>🎵 Spotify Configuration</h2>
-                <div class="form-group">
-                    <label>Client ID</label>
-                    <input type="text" id="clientId" value="{{ spotify_config.get('client_id', '') }}" placeholder="Enter Spotify Client ID">
-                </div>
-                <div class="form-group">
-                    <label>Client Secret</label>
-                    <input type="password" id="clientSecret" value="{{ spotify_config.get('client_secret', '') }}" placeholder="Enter Spotify Client Secret">
-                </div>
-                <button onclick="saveSpotifyConfig()">Save Spotify Config</button>
-            </div>
-            
-            <!-- Player Control -->
-            <div class="card">
-                <h2>🎮 Player Control</h2>
-                <button onclick="controlPlayer('restart')">Restart Player</button>
-                <button onclick="controlPlayer('stop')" class="danger">Stop Player</button>
-                <div style="margin-top: 15px;">
-                    <button onclick="controlPlayer('play')">▶ Play</button>
-                    <button onclick="controlPlayer('pause')">⏸ Pause</button>
-                    <button onclick="controlPlayer('next')">⏭ Next</button>
-                </div>
-            </div>
-            
-            <!-- System Stats -->
-            <div class="card">
-                <h2>📊 System Status</h2>
-                <div class="stats">
-                    <div class="stat">
-                        <div class="stat-value">{{ cpu_usage }}%</div>
-                        <div class="stat-label">CPU Usage</div>
-                    </div>
-                    <div class="stat">
-                        <div class="stat-value">{{ memory_usage }}%</div>
-                        <div class="stat-label">Memory Usage</div>
-                    </div>
-                    <div class="stat">
-                        <div class="stat-value">{{ disk_usage }}%</div>
-                        <div class="stat-label">Disk Usage</div>
-                    </div>
-                    <div class="stat">
-                        <div class="stat-value">{{ uptime }}</div>
-                        <div class="stat-label">Uptime</div>
+                    <label>Allowed Time</label>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="time" id="startTime" value="{{ config.time_restrictions.start_time }}" style="flex: 1;">
+                        <span style="align-self: center;">to</span>
+                        <input type="time" id="endTime" value="{{ config.time_restrictions.end_time }}" style="flex: 1;">
                     </div>
                 </div>
             </div>
             
-            <!-- Admin Settings -->
-            <div class="card">
-                <h2>⚙️ Admin Settings</h2>
-                <div class="form-group">
-                    <label>Admin Username</label>
-                    <input type="text" id="adminUser" value="{{ config.admin_user }}">
-                </div>
-                <div class="form-group">
-                    <label>New Password</label>
-                    <input type="password" id="adminPass" placeholder="Leave blank to keep current">
-                </div>
-                <button onclick="saveAdminSettings()">Update Settings</button>
-                <button onclick="logout()" class="danger" style="margin-left: 10px;">Logout</button>
-            </div>
-            
-            <!-- System Updates -->
-            <div class="card">
-                <h2>🔄 System Updates</h2>
-                <p style="color: #666; font-size: 12px; margin-bottom: 15px;">
-                    Keep your system up to date with the latest security patches and improvements.
-                </p>
-                <button onclick="checkUpdates()">Check for Updates</button>
-                <button onclick="runUpdate()" style="margin-left: 10px;">Update System</button>
-                <div id="updateStatus" style="margin-top: 15px; display: none;">
-                    <div style="padding: 10px; background: #f3f4f6; border-radius: 5px;">
-                        <div id="updateMessage" style="font-size: 12px; color: #666;"></div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- System Control -->
-            <div class="card">
-                <h2>⚡ System Control</h2>
-                <p style="color: #666; font-size: 12px; margin-bottom: 15px;">
-                    Manage system power and restart services.
-                </p>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                    <button onclick="rebootSystem()" style="background: #f59e0b;">
-                        🔄 Reboot System
-                    </button>
-                    <button onclick="powerOffSystem()" class="danger">
-                        ⏻ Power Off
-                    </button>
-                    <button onclick="restartServices()" style="grid-column: span 2;">
-                        🔧 Restart All Services
-                    </button>
-                </div>
-                <div style="margin-top: 15px; padding: 10px; background: #fef3c7; border-radius: 5px; border: 1px solid #fbbf24;">
-                    <p style="font-size: 11px; color: #92400e; margin: 0;">
-                        <strong>Warning:</strong> Reboot and power off will immediately affect the system. Save any work before proceeding.
-                    </p>
-                </div>
-            </div>
-            
-            <!-- System Logs -->
-            <div class="card">
-                <h2>📋 System Logs & Diagnostics</h2>
-                <p style="color: #666; font-size: 12px; margin-bottom: 15px;">
-                    View system logs and debug information for troubleshooting.
-                </p>
-                <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
-                    <button onclick="openLogModal('player')">Player Logs</button>
-                    <button onclick="openLogModal('admin')">Admin Panel</button>
-                    <button onclick="openLogModal('nginx')">Nginx Logs</button>
-                    <button onclick="openLogModal('system')">System Logs</button>
-                    <button onclick="openLogModal('auth')">Auth Logs</button>
-                    <button onclick="openLogModal('all')">All Logs</button>
-                </div>
-                <div style="display: flex; gap: 10px;">
-                    <button onclick="downloadLogs()">Download All Logs</button>
-                    <button onclick="clearLogs()" class="danger">Clear Old Logs</button>
-                </div>
-            </div>
+        </div>
+        
+        <!-- Parental Controls Section -->
+        <h2 style="color: white; margin: 20px 0 10px 0;">👨‍👩‍👧‍👦 Parental Controls</h2>
+        <div class="grid">
             
             <!-- Content Filtering -->
             <div class="card" style="grid-column: span 2;">
@@ -768,6 +715,91 @@ ADMIN_TEMPLATE = '''
                 </div>
             </div>
             
+        </div>
+        
+        <!-- System Management Section -->
+        <h2 style="color: white; margin: 20px 0 10px 0;">🖥️ System Management</h2>
+        <div class="grid">
+            <!-- System Stats -->
+            <div class="card">
+                <h2>📊 System Status</h2>
+                <div class="stats">
+                    <div class="stat">
+                        <div class="stat-value">{{ cpu_usage }}%</div>
+                        <div class="stat-label">CPU Usage</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">{{ memory_usage }}%</div>
+                        <div class="stat-label">Memory Usage</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">{{ disk_usage }}%</div>
+                        <div class="stat-label">Disk Usage</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">{{ uptime }}</div>
+                        <div class="stat-label">Uptime</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- System Control -->
+            <div class="card">
+                <h2>⚡ System Control</h2>
+                <p style="color: #666; font-size: 12px; margin-bottom: 15px;">
+                    Manage system power and restart services.
+                </p>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <button onclick="rebootSystem()" style="background: #f59e0b;">
+                        🔄 Reboot System
+                    </button>
+                    <button onclick="powerOffSystem()" class="danger">
+                        ⏻ Power Off
+                    </button>
+                    <button onclick="restartServices()" style="grid-column: span 2;">
+                        🔧 Restart All Services
+                    </button>
+                </div>
+                <div style="margin-top: 15px; padding: 10px; background: #fef3c7; border-radius: 5px; border: 1px solid #fbbf24;">
+                    <p style="font-size: 11px; color: #92400e; margin: 0;">
+                        <strong>Warning:</strong> Reboot and power off will immediately affect the system.
+                    </p>
+                </div>
+            </div>
+            
+            <!-- System Updates -->
+            <div class="card">
+                <h2>🔄 System Updates</h2>
+                <p style="color: #666; font-size: 12px; margin-bottom: 15px;">
+                    Keep your system up to date with security patches.
+                </p>
+                <button onclick="checkUpdates()">Check for Updates</button>
+                <button onclick="runUpdate()" style="margin-left: 10px;">Update System</button>
+                <div id="updateStatus" style="margin-top: 15px; display: none;">
+                    <div style="padding: 10px; background: #f3f4f6; border-radius: 5px;">
+                        <div id="updateMessage" style="font-size: 12px; color: #666;"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- System Logs -->
+            <div class="card">
+                <h2>📋 System Logs</h2>
+                <p style="color: #666; font-size: 12px; margin-bottom: 15px;">
+                    View logs for troubleshooting.
+                </p>
+                <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
+                    <button onclick="openLogModal('player')">Player</button>
+                    <button onclick="openLogModal('admin')">Admin</button>
+                    <button onclick="openLogModal('system')">System</button>
+                    <button onclick="openLogModal('all')">All Logs</button>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button onclick="downloadLogs()">Download Logs</button>
+                    <button onclick="clearLogs()" class="danger">Clear Logs</button>
+                </div>
+            </div>
+            
             <!-- Bluetooth Devices -->
             <div class="card">
                 <h2>🎧 Bluetooth Devices</h2>
@@ -885,6 +917,10 @@ ADMIN_TEMPLATE = '''
         
         // Save settings functions
         function saveSpotifyConfig() {
+            const statusDiv = document.getElementById('spotifyStatus');
+            const statusBox = document.getElementById('spotifyStatusBox');
+            const statusMessage = document.getElementById('spotifyStatusMessage');
+            
             fetch('/api/spotify/config', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
@@ -893,7 +929,53 @@ ADMIN_TEMPLATE = '''
                     client_secret: document.getElementById('clientSecret').value
                 })
             }).then(r => r.json()).then(data => {
-                alert(data.message || 'Configuration saved');
+                statusDiv.style.display = 'block';
+                statusBox.style.background = '#10b981';
+                statusBox.style.color = 'white';
+                statusMessage.innerHTML = '✓ Configuration saved successfully';
+                setTimeout(() => { statusDiv.style.display = 'none'; }, 3000);
+            }).catch(err => {
+                statusDiv.style.display = 'block';
+                statusBox.style.background = '#ef4444';
+                statusBox.style.color = 'white';
+                statusMessage.innerHTML = '✗ Failed to save configuration';
+                setTimeout(() => { statusDiv.style.display = 'none'; }, 5000);
+            });
+        }
+        
+        function testSpotifyConfig() {
+            const statusDiv = document.getElementById('spotifyStatus');
+            const statusBox = document.getElementById('spotifyStatusBox');
+            const statusMessage = document.getElementById('spotifyStatusMessage');
+            
+            // Show loading state
+            statusDiv.style.display = 'block';
+            statusBox.style.background = '#3b82f6';
+            statusBox.style.color = 'white';
+            statusMessage.innerHTML = '⟳ Testing Spotify API connection...';
+            
+            fetch('/api/spotify/test', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            }).then(async response => {
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    // Success
+                    statusBox.style.background = '#10b981';
+                    statusBox.style.color = 'white';
+                    statusMessage.innerHTML = `✓ ${data.message}<br><small>Token expires in: ${Math.floor(data.expires_in / 60)} minutes</small>`;
+                } else {
+                    // Error
+                    statusBox.style.background = '#ef4444';
+                    statusBox.style.color = 'white';
+                    statusMessage.innerHTML = `✗ ${data.error}`;
+                }
+            }).catch(err => {
+                // Network or other error
+                statusBox.style.background = '#ef4444';
+                statusBox.style.color = 'white';
+                statusMessage.innerHTML = `✗ Connection failed: ${err.message}`;
             });
         }
         
@@ -1635,6 +1717,65 @@ def update_spotify_config():
     
     save_spotify_config(config)
     return jsonify({'success': True, 'message': 'Spotify configuration saved'})
+
+@app.route('/api/spotify/test', methods=['POST'])
+def test_spotify_config():
+    """Test Spotify API configuration"""
+    if 'logged_in' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    try:
+        import requests
+        import base64
+        
+        spotify_config = load_spotify_config()
+        
+        if not spotify_config.get('client_id') or not spotify_config.get('client_secret'):
+            return jsonify({'success': False, 'error': 'Spotify credentials not configured. Please enter your Client ID and Client Secret.'}), 400
+        
+        # Test by getting an access token
+        auth_str = f"{spotify_config['client_id']}:{spotify_config['client_secret']}"
+        auth_bytes = auth_str.encode("utf-8")
+        auth_base64 = str(base64.b64encode(auth_bytes), "utf-8")
+        
+        url = "https://accounts.spotify.com/api/token"
+        headers = {
+            "Authorization": f"Basic {auth_base64}",
+            "Content-Type": "application/x-www-form-urlencoded"
+        }
+        data = {
+            "grant_type": "client_credentials"
+        }
+        
+        response = requests.post(url, headers=headers, data=data, timeout=10)
+        
+        if response.status_code == 200:
+            # Success - credentials are valid
+            token_data = response.json()
+            return jsonify({
+                'success': True, 
+                'message': 'Spotify API credentials validated successfully! Your configuration is working correctly.',
+                'scope': token_data.get('scope', 'client_credentials'),
+                'expires_in': token_data.get('expires_in', 3600)
+            })
+        elif response.status_code == 401:
+            return jsonify({
+                'success': False, 
+                'error': 'Invalid Client ID or Client Secret. Please check your Spotify app credentials.'
+            }), 401
+        else:
+            error_data = response.json() if response.headers.get('content-type') == 'application/json' else {}
+            return jsonify({
+                'success': False, 
+                'error': f"Spotify API error: {error_data.get('error_description', response.text)}"
+            }), response.status_code
+            
+    except requests.exceptions.Timeout:
+        return jsonify({'success': False, 'error': 'Connection timeout. Please check your internet connection.'}), 504
+    except requests.exceptions.ConnectionError:
+        return jsonify({'success': False, 'error': 'Unable to connect to Spotify API. Please check your internet connection.'}), 503
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'Unexpected error: {str(e)}'}), 500
 
 @app.route('/api/player/<action>', methods=['POST'])
 def control_player(action):
