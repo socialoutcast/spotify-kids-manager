@@ -310,6 +310,7 @@ rm -f /etc/nginx/sites-enabled/default
 
 # Create .xinitrc for the user
 echo -e "${YELLOW}Creating X session configuration...${NC}"
+mkdir -p /home/$APP_USER
 cat > /home/$APP_USER/.xinitrc << EOF
 #!/bin/sh
 
@@ -330,6 +331,7 @@ chown $APP_USER:$APP_USER /home/$APP_USER/.xinitrc
 
 # Create .bash_profile for auto-start
 echo -e "${YELLOW}Configuring auto-start...${NC}"
+mkdir -p /home/$APP_USER
 cat > /home/$APP_USER/.bash_profile << EOF
 #!/bin/bash
 
@@ -339,7 +341,7 @@ if [[ -z \$DISPLAY && \$XDG_VTNR -eq 1 ]]; then
 fi
 EOF
 
-chown $APP_USER:$APP_USER /home/$APP_USER/.bash_profile
+chown -R $APP_USER:$APP_USER /home/$APP_USER
 
 # Enable services
 echo -e "${YELLOW}Enabling services...${NC}"
