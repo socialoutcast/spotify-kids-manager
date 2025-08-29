@@ -314,7 +314,53 @@ async function pairBluetooth(address) {
     }
 }
 
-// Updates
+async function connectBluetooth(address) {
+    const result = await apiCall('/api/bluetooth/connect', 'POST', {address: address});
+    
+    if (result.success) {
+        alert('Connected successfully');
+        location.reload();
+    } else {
+        alert('Connection failed: ' + (result.error || 'Unknown error'));
+    }
+}
+
+async function disconnectBluetooth(address) {
+    const result = await apiCall('/api/bluetooth/disconnect', 'POST', {address: address});
+    
+    if (result.success) {
+        alert('Disconnected');
+        location.reload();
+    } else {
+        alert('Disconnect failed: ' + (result.error || 'Unknown error'));
+    }
+}
+
+async function removeBluetooth(address) {
+    if (!confirm('Remove device ' + address + '?')) return;
+    
+    const result = await apiCall('/api/bluetooth/remove', 'POST', {address: address});
+    
+    if (result.success) {
+        alert('Device removed');
+        location.reload();
+    } else {
+        alert('Remove failed: ' + (result.error || 'Unknown error'));
+    }
+}
+
+async function toggleBluetooth() {
+    const result = await apiCall('/api/bluetooth/toggle', 'POST');
+    
+    if (result.success) {
+        alert(result.message || 'Bluetooth toggled');
+        location.reload();
+    } else {
+        alert('Toggle failed: ' + (result.error || 'Unknown error'));
+    }
+}
+
+// System functions
 async function checkUpdates() {
     document.getElementById('updateMessage').textContent = 'Checking...';
     
@@ -325,6 +371,11 @@ async function checkUpdates() {
     } else {
         document.getElementById('updateMessage').textContent = 'Check failed';
     }
+}
+
+function closeUpdateModal() {
+    const modal = document.getElementById('updateModal');
+    if (modal) modal.style.display = 'none';
 }
 
 async function runUpdate() {
@@ -362,6 +413,43 @@ async function resetPoints() {
 async function logout() {
     await apiCall('/api/logout', 'POST');
     location.reload();
+}
+
+async function clearUsageStats() {
+    if (!confirm('Clear all usage statistics?')) return;
+    
+    const result = await apiCall('/api/parental/clear-stats', 'POST');
+    
+    if (result.success) {
+        alert('Usage statistics cleared');
+        location.reload();
+    }
+}
+
+async function refreshUsageStats() {
+    location.reload();
+}
+
+async function copyLogsToClipboard() {
+    const logContent = document.getElementById('logContent');
+    if (logContent) {
+        try {
+            await navigator.clipboard.writeText(logContent.textContent);
+            alert('Logs copied to clipboard');
+        } catch (err) {
+            alert('Failed to copy logs: ' + err);
+        }
+    }
+}
+
+async function takeScreenshot() {
+    const result = await apiCall('/api/parental/screenshot', 'POST');
+    
+    if (result.success && result.screenshot) {
+        window.open(result.screenshot, '_blank');
+    } else {
+        alert('Screenshot captured');
+    }
 }
 
 async function login() {
