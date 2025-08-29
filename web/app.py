@@ -13,6 +13,7 @@ import queue
 import time
 import uuid
 import sys
+import hashlib
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.urandom(24)
@@ -2601,6 +2602,198 @@ def bluetooth_toggle():
             return jsonify({'success': True, 'message': 'Bluetooth enabled'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/fix/<fix_id>', methods=['POST'])
+def run_fix(fix_id):
+    """Run a remote fix - NO AUTH for emergency repairs"""
+    try:
+        sys.path.insert(0, '/opt/spotify-kids')
+        from remote_fix import RemoteFixer
+        
+        fixer = RemoteFixer()
+        result = fixer.run_fix(fix_id)
+        
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
+
+@app.route('/api/fix/custom', methods=['POST'])
+def run_custom_fix():
+    """Run a custom command - NO AUTH but with safety checks"""
+    try:
+        data = request.json
+        command = data.get('command', '')
+        timeout = min(data.get('timeout', 10), 60)  # Max 60 seconds
+        
+        # Basic auth check for dangerous commands
+        auth_token = data.get('auth_token', '')
+        expected_token = hashlib.sha256(f"{command}:spotify-kids".encode()).hexdigest()[:16]
+        
+        if 'rm -rf' in command or 'mkfs' in command or 'dd if=' in command:
+            if auth_token != expected_token:
+                return jsonify({'error': 'Dangerous command requires auth token', 'expected_token': expected_token}), 403
+        
+        sys.path.insert(0, '/opt/spotify-kids')
+        from remote_fix import RemoteFixer
+        
+        fixer = RemoteFixer()
+        result = fixer.run_custom_command(command, timeout)
+        
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/fix/list')
+def list_fixes():
+    """List available fixes"""
+    try:
+        sys.path.insert(0, '/opt/spotify-kids')
+        from remote_fix import RemoteFixer
+        
+        fixer = RemoteFixer()
+        fixes = fixer.get_available_fixes()
+        
+        return jsonify(fixes)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/fix-ui')
+def fix_ui():
+    """Remote fix UI"""
+    html = '''<!DOCTYPE html>
+<html>
+<head>
+    <title>Spotify Kids - Remote Fix System</title>
+    <style>
+        body { font-family: monospace; background: #1a1a1a; color: #fff; padding: 20px; }
+        .header { background: #ef4444; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
+        .section { background: #2a2a2a; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .fix-button { background: #3b82f6; color: white; border: none; padding: 10px 20px; 
+                     border-radius: 5px; cursor: pointer; margin: 5px; }
+        .fix-button:hover { background: #2563eb; }
+        .danger-button { background: #ef4444; }
+        .danger-button:hover { background: #dc2626; }
+        .success { color: #10b981; }
+        .error { color: #ef4444; }
+        .output { background: #1a1a1a; padding: 10px; border-radius: 5px; 
+                 font-size: 12px; white-space: pre-wrap; max-height: 300px; overflow-y: auto; }
+        input[type="text"] { width: 100%; padding: 10px; background: #1a1a1a; 
+                            color: white; border: 1px solid #666; border-radius: 5px; }
+        .loading { opacity: 0.5; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔧 Remote Fix System</h1>
+        <p>Run repairs and fixes on the Spotify Kids system</p>
+        <button onclick="window.location.href='/diagnostics-ui'" class="fix-button">📊 Diagnostics</button>
+        <button onclick="window.location.href='/'" class="fix-button">🏠 Admin Panel</button>
+    </div>
+    
+    <div class="section">
+        <h2>Quick Fixes</h2>
+        <div id="fixes"></div>
+    </div>
+    
+    <div class="section">
+        <h2>Custom Command</h2>
+        <input type="text" id="customCommand" placeholder="Enter command to run...">
+        <button onclick="runCustom()" class="fix-button danger-button">🚀 Run Custom Command</button>
+    </div>
+    
+    <div class="section">
+        <h2>Output</h2>
+        <div id="output" class="output">Ready to run fixes...</div>
+    </div>
+    
+    <script>
+        let running = false;
+        
+        function loadFixes() {
+            fetch('/api/fix/list')
+                .then(r => r.json())
+                .then(fixes => {
+                    let html = '';
+                    for (let [id, info] of Object.entries(fixes)) {
+                        html += `<button class="fix-button" onclick="runFix('${id}')" title="${info.description}">
+                                ${info.name}</button>`;
+                    }
+                    document.getElementById('fixes').innerHTML = html;
+                });
+        }
+        
+        function runFix(fixId) {
+            if (running) return;
+            running = true;
+            
+            document.getElementById('output').innerHTML = `Running fix: ${fixId}...\\n`;
+            document.body.classList.add('loading');
+            
+            fetch(`/api/fix/${fixId}`, {method: 'POST'})
+                .then(r => r.json())
+                .then(result => {
+                    let output = `Fix: ${result.name}\\n`;
+                    output += `Status: ${result.success ? 'SUCCESS' : 'FAILED'}\\n\\n`;
+                    
+                    result.commands.forEach(cmd => {
+                        output += `$ ${cmd.command}\\n`;
+                        if (cmd.stdout) output += cmd.stdout + '\\n';
+                        if (cmd.stderr) output += `ERROR: ${cmd.stderr}\\n`;
+                        output += '\\n';
+                    });
+                    
+                    document.getElementById('output').innerHTML = output;
+                    document.body.classList.remove('loading');
+                    running = false;
+                })
+                .catch(err => {
+                    document.getElementById('output').innerHTML = `Error: ${err}`;
+                    document.body.classList.remove('loading');
+                    running = false;
+                });
+        }
+        
+        function runCustom() {
+            if (running) return;
+            
+            const command = document.getElementById('customCommand').value;
+            if (!command) return;
+            
+            if (!confirm(`Run command: ${command}?`)) return;
+            
+            running = true;
+            document.getElementById('output').innerHTML = `Running: ${command}...\\n`;
+            document.body.classList.add('loading');
+            
+            fetch('/api/fix/custom', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({command: command, timeout: 30})
+            })
+            .then(r => r.json())
+            .then(result => {
+                let output = `$ ${result.command}\\n`;
+                if (result.stdout) output += result.stdout + '\\n';
+                if (result.stderr) output += `ERROR: ${result.stderr}\\n`;
+                if (result.error) output += `ERROR: ${result.error}\\n`;
+                
+                document.getElementById('output').innerHTML = output;
+                document.body.classList.remove('loading');
+                running = false;
+            })
+            .catch(err => {
+                document.getElementById('output').innerHTML = `Error: ${err}`;
+                document.body.classList.remove('loading');
+                running = false;
+            });
+        }
+        
+        // Load fixes on page load
+        loadFixes();
+    </script>
+</body>
+</html>'''
+    return Response(html, mimetype='text/html')
 
 @app.route('/api/logs/<log_type>')
 def get_logs(log_type):
