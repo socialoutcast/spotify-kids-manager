@@ -380,6 +380,36 @@ ADMIN_TEMPLATE = '''
                 </div>
             </div>
             
+            <!-- System Logs -->
+            <div class="card" style="grid-column: span 2;">
+                <h2>📋 System Logs & Diagnostics</h2>
+                <p style="color: #666; font-size: 12px; margin-bottom: 15px;">
+                    View system logs and debug information for troubleshooting.
+                </p>
+                <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
+                    <button onclick="loadLog('player')">Player Logs</button>
+                    <button onclick="loadLog('admin')">Admin Panel Logs</button>
+                    <button onclick="loadLog('nginx')">Nginx Logs</button>
+                    <button onclick="loadLog('system')">System Boot Logs</button>
+                    <button onclick="loadLog('auth')">Auth Logs</button>
+                    <button onclick="loadLog('all')">All Recent Logs</button>
+                    <button onclick="clearLogs()" class="danger">Clear Old Logs</button>
+                </div>
+                <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                    <label style="display: flex; align-items: center;">
+                        <input type="checkbox" id="autoRefresh" checked style="margin-right: 5px;">
+                        Auto-refresh (5s)
+                    </label>
+                    <label style="display: flex; align-items: center;">
+                        Lines: <input type="number" id="logLines" value="100" min="10" max="1000" style="width: 80px; margin-left: 5px;">
+                    </label>
+                    <button onclick="downloadLogs()">Download All Logs</button>
+                </div>
+                <div id="logOutput" style="background: #1e1e1e; color: #00ff00; font-family: 'Courier New', monospace; font-size: 11px; padding: 15px; border-radius: 5px; height: 400px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word;">
+                    Select a log type to view...
+                </div>
+            </div>
+            
             <!-- Bluetooth Devices -->
             <div class="card">
                 <h2>🎧 Bluetooth Devices</h2>
@@ -667,6 +697,65 @@ ADMIN_TEMPLATE = '''
                 })
                 .catch(err => alert('Error: ' + err));
         }
+        
+        // Logs functions
+        let currentLogType = null;
+        let logRefreshInterval = null;
+        
+        function loadLog(type) {
+            currentLogType = type;
+            const lines = document.getElementById('logLines').value;
+            const output = document.getElementById('logOutput');
+            output.textContent = 'Loading logs...';
+            
+            fetch(`/api/logs/${type}?lines=${lines}`)
+                .then(r => r.text())
+                .then(data => {
+                    output.textContent = data || 'No logs available';
+                    output.scrollTop = output.scrollHeight;
+                })
+                .catch(err => {
+                    output.textContent = 'Error loading logs: ' + err;
+                });
+        }
+        
+        function clearLogs() {
+            if (!confirm('Clear old log files? This will free up disk space.')) return;
+            
+            fetch('/api/logs/clear', {method: 'POST'})
+                .then(r => r.json())
+                .then(data => {
+                    alert(data.message || 'Logs cleared');
+                    if (currentLogType) loadLog(currentLogType);
+                })
+                .catch(err => alert('Error: ' + err));
+        }
+        
+        function downloadLogs() {
+            window.location.href = '/api/logs/download';
+        }
+        
+        // Auto-refresh logs
+        document.getElementById('autoRefresh').addEventListener('change', function(e) {
+            if (e.target.checked && currentLogType) {
+                logRefreshInterval = setInterval(() => {
+                    if (currentLogType) loadLog(currentLogType);
+                }, 5000);
+            } else {
+                clearInterval(logRefreshInterval);
+                logRefreshInterval = null;
+            }
+        });
+        
+        // Load player logs by default
+        window.addEventListener('load', () => {
+            loadLog('player');
+            if (document.getElementById('autoRefresh').checked) {
+                logRefreshInterval = setInterval(() => {
+                    if (currentLogType) loadLog(currentLogType);
+                }, 5000);
+            }
+        });
         
         {% else %}
         function login() {
@@ -1109,6 +1198,129 @@ def bluetooth_toggle():
             return jsonify({'success': True, 'message': 'Bluetooth enabled'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/logs/<log_type>')
+def get_logs(log_type):
+    """Get system logs"""
+    if 'logged_in' not in session:
+        return 'Not authenticated', 401
+    
+    lines = request.args.get('lines', '100')
+    
+    try:
+        if log_type == 'player':
+            # Get player service logs
+            result = subprocess.run(['sudo', 'journalctl', '-u', 'spotify-player', '-n', lines, '--no-pager'],
+                                  capture_output=True, text=True)
+            return result.stdout or "No player logs available"
+            
+        elif log_type == 'admin':
+            # Get admin panel logs
+            result = subprocess.run(['sudo', 'journalctl', '-u', 'spotify-admin', '-n', lines, '--no-pager'],
+                                  capture_output=True, text=True)
+            return result.stdout or "No admin panel logs available"
+            
+        elif log_type == 'nginx':
+            # Get nginx error logs
+            result = subprocess.run(['sudo', 'tail', '-n', lines, '/var/log/nginx/error.log'],
+                                  capture_output=True, text=True)
+            return result.stdout or "No nginx logs available"
+            
+        elif log_type == 'system':
+            # Get boot logs
+            result = subprocess.run(['sudo', 'journalctl', '-b', '-n', lines, '--no-pager'],
+                                  capture_output=True, text=True)
+            return result.stdout or "No system logs available"
+            
+        elif log_type == 'auth':
+            # Get authentication logs
+            result = subprocess.run(['sudo', 'tail', '-n', lines, '/var/log/auth.log'],
+                                  capture_output=True, text=True)
+            return result.stdout or "No auth logs available"
+            
+        elif log_type == 'all':
+            # Get all recent logs
+            logs = []
+            logs.append("=== PLAYER LOGS ===")
+            result = subprocess.run(['sudo', 'journalctl', '-u', 'spotify-player', '-n', '50', '--no-pager'],
+                                  capture_output=True, text=True)
+            logs.append(result.stdout or "No player logs")
+            
+            logs.append("\n=== ADMIN PANEL LOGS ===")
+            result = subprocess.run(['sudo', 'journalctl', '-u', 'spotify-admin', '-n', '50', '--no-pager'],
+                                  capture_output=True, text=True)
+            logs.append(result.stdout or "No admin logs")
+            
+            logs.append("\n=== RECENT SYSTEM LOGS ===")
+            result = subprocess.run(['sudo', 'journalctl', '-n', '50', '--no-pager'],
+                                  capture_output=True, text=True)
+            logs.append(result.stdout or "No system logs")
+            
+            return '\n'.join(logs)
+            
+        else:
+            return "Invalid log type", 400
+            
+    except Exception as e:
+        return f"Error reading logs: {str(e)}", 500
+
+@app.route('/api/logs/clear', methods=['POST'])
+def clear_logs():
+    """Clear old log files"""
+    if 'logged_in' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    try:
+        # Rotate logs
+        subprocess.run(['sudo', 'journalctl', '--rotate'], check=False)
+        subprocess.run(['sudo', 'journalctl', '--vacuum-time=1d'], check=False)
+        
+        # Clear nginx logs
+        subprocess.run(['sudo', 'truncate', '-s', '0', '/var/log/nginx/error.log'], check=False)
+        subprocess.run(['sudo', 'truncate', '-s', '0', '/var/log/nginx/access.log'], check=False)
+        
+        return jsonify({'success': True, 'message': 'Old logs cleared'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/logs/download')
+def download_logs():
+    """Download all logs as a text file"""
+    if 'logged_in' not in session:
+        return 'Not authenticated', 401
+    
+    try:
+        from datetime import datetime
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        
+        logs = []
+        logs.append(f"Spotify Kids Manager - System Logs Export\n")
+        logs.append(f"Generated: {datetime.now()}\n")
+        logs.append("="*60 + "\n\n")
+        
+        # Collect all logs
+        logs.append("PLAYER SERVICE LOGS\n" + "="*40 + "\n")
+        result = subprocess.run(['sudo', 'journalctl', '-u', 'spotify-player', '-n', '500', '--no-pager'],
+                              capture_output=True, text=True)
+        logs.append(result.stdout or "No logs available")
+        
+        logs.append("\n\nADMIN PANEL LOGS\n" + "="*40 + "\n")
+        result = subprocess.run(['sudo', 'journalctl', '-u', 'spotify-admin', '-n', '500', '--no-pager'],
+                              capture_output=True, text=True)
+        logs.append(result.stdout or "No logs available")
+        
+        logs.append("\n\nSYSTEM BOOT LOGS\n" + "="*40 + "\n")
+        result = subprocess.run(['sudo', 'journalctl', '-b', '-n', '500', '--no-pager'],
+                              capture_output=True, text=True)
+        logs.append(result.stdout or "No logs available")
+        
+        # Create response
+        response = Response('\n'.join(logs), mimetype='text/plain')
+        response.headers['Content-Disposition'] = f'attachment; filename=spotify_logs_{timestamp}.txt'
+        return response
+        
+    except Exception as e:
+        return f"Error generating log file: {str(e)}", 500
 
 import time
 

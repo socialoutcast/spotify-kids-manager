@@ -190,6 +190,9 @@ $ADMIN_USER ALL=(ALL) NOPASSWD: /bin/systemctl stop bluetooth
 $ADMIN_USER ALL=(ALL) NOPASSWD: /bin/systemctl is-active bluetooth
 $ADMIN_USER ALL=(ALL) NOPASSWD: /usr/bin/bluetoothctl*
 $ADMIN_USER ALL=(ALL) NOPASSWD: /usr/sbin/rfkill*
+$ADMIN_USER ALL=(ALL) NOPASSWD: /usr/bin/journalctl*
+$ADMIN_USER ALL=(ALL) NOPASSWD: /usr/bin/tail*
+$ADMIN_USER ALL=(ALL) NOPASSWD: /usr/bin/truncate*
 EOF
 chmod 0440 /etc/sudoers.d/spotify-admin
 
@@ -244,10 +247,13 @@ Type=simple
 User=$APP_USER
 Environment="DISPLAY=:0"
 Environment="SPOTIFY_CONFIG_DIR=$CONFIG_DIR"
+Environment="SPOTIFY_DEBUG=true"
 ExecStartPre=/bin/sleep 5
-ExecStart=/usr/bin/python3 $APP_DIR/spotify_player.py
+ExecStart=/usr/bin/python3 -u $APP_DIR/spotify_player.py
 Restart=always
 RestartSec=10
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=graphical.target

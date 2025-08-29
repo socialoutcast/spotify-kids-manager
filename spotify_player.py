@@ -13,13 +13,50 @@ import requests
 from io import BytesIO
 import subprocess
 import sys
+import logging
+from logging.handlers import RotatingFileHandler
+import traceback
 
 # Configuration
 CONFIG_DIR = os.environ.get('SPOTIFY_CONFIG_DIR', '/opt/spotify-kids/config')
 CACHE_DIR = os.path.join(CONFIG_DIR, '.cache')
+LOG_DIR = '/var/log/spotify-kids'
 CLIENT_ID = None
 CLIENT_SECRET = None
 REDIRECT_URI = 'http://localhost:8888/callback'
+DEBUG_MODE = os.environ.get('SPOTIFY_DEBUG', 'true').lower() == 'true'  # Enable debug by default
+
+# Setup logging
+os.makedirs(LOG_DIR, exist_ok=True)
+log_file = os.path.join(LOG_DIR, 'player.log')
+
+# Configure logger
+logger = logging.getLogger('SpotifyPlayer')
+logger.setLevel(logging.DEBUG if DEBUG_MODE else logging.INFO)
+
+# File handler with rotation
+file_handler = RotatingFileHandler(log_file, maxBytes=10*1024*1024, backupCount=5)
+file_handler.setLevel(logging.DEBUG if DEBUG_MODE else logging.INFO)
+
+# Console handler for systemd
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setLevel(logging.DEBUG if DEBUG_MODE else logging.INFO)
+
+# Format
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+file_handler.setFormatter(formatter)
+console_handler.setFormatter(formatter)
+
+logger.addHandler(file_handler)
+logger.addHandler(console_handler)
+
+logger.info("="*60)
+logger.info("Spotify Kids Player Starting")
+logger.info(f"Debug Mode: {DEBUG_MODE}")
+logger.info(f"Config Dir: {CONFIG_DIR}")
+logger.info(f"Log Dir: {LOG_DIR}")
+logger.info(f"Python Version: {sys.version}")
+logger.info("="*60)
 
 class VirtualKeyboard(tk.Toplevel):
     """On-screen keyboard for touchscreen input"""
@@ -86,38 +123,51 @@ class VirtualKeyboard(tk.Toplevel):
 
 class SpotifyPlayer:
     def __init__(self):
-        self.root = tk.Tk()
-        self.root.title("Spotify Player")
+        logger.info("Initializing SpotifyPlayer class")
+        try:
+            self.root = tk.Tk()
+            self.root.title("Spotify Player")
+            logger.info("Tkinter root window created")
+            
+            # Fullscreen kiosk mode
+            self.root.attributes('-fullscreen', True)
+            self.root.configure(bg='#121212')
+            logger.info("Set fullscreen kiosk mode")
+            
+            # Prevent closing with Alt+F4
+            self.root.protocol("WM_DELETE_WINDOW", lambda: None)
+            
+            # Disable Alt+Tab and other key combinations
+            self.root.bind('<Alt-Tab>', lambda e: 'break')
+            self.root.bind('<Alt-F4>', lambda e: 'break')
+            self.root.bind('<Control-Alt-Delete>', lambda e: 'break')
+            logger.debug("Disabled window closing and key combinations")
         
-        # Fullscreen kiosk mode
-        self.root.attributes('-fullscreen', True)
-        self.root.configure(bg='#121212')
-        
-        # Prevent closing with Alt+F4
-        self.root.protocol("WM_DELETE_WINDOW", lambda: None)
-        
-        # Disable Alt+Tab and other key combinations
-        self.root.bind('<Alt-Tab>', lambda e: 'break')
-        self.root.bind('<Alt-F4>', lambda e: 'break')
-        self.root.bind('<Control-Alt-Delete>', lambda e: 'break')
-        
-        # Load configuration
-        self.load_config()
-        
-        # Initialize Spotify
-        self.sp = None
-        self.current_track = None
-        self.is_playing = False
-        self.current_device = None
-        
-        # Create UI
-        self.create_ui()
-        
-        # Try to authenticate
-        self.authenticate()
-        
-        # Start update loop
-        self.update_loop()
+            # Load configuration
+            self.load_config()
+            
+            # Initialize Spotify
+            self.sp = None
+            self.current_track = None
+            self.is_playing = False
+            self.current_device = None
+            logger.info("Initialized Spotify variables")
+            
+            # Create UI
+            self.create_ui()
+            logger.info("UI created successfully")
+            
+            # Try to authenticate
+            self.authenticate()
+            
+            # Start update loop
+            self.update_loop()
+            logger.info("Update loop started")
+            
+        except Exception as e:
+            logger.error(f"Failed to initialize SpotifyPlayer: {str(e)}")
+            logger.error(traceback.format_exc())
+            raise
         
     def load_config(self):
         """Load Spotify API credentials from config file"""
