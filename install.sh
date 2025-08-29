@@ -2841,326 +2841,94 @@ EOF
     log_success "Uninstall script created"
 }
 
-# Install custom boot splash screen
+# Install custom boot splash screen (simple version for RPi)
 install_bootsplash() {
-    log_info "Installing custom boot splash screen..."
+    log_info "Installing simple boot splash..."
     
-    # Install required packages
-    apt-get install -y plymouth plymouth-themes imagemagick >/dev/null 2>&1 || {
-        log_warning "Could not install Plymouth, skipping boot splash"
+    # Check if we're on Raspberry Pi
+    if [[ ! -f /proc/device-tree/model ]] || ! grep -q "Raspberry Pi" /proc/device-tree/model; then
+        log_warning "Not running on Raspberry Pi, skipping boot splash"
         return
-    }
-    
-    # Backup original Plymouth theme
-    log_info "Backing up original boot splash..."
-    ORIGINAL_THEME=$(plymouth-set-default-theme 2>/dev/null || echo "bgrt")
-    echo "$ORIGINAL_THEME" > "$INSTALL_DIR/config/original-plymouth-theme.conf"
-    
-    # Backup boot configuration files
-    if [ -f /boot/cmdline.txt ]; then
-        cp /boot/cmdline.txt "$INSTALL_DIR/config/cmdline.txt.backup" 2>/dev/null || true
-    fi
-    if [ -f /etc/default/grub ]; then
-        cp /etc/default/grub "$INSTALL_DIR/config/grub.backup" 2>/dev/null || true
     fi
     
-    # Create theme directory
-    THEME_DIR="/usr/share/plymouth/themes/spotify-kids"
-    mkdir -p "$THEME_DIR"
+    # Install fbi for framebuffer image display
+    apt-get install -y fbi >/dev/null 2>&1 || true
     
-    # Create a professional logo using ImageMagick
-    log_info "Creating professional boot logo..."
+    # Create splash directory
+    mkdir -p /usr/share/pixmaps
     
-    # Check if ImageMagick is available
-    if ! command -v convert >/dev/null 2>&1; then
-        log_warning "ImageMagick not found, creating simple text logo"
-        # Create simple colored rectangle as fallback
-        echo "No ImageMagick available" > "$THEME_DIR/logo.txt"
-        # Create a minimal logo file
-        printf '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x01\x00\x00\x00\x01\x00\x08\x06\x00\x00\x00' > "$THEME_DIR/logo.png"
-    else
-        # Create a reliable, professional logo
-        convert -size 256x256 xc:'#1db954' \
-            \( -size 220x220 xc:'#1ed760' \) -gravity center -composite \
-            \( -size 200x200 xc:'#1db954' \) -gravity center -composite \
-            -fill white -font DejaVu-Sans-Bold -pointsize 48 \
-            -gravity center -annotate +0-20 'Spotify' \
-            -fill white -font DejaVu-Sans -pointsize 32 \
-            -gravity center -annotate +0+20 'Kids' \
-            "$THEME_DIR/logo.png" 2>/dev/null || {
-                # Simpler fallback if font issues
-                convert -size 256x256 xc:'#1db954' \
-                    -fill white -pointsize 72 \
-                    -gravity center -annotate +0+0 'SK' \
-                    "$THEME_DIR/logo.png" 2>/dev/null || {
-                        # Create minimal 1x1 green pixel as ultimate fallback
-                        convert -size 256x256 xc:'#1db954' "$THEME_DIR/logo.png" 2>/dev/null
-                    }
+    # Create simple Spotify Kids logo splash (black background with green logo)
+    if command -v convert >/dev/null 2>&1; then
+        log_info "Creating boot splash image..."
+        convert -size 1920x1080 xc:black \
+            -fill '#1DB954' \
+            -draw "circle 960,540 960,640" \
+            -fill black \
+            -draw "arc 920,500 1000,580 340,20" \
+            -draw "arc 900,520 1020,560 340,20" \
+            -draw "arc 880,540 1040,540 340,20" \
+            /usr/share/pixmaps/splash.png 2>/dev/null || {
+                # Solid black fallback
+                convert -size 1920x1080 xc:black /usr/share/pixmaps/splash.png 2>/dev/null
             }
     fi
     
-    # Verify logo was created successfully
-    if [ ! -f "$THEME_DIR/logo.png" ] || [ ! -s "$THEME_DIR/logo.png" ]; then
-        log_warning "Failed to create logo.png, creating text-based fallback"
-        # Create a simple solid color image as fallback
-        printf '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x01\x00\x00\x00\x01\x00\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\tpHYs\x00\x00\x0b\x13\x00\x00\x0b\x13\x01\x00\x9a\x9c\x18\x00\x00\x00\x12IDATx\x9cc\xf8\x0f\x00\x00\x01\x00\x01\x00\x18\xdd\x8d\xb4\x1c\x00\x00\x00\x00IEND\xaeB`\x82' > "$THEME_DIR/logo.png"
-    fi
-    
-    # Create smaller versions
-    if command -v convert >/dev/null 2>&1 && [ -f "$THEME_DIR/logo.png" ]; then
-        convert "$THEME_DIR/logo.png" -resize 128x128 "$THEME_DIR/logo-128.png" 2>/dev/null
-    fi
-    
-    # Create spinning wheel frames
-    log_info "Creating spinner animation..."
-    if command -v convert >/dev/null 2>&1; then
-        for i in {0..11}; do
-            angle=$((i * 30))
-            convert -size 64x64 xc:transparent \
-                -stroke '#1ed760' -stroke-width 4 -fill none \
-                -draw "arc 16,16 48,48 $((angle)),$(((angle + 60) % 360))" \
-                -stroke '#1ed76088' -stroke-width 3 \
-                -draw "arc 18,18 46,46 $(((angle + 60) % 360)),$(((angle + 120) % 360))" \
-                -stroke '#1ed76044' -stroke-width 2 \
-                -draw "arc 20,20 44,44 $(((angle + 120) % 360)),$(((angle + 180) % 360))" \
-                "$THEME_DIR/spinner-$i.png" 2>/dev/null || {
-                    # Create simple colored square as fallback
-                    convert -size 64x64 xc:'#1ed760' "$THEME_DIR/spinner-$i.png" 2>/dev/null
-                }
-        done
-    else
-        # Create fallback spinner images without ImageMagick
-        for i in {0..11}; do
-            # Create minimal 1px PNG files as placeholders
-            printf '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00@\x00\x00\x00@\x08\x02\x00\x00\x00%\x0b\xe6\x89\x00\x00\x00\x15IDATx\x9cc\xf8\x0f\x00\x00\x01\x00\x01\x00\x18\xdd\x8d\xb4\x1c\x00\x00\x00\x00IEND\xaeB`\x82' > "$THEME_DIR/spinner-$i.png"
-        done
-    fi
-    
-    # Verify all spinner files were created
-    missing_spinners=0
-    for i in {0..11}; do
-        if [ ! -f "$THEME_DIR/spinner-$i.png" ]; then
-            missing_spinners=$((missing_spinners + 1))
-            # Create minimal fallback
-            printf '\x89PNG\r\n\x1a\n' > "$THEME_DIR/spinner-$i.png"
-        fi
-    done
-    
-    if [ $missing_spinners -gt 0 ]; then
-        log_warning "Created $missing_spinners fallback spinner images"
-    fi
-    
-    # Create the Plymouth theme script
-    cat > "$THEME_DIR/spotify-kids.script" <<'EOF'
-# Spotify Kids Manager Plymouth Theme
-
-# Set background gradient
-Window.SetBackgroundTopColor(0.05, 0.05, 0.05);
-Window.SetBackgroundBottomColor(0.0, 0.0, 0.0);
-
-# Logo setup
-logo.image = Image("logo.png");
-logo.sprite = Sprite(logo.image);
-logo.sprite.SetX(Window.GetWidth() / 2 - logo.image.GetWidth() / 2);
-logo.sprite.SetY(Window.GetHeight() / 2 - logo.image.GetHeight() / 2 - 50);
-logo.sprite.SetOpacity(1);
-
-# Message sprite for boot status
-message_sprite = Sprite();
-message_sprite.SetPosition(Window.GetWidth() / 2 - 200, Window.GetHeight() / 2 + 120, 0);
-
-# Prompt sprite for password prompts (CRITICAL: was missing)
-prompt_sprite = Sprite();
-
-# Spinner setup
-spinner.count = 12;
-for (i = 0; i < spinner.count; i++) {
-    spinner[i].image = Image("spinner-" + i + ".png");
-}
-spinner.sprite = Sprite();
-spinner.sprite.SetX(Window.GetWidth() / 2 - 32);
-spinner.sprite.SetY(Window.GetHeight() / 2 + 60);
-
-# Animation variables
-global.counter = 0;
-global.progress = 0;
-
-# Boot progress callback
-fun boot_progress_callback(time, progress) {
-    global.progress = progress;
-    
-    # Hide spinner when boot is complete
-    if (progress >= 1) {
-        spinner.sprite.SetOpacity(0);
-    }
-}
-
-# Update status callback
-fun update_status_callback(status) {
-    if (status == "normal") {
-        message_sprite.SetOpacity(0);
-    } else if (status == "fsck") {
-        message = Image.Text("Checking disk...", 0.9, 0.9, 0.9);
-        message_sprite.SetImage(message);
-        message_sprite.SetOpacity(1);
-    } else if (status == "systemd") {
-        message = Image.Text("Starting services...", 0.9, 0.9, 0.9);
-        message_sprite.SetImage(message);
-        message_sprite.SetOpacity(1);
-    }
-}
-
-# Display message callback
-fun display_message_callback(text) {
-    message = Image.Text(text, 0.9, 0.9, 0.9);
-    message_sprite.SetImage(message);
-    message_sprite.SetX(Window.GetWidth() / 2 - message.GetWidth() / 2);
-    message_sprite.SetOpacity(1);
-}
-
-# Display password callback
-fun display_password_callback(prompt, bullets) {
-    prompt_sprite.SetImage(Image.Text(prompt, 0.9, 0.9, 0.9));
-    prompt_sprite.SetX(Window.GetWidth() / 2 - prompt_sprite.GetWidth() / 2);
-    prompt_sprite.SetY(Window.GetHeight() / 2 + 200);
-    prompt_sprite.SetOpacity(1);
-}
-
-# Progress bar sprite
-progress_bar = Sprite();
-progress_bar.SetX(Window.GetWidth() / 2 - 150);
-progress_bar.SetY(Window.GetHeight() / 2 + 100);
-
-# Refresh callback for animation
-fun refresh_callback() {
-    global.counter++;
-    
-    # Animate spinner at reasonable speed
-    if (global.progress < 1) {
-        spinner_index = Math.Int(global.counter / 2) % spinner.count;  # Faster animation
-        spinner.sprite.SetImage(spinner[spinner_index].image);
-        spinner.sprite.SetOpacity(1);
-    }
-    
-    # Draw progress bar
-    if (global.progress > 0) {
-        bar_width = Math.Int(300 * global.progress);
-        if (bar_width > 0) {
-            # Create a simple progress indicator
-            progress_text = "Boot Progress: " + Math.Int(global.progress * 100) + "%";
-            progress_image = Image.Text(progress_text, 0.9, 0.9, 0.9);
-            progress_bar.SetImage(progress_image);
-            progress_bar.SetX(Window.GetWidth() / 2 - progress_image.GetWidth() / 2);
-            progress_bar.SetOpacity(1);
-        }
-    }
-    
-    # Pulse logo gently
-    opacity = 0.9 + 0.1 * Math.Sin(global.counter / 8.0);  # Slightly faster pulse
-    logo.sprite.SetOpacity(opacity);
-}
-
-# Hide message callback
-fun hide_message_callback() {
-    message_sprite.SetOpacity(0);
-    prompt_sprite.SetOpacity(0);
-}
-
-# Quit callback
-fun quit_callback() {
-    logo.sprite.SetOpacity(1);
-    message_sprite.SetOpacity(0);
-}
-
-# Register callbacks
-Plymouth.SetBootProgressFunction(boot_progress_callback);
-Plymouth.SetUpdateStatusFunction(update_status_callback);
-Plymouth.SetDisplayMessageFunction(display_message_callback);
-Plymouth.SetDisplayPasswordFunction(display_password_callback);
-Plymouth.SetRefreshFunction(refresh_callback);
-Plymouth.SetHideMessageFunction(hide_message_callback);
-Plymouth.SetQuitFunction(quit_callback);
-EOF
-    
-    # Create the Plymouth theme file
-    cat > "$THEME_DIR/spotify-kids.plymouth" <<EOF
-[Plymouth Theme]
-Name=Spotify Kids Manager
-Description=Boot splash for Spotify Kids Manager
-ModuleName=script
-
-[script]
-ImageDir=/usr/share/plymouth/themes/spotify-kids
-ScriptFile=/usr/share/plymouth/themes/spotify-kids/spotify-kids.script
-EOF
-    
-    # Install and set as default theme
-    update-alternatives --install /usr/share/plymouth/themes/default.plymouth default.plymouth \
-        /usr/share/plymouth/themes/spotify-kids/spotify-kids.plymouth 100 2>/dev/null
-    
-    plymouth-set-default-theme spotify-kids 2>/dev/null || true
-    
-    # Update initramfs
-    update-initramfs -u >/dev/null 2>&1 || true
-    
-    # Configure boot parameters for Raspberry Pi (SIMPLE)
+    # Find cmdline.txt location
     if [ -f /boot/cmdline.txt ]; then
-        cp /boot/cmdline.txt /boot/cmdline.txt.backup
-        
-        # Just add basic splash parameters if not present
-        if ! grep -q "splash" /boot/cmdline.txt; then
-            sed -i 's/$/ quiet splash plymouth.ignore-serial-consoles/' /boot/cmdline.txt
-        fi
+        CMDLINE="/boot/cmdline.txt"
+    elif [ -f /boot/firmware/cmdline.txt ]; then  
+        CMDLINE="/boot/firmware/cmdline.txt"
+    else
+        log_warning "cmdline.txt not found, skipping boot parameters"
+        return
     fi
     
-    # Configure GRUB for standard systems
-    if [ -f /etc/default/grub ]; then
-        if ! grep -q "splash" /etc/default/grub; then
-            cp /etc/default/grub /etc/default/grub.backup
-            sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="[^"]*"/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash loglevel=0 rd.udev.log_level=0 vt.global_cursor_default=0"/' /etc/default/grub
-            # Ensure Plymouth doesn't quit early
-            sed -i 's/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=0/' /etc/default/grub
-            update-grub >/dev/null 2>&1 || true
-        fi
+    # Backup and modify cmdline.txt for quiet boot
+    cp "$CMDLINE" "$INSTALL_DIR/config/cmdline.txt.backup" 2>/dev/null || true
+    if ! grep -q "logo.nologo" "$CMDLINE"; then
+        sed -i 's/$/ logo.nologo consoleblank=1/' "$CMDLINE"
     fi
     
-    # Configure Plymouth for better display duration
-    mkdir -p /etc/plymouth
-    cat > /etc/plymouth/plymouthd.conf <<EOF
-[Daemon]
-Theme=spotify-kids
-ShowDelay=0
-DeviceTimeout=30
-# Ensure Plymouth stays visible longer during boot
-EOF
-    
-    # Simple Plymouth configuration - let it work normally
-    log_info "Configuring Plymouth services..."
-    
-    # Ensure standard Plymouth services are enabled
-    systemctl unmask plymouth.service plymouth-quit.service plymouth-quit-wait.service 2>/dev/null || true
-    systemctl enable plymouth.service plymouth-quit.service plymouth-quit-wait.service 2>/dev/null || true
-    
-    # Clean up any custom overrides from previous installs
-    rm -rf /etc/systemd/system/getty@*.service.d/
-    rm -f /etc/systemd/system/plymouth-*.service 2>/dev/null || true
-    
-    # Ensure Plymouth modules in initramfs
-    if [ -f /etc/initramfs-tools/modules ]; then
-        grep -q "drm" /etc/initramfs-tools/modules || echo "drm" >> /etc/initramfs-tools/modules
-        grep -q "drm_kms_helper" /etc/initramfs-tools/modules || echo "drm_kms_helper" >> /etc/initramfs-tools/modules
+    # Find config.txt location
+    if [ -f /boot/config.txt ]; then
+        CONFIG="/boot/config.txt"
+    elif [ -f /boot/firmware/config.txt ]; then
+        CONFIG="/boot/firmware/config.txt"  
+    else
+        log_warning "config.txt not found"
+        return
     fi
     
-    # Force framebuffer for Plymouth
-    cat > /etc/initramfs-tools/conf.d/plymouth <<EOF
-FRAMEBUFFER=y
-EOF
+    # Disable rainbow splash
+    if ! grep -q "disable_splash=1" "$CONFIG"; then
+        echo "disable_splash=1" >> "$CONFIG"
+    fi
     
-    log_success "Boot splash installed successfully"
-}
+    # Create simple splash service
+    cat > /etc/systemd/system/bootsplash.service <<EOF
+[Unit]
+Description=Boot splash screen
+DefaultDependencies=no
+After=local-fs.target
+Before=getty.target
 
-# Test and repair web admin panel
-test_and_repair_web() {
+[Service]
+Type=forking
+ExecStart=/usr/bin/fbi -T 1 -noverbose -a /usr/share/pixmaps/splash.png
+ExecStop=/usr/bin/killall fbi
+RemainAfterExit=yes
+StandardInput=tty
+StandardOutput=tty
+
+[Install]
+WantedBy=sysinit.target
+EOF
+    
+    systemctl enable bootsplash.service 2>/dev/null || true
+    
+    log_success "Simple boot splash configured"
+    return  # Exit here, skip all the complex Plymouth stuff
+}
     log_info "Testing web admin panel..."
     
     # Give services time to start
@@ -3397,23 +3165,26 @@ uninstall_all() {
     # Restore original boot splash
     log_info "Restoring original boot splash..."
     
-    # Restore original Plymouth theme if we have backup
-    if [ -f "$INSTALL_DIR/config/original-plymouth-theme.conf" ]; then
-        ORIGINAL_THEME=$(cat "$INSTALL_DIR/config/original-plymouth-theme.conf" 2>/dev/null || echo "bgrt")
-        plymouth-set-default-theme "$ORIGINAL_THEME" 2>/dev/null || true
+    # Remove our splash service
+    systemctl disable bootsplash.service 2>/dev/null || true
+    rm -f /etc/systemd/system/bootsplash.service
+    
+    # Remove splash image
+    rm -f /usr/share/pixmaps/splash.png
+    
+    # Restore cmdline.txt if we have backup
+    if [ -f "$INSTALL_DIR/config/cmdline.txt.backup" ]; then
+        if [ -f /boot/cmdline.txt ]; then
+            cp "$INSTALL_DIR/config/cmdline.txt.backup" /boot/cmdline.txt
+        elif [ -f /boot/firmware/cmdline.txt ]; then
+            cp "$INSTALL_DIR/config/cmdline.txt.backup" /boot/firmware/cmdline.txt
+        fi
     fi
     
-    # Remove our custom theme
-    rm -rf /usr/share/plymouth/themes/spotify-kids 2>/dev/null || true
-    update-alternatives --remove default.plymouth /usr/share/plymouth/themes/spotify-kids/spotify-kids.plymouth 2>/dev/null || true
-    
-    # Remove any Plymouth service overrides we created
-    rm -f /etc/systemd/system/plymouth-*.service 2>/dev/null || true
-    rm -rf /etc/systemd/system/getty@*.service.d/ 2>/dev/null || true
-    
-    # Restore Plymouth services to defaults
-    systemctl unmask plymouth.service plymouth-quit.service plymouth-quit-wait.service 2>/dev/null || true
-    systemctl enable plymouth.service plymouth-quit.service plymouth-quit-wait.service 2>/dev/null || true
+    # Remove disable_splash from config.txt
+    for config in /boot/config.txt /boot/firmware/config.txt; do
+        [ -f "$config" ] && sed -i '/disable_splash=1/d' "$config"
+    done
     
     # Restore boot configuration files
     if [ -f "$INSTALL_DIR/config/cmdline.txt.backup" ]; then
