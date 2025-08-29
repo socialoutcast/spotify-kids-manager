@@ -1792,20 +1792,22 @@ def bluetooth_scan():
         return jsonify({'error': 'Not authenticated'}), 401
     
     try:
-        # Enable scanning
-        subprocess.run(['sudo', 'bluetoothctl', 'scan', 'on'], 
-                      capture_output=True, timeout=1)
+        # Start scanning in background
+        scan_process = subprocess.Popen(['sudo', 'bluetoothctl', '--', 'scan', 'on'], 
+                                       stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         
-        # Wait for devices to be discovered
-        time.sleep(10)
+        # Wait a bit for devices to be discovered
+        time.sleep(3)
         
         # Get devices
         result = subprocess.run(['sudo', 'bluetoothctl', 'devices'], 
                               capture_output=True, text=True, timeout=5)
         
-        # Stop scanning
-        subprocess.run(['sudo', 'bluetoothctl', 'scan', 'off'], 
-                      capture_output=True, timeout=1)
+        # Stop scanning (kill the background process)
+        if 'scan_process' in locals():
+            scan_process.terminate()
+        subprocess.run(['sudo', 'bluetoothctl', '--', 'scan', 'off'], 
+                      capture_output=True, timeout=2)
         
         devices = []
         paired_addresses = set()
