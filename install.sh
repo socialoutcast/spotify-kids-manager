@@ -252,13 +252,20 @@ fi
 # Set permissions
 chown -R "$APP_USER:$APP_USER" "$APP_DIR"
 chown -R "$ADMIN_USER:$ADMIN_USER" "$APP_DIR/web"
+# Make config dir accessible to both users
 chown -R "$ADMIN_USER:$ADMIN_USER" "$CONFIG_DIR"
-chown -R "$APP_USER:$APP_USER" "/var/log/spotify-kids"
-# Player needs read access to config, admin needs write
 chmod 775 "$CONFIG_DIR"
-chmod 664 "$CONFIG_DIR"/* 2>/dev/null || true
+# Create cache directory for player
+mkdir -p "$CONFIG_DIR/.cache"
+chown "$APP_USER:$APP_USER" "$CONFIG_DIR/.cache"
+chmod 755 "$CONFIG_DIR/.cache"
 # Both users need access to logs
+chown -R "$APP_USER:$APP_USER" "/var/log/spotify-kids"
 chmod 775 "/var/log/spotify-kids"
+# Allow player to read config files
+chmod 664 "$CONFIG_DIR"/*.json 2>/dev/null || true
+# Add player to admin group for config access
+usermod -a -G "$ADMIN_USER" "$APP_USER" 2>/dev/null || true
 
 # Configure auto-login
 echo -e "${YELLOW}Configuring auto-login...${NC}"
