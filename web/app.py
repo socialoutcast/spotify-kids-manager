@@ -1785,10 +1785,18 @@ def get_logs(log_type):
     
     try:
         if log_type == 'player':
-            # Get player service logs
+            # Get player application logs from actual log file
+            log_file = '/var/log/spotify-kids/player.log'
+            if os.path.exists(log_file):
+                result = subprocess.run(['sudo', 'tail', '-n', lines, log_file],
+                                      capture_output=True, text=True)
+                if result.stdout:
+                    return result.stdout
+            
+            # Fallback to journalctl if no log file
             result = subprocess.run(['sudo', 'journalctl', '-u', 'spotify-player', '-n', lines, '--no-pager'],
                                   capture_output=True, text=True)
-            return result.stdout or "No player logs available"
+            return result.stdout or "No player logs available - player may not be running"
             
         elif log_type == 'admin':
             # Get admin panel logs
@@ -1803,10 +1811,23 @@ def get_logs(log_type):
             return result.stdout or "No nginx logs available"
             
         elif log_type == 'system':
-            # Get boot logs
+            # Get X session logs first
+            logs = []
+            xsession_log = '/var/log/spotify-kids/xsession.log'
+            if os.path.exists(xsession_log):
+                result = subprocess.run(['sudo', 'tail', '-n', '30', xsession_log],
+                                      capture_output=True, text=True)
+                if result.stdout:
+                    logs.append("=== X SESSION LOGS ===")
+                    logs.append(result.stdout)
+                    logs.append("")
+            
+            # Then boot logs
             result = subprocess.run(['sudo', 'journalctl', '-b', '-n', lines, '--no-pager'],
                                   capture_output=True, text=True)
-            return result.stdout or "No system logs available"
+            logs.append("=== SYSTEM BOOT LOGS ===")
+            logs.append(result.stdout or "No system logs available")
+            return '\n'.join(logs)
             
         elif log_type == 'auth':
             # Get authentication logs
@@ -1815,22 +1836,43 @@ def get_logs(log_type):
             return result.stdout or "No auth logs available"
             
         elif log_type == 'all':
-            # Get all recent logs
+            # Get all recent logs from actual files
             logs = []
-            logs.append("=== PLAYER LOGS ===")
-            result = subprocess.run(['sudo', 'journalctl', '-u', 'spotify-player', '-n', '50', '--no-pager'],
-                                  capture_output=True, text=True)
-            logs.append(result.stdout or "No player logs")
             
+            # Player logs from file
+            logs.append("=== PLAYER LOGS ===")
+            player_log = '/var/log/spotify-kids/player.log'
+            if os.path.exists(player_log):
+                result = subprocess.run(['sudo', 'tail', '-n', '50', player_log],
+                                      capture_output=True, text=True)
+                logs.append(result.stdout or "No player logs in file")
+            else:
+                # Fallback to journalctl
+                result = subprocess.run(['sudo', 'journalctl', '-u', 'spotify-player', '-n', '50', '--no-pager'],
+                                      capture_output=True, text=True)
+                logs.append(result.stdout or "No player service logs")
+            
+            # X Session logs
+            logs.append("\n=== X SESSION LOGS ===")
+            xsession_log = '/var/log/spotify-kids/xsession.log'
+            if os.path.exists(xsession_log):
+                result = subprocess.run(['sudo', 'tail', '-n', '30', xsession_log],
+                                      capture_output=True, text=True)
+                logs.append(result.stdout or "No X session logs")
+            else:
+                logs.append("X session log file not found")
+            
+            # Admin panel logs
             logs.append("\n=== ADMIN PANEL LOGS ===")
             result = subprocess.run(['sudo', 'journalctl', '-u', 'spotify-admin', '-n', '50', '--no-pager'],
                                   capture_output=True, text=True)
             logs.append(result.stdout or "No admin logs")
             
+            # Recent system logs
             logs.append("\n=== RECENT SYSTEM LOGS ===")
-            result = subprocess.run(['sudo', 'journalctl', '-n', '50', '--no-pager'],
-                                  capture_output=True, text=True)
-            logs.append(result.stdout or "No system logs")
+            result = subprocess.run(['sudo', 'dmesg', '-T', '|', 'tail', '-n', '30'],
+                                  capture_output=True, text=True, shell=True)
+            logs.append(result.stdout or "No recent kernel messages")
             
             return '\n'.join(logs)
             
@@ -1847,7 +1889,7 @@ def clear_logs():
         return jsonify({'error': 'Not authenticated'}), 401
     
     try:
-        # Rotate logs
+        # Rotate journalctl logs
         subprocess.run(['sudo', 'journalctl', '--rotate'], check=False)
         subprocess.run(['sudo', 'journalctl', '--vacuum-time=1d'], check=False)
         
@@ -1855,7 +1897,11 @@ def clear_logs():
         subprocess.run(['sudo', 'truncate', '-s', '0', '/var/log/nginx/error.log'], check=False)
         subprocess.run(['sudo', 'truncate', '-s', '0', '/var/log/nginx/access.log'], check=False)
         
-        return jsonify({'success': True, 'message': 'Old logs cleared'})
+        # Clear our custom log files
+        subprocess.run(['sudo', 'truncate', '-s', '0', '/var/log/spotify-kids/player.log'], check=False)
+        subprocess.run(['sudo', 'truncate', '-s', '0', '/var/log/spotify-kids/xsession.log'], check=False)
+        
+        return jsonify({'success': True, 'message': 'All logs cleared'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -1874,21 +1920,34 @@ def download_logs():
         logs.append(f"Generated: {datetime.now()}\n")
         logs.append("="*60 + "\n\n")
         
-        # Collect all logs
-        logs.append("PLAYER SERVICE LOGS\n" + "="*40 + "\n")
-        result = subprocess.run(['sudo', 'journalctl', '-u', 'spotify-player', '-n', '500', '--no-pager'],
-                              capture_output=True, text=True)
-        logs.append(result.stdout or "No logs available")
+        # Collect all logs from actual files
+        logs.append("PLAYER APPLICATION LOGS\n" + "="*40 + "\n")
+        player_log = '/var/log/spotify-kids/player.log'
+        if os.path.exists(player_log):
+            result = subprocess.run(['sudo', 'cat', player_log],
+                                  capture_output=True, text=True)
+            logs.append(result.stdout or "No player logs in file")
+        else:
+            result = subprocess.run(['sudo', 'journalctl', '-u', 'spotify-player', '-n', '500', '--no-pager'],
+                                  capture_output=True, text=True)
+            logs.append(result.stdout or "No player service logs")
+        
+        logs.append("\n\nX SESSION LOGS\n" + "="*40 + "\n")
+        xsession_log = '/var/log/spotify-kids/xsession.log'
+        if os.path.exists(xsession_log):
+            result = subprocess.run(['sudo', 'cat', xsession_log],
+                                  capture_output=True, text=True)
+            logs.append(result.stdout or "No X session logs")
         
         logs.append("\n\nADMIN PANEL LOGS\n" + "="*40 + "\n")
         result = subprocess.run(['sudo', 'journalctl', '-u', 'spotify-admin', '-n', '500', '--no-pager'],
                               capture_output=True, text=True)
-        logs.append(result.stdout or "No logs available")
+        logs.append(result.stdout or "No admin panel logs")
         
         logs.append("\n\nSYSTEM BOOT LOGS\n" + "="*40 + "\n")
         result = subprocess.run(['sudo', 'journalctl', '-b', '-n', '500', '--no-pager'],
                               capture_output=True, text=True)
-        logs.append(result.stdout or "No logs available")
+        logs.append(result.stdout or "No system boot logs")
         
         # Create response
         response = Response('\n'.join(logs), mimetype='text/plain')
