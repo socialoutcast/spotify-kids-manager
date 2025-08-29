@@ -512,32 +512,22 @@ ADMIN_TEMPLATE = '''
             </div>
             
             <!-- System Logs -->
-            <div class="card" style="grid-column: span 2;">
+            <div class="card">
                 <h2>📋 System Logs & Diagnostics</h2>
                 <p style="color: #666; font-size: 12px; margin-bottom: 15px;">
                     View system logs and debug information for troubleshooting.
                 </p>
                 <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
-                    <button onclick="loadLog('player')">Player Logs</button>
-                    <button onclick="loadLog('admin')">Admin Panel Logs</button>
-                    <button onclick="loadLog('nginx')">Nginx Logs</button>
-                    <button onclick="loadLog('system')">System Boot Logs</button>
-                    <button onclick="loadLog('auth')">Auth Logs</button>
-                    <button onclick="loadLog('all')">All Recent Logs</button>
-                    <button onclick="clearLogs()" class="danger">Clear Old Logs</button>
+                    <button onclick="openLogModal('player')">Player Logs</button>
+                    <button onclick="openLogModal('admin')">Admin Panel</button>
+                    <button onclick="openLogModal('nginx')">Nginx Logs</button>
+                    <button onclick="openLogModal('system')">System Logs</button>
+                    <button onclick="openLogModal('auth')">Auth Logs</button>
+                    <button onclick="openLogModal('all')">All Logs</button>
                 </div>
-                <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-                    <label style="display: flex; align-items: center;">
-                        <input type="checkbox" id="autoRefresh" checked style="margin-right: 5px;">
-                        Auto-refresh (5s)
-                    </label>
-                    <label style="display: flex; align-items: center;">
-                        Lines: <input type="number" id="logLines" value="100" min="10" max="1000" style="width: 80px; margin-left: 5px;">
-                    </label>
+                <div style="display: flex; gap: 10px;">
                     <button onclick="downloadLogs()">Download All Logs</button>
-                </div>
-                <div id="logOutput" style="background: #1e1e1e; color: #00ff00; font-family: 'Courier New', monospace; font-size: 11px; padding: 15px; border-radius: 5px; height: 400px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word;">
-                    Select a log type to view...
+                    <button onclick="clearLogs()" class="danger">Clear Old Logs</button>
                 </div>
             </div>
             
@@ -807,6 +797,39 @@ ADMIN_TEMPLATE = '''
             </div>
         </div>
         
+        <!-- Log Viewer Modal -->
+        <div id="logModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000;">
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #2a2a2a; border-radius: 10px; padding: 20px; width: 90%; max-width: 1200px; height: 80vh; display: flex; flex-direction: column;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h2 id="logModalTitle" style="color: white; margin: 0;">System Logs</h2>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <label style="color: white; display: flex; align-items: center;">
+                            <input type="checkbox" id="modalAutoRefresh" checked style="margin-right: 5px;">
+                            Auto-refresh
+                        </label>
+                        <label style="color: white; display: flex; align-items: center;">
+                            Lines: 
+                            <input type="number" id="modalLogLines" value="200" min="10" max="2000" style="width: 80px; margin-left: 5px; background: #444; color: white; border: 1px solid #666; border-radius: 3px; padding: 2px 5px;">
+                        </label>
+                        <button onclick="refreshCurrentLog()" style="padding: 5px 15px;">Refresh</button>
+                        <button onclick="closeLogModal()" style="padding: 5px 15px; background: #ef4444;">Close</button>
+                    </div>
+                </div>
+                <div id="modalLogOutput" style="background: #1a1a1a; color: #00ff00; font-family: 'Courier New', monospace; font-size: 12px; padding: 20px; border-radius: 5px; flex: 1; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word; border: 1px solid #444;">
+                    Loading logs...
+                </div>
+                <div style="margin-top: 15px; display: flex; gap: 10px; justify-content: center;">
+                    <button onclick="openLogModal('player')" style="padding: 8px 20px;">Player</button>
+                    <button onclick="openLogModal('admin')" style="padding: 8px 20px;">Admin</button>
+                    <button onclick="openLogModal('nginx')" style="padding: 8px 20px;">Nginx</button>
+                    <button onclick="openLogModal('system')" style="padding: 8px 20px;">System</button>
+                    <button onclick="openLogModal('auth')" style="padding: 8px 20px;">Auth</button>
+                    <button onclick="openLogModal('all')" style="padding: 8px 20px;">All</button>
+                    <button onclick="copyLogsToClipboard()" style="padding: 8px 20px; background: #667eea;">Copy to Clipboard</button>
+                </div>
+            </div>
+        </div>
+        
         {% else %}
         <!-- Login Form -->
         <div class="login-container">
@@ -1046,10 +1069,36 @@ ADMIN_TEMPLATE = '''
         let currentLogType = null;
         let logRefreshInterval = null;
         
-        function loadLog(type) {
+        function openLogModal(type) {
             currentLogType = type;
-            const lines = document.getElementById('logLines').value;
-            const output = document.getElementById('logOutput');
+            document.getElementById('logModal').style.display = 'block';
+            
+            // Set title
+            const titles = {
+                'player': 'Player Logs',
+                'admin': 'Admin Panel Logs',
+                'nginx': 'Nginx Logs',
+                'system': 'System Logs',
+                'auth': 'Authentication Logs',
+                'all': 'All System Logs'
+            };
+            document.getElementById('logModalTitle').textContent = titles[type] || 'System Logs';
+            
+            // Load logs
+            loadModalLog(type);
+            
+            // Setup auto-refresh
+            if (document.getElementById('modalAutoRefresh').checked) {
+                clearInterval(logRefreshInterval);
+                logRefreshInterval = setInterval(() => {
+                    loadModalLog(currentLogType);
+                }, 5000);
+            }
+        }
+        
+        function loadModalLog(type) {
+            const lines = document.getElementById('modalLogLines').value;
+            const output = document.getElementById('modalLogOutput');
             output.textContent = 'Loading logs...';
             
             fetch(`/api/logs/${type}?lines=${lines}`)
@@ -1063,6 +1112,27 @@ ADMIN_TEMPLATE = '''
                 });
         }
         
+        function closeLogModal() {
+            document.getElementById('logModal').style.display = 'none';
+            clearInterval(logRefreshInterval);
+            logRefreshInterval = null;
+        }
+        
+        function refreshCurrentLog() {
+            if (currentLogType) {
+                loadModalLog(currentLogType);
+            }
+        }
+        
+        function copyLogsToClipboard() {
+            const logText = document.getElementById('modalLogOutput').textContent;
+            navigator.clipboard.writeText(logText).then(() => {
+                alert('Logs copied to clipboard');
+            }).catch(err => {
+                alert('Failed to copy logs: ' + err);
+            });
+        }
+        
         function clearLogs() {
             if (!confirm('Clear old log files? This will free up disk space.')) return;
             
@@ -1070,7 +1140,7 @@ ADMIN_TEMPLATE = '''
                 .then(r => r.json())
                 .then(data => {
                     alert(data.message || 'Logs cleared');
-                    if (currentLogType) loadLog(currentLogType);
+                    if (currentLogType) loadModalLog(currentLogType);
                 })
                 .catch(err => alert('Error: ' + err));
         }
@@ -1079,11 +1149,12 @@ ADMIN_TEMPLATE = '''
             window.location.href = '/api/logs/download';
         }
         
-        // Auto-refresh logs
-        document.getElementById('autoRefresh').addEventListener('change', function(e) {
+        // Auto-refresh toggle for modal
+        document.getElementById('modalAutoRefresh').addEventListener('change', function(e) {
             if (e.target.checked && currentLogType) {
+                clearInterval(logRefreshInterval);
                 logRefreshInterval = setInterval(() => {
-                    if (currentLogType) loadLog(currentLogType);
+                    loadModalLog(currentLogType);
                 }, 5000);
             } else {
                 clearInterval(logRefreshInterval);
@@ -1091,13 +1162,10 @@ ADMIN_TEMPLATE = '''
             }
         });
         
-        // Load player logs by default
-        window.addEventListener('load', () => {
-            loadLog('player');
-            if (document.getElementById('autoRefresh').checked) {
-                logRefreshInterval = setInterval(() => {
-                    if (currentLogType) loadLog(currentLogType);
-                }, 5000);
+        // Close modal on ESC key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeLogModal();
             }
         });
         
