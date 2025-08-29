@@ -106,7 +106,11 @@ apt-get install -y \
     nginx \
     git \
     unclutter \
-    chromium-browser
+    chromium-browser \
+    bluez \
+    bluez-tools \
+    pulseaudio-module-bluetooth \
+    rfkill
 
 # Install Python packages
 echo -e "${YELLOW}Installing Python packages...${NC}"
@@ -144,6 +148,11 @@ $ADMIN_USER ALL=(ALL) NOPASSWD: /bin/systemctl restart spotify-player
 $ADMIN_USER ALL=(ALL) NOPASSWD: /bin/systemctl stop spotify-player
 $ADMIN_USER ALL=(ALL) NOPASSWD: /bin/systemctl start spotify-player
 $ADMIN_USER ALL=(ALL) NOPASSWD: /bin/systemctl status spotify-player
+$ADMIN_USER ALL=(ALL) NOPASSWD: /bin/systemctl start bluetooth
+$ADMIN_USER ALL=(ALL) NOPASSWD: /bin/systemctl stop bluetooth
+$ADMIN_USER ALL=(ALL) NOPASSWD: /bin/systemctl is-active bluetooth
+$ADMIN_USER ALL=(ALL) NOPASSWD: /usr/bin/bluetoothctl*
+$ADMIN_USER ALL=(ALL) NOPASSWD: /usr/sbin/rfkill*
 EOF
 chmod 0440 /etc/sudoers.d/spotify-admin
 
@@ -311,9 +320,33 @@ Section "InputClass"
 EOF
 fi
 
+# Configure Bluetooth and audio
+echo -e "${YELLOW}Configuring Bluetooth and audio...${NC}"
+
+# Enable Bluetooth service
+systemctl enable bluetooth.service
+systemctl start bluetooth.service
+
+# Configure PulseAudio for Bluetooth
+if ! grep -q "load-module module-bluetooth-policy" /etc/pulse/default.pa 2>/dev/null; then
+    echo "load-module module-bluetooth-policy" >> /etc/pulse/default.pa
+fi
+if ! grep -q "load-module module-bluetooth-discover" /etc/pulse/default.pa 2>/dev/null; then
+    echo "load-module module-bluetooth-discover" >> /etc/pulse/default.pa
+fi
+
+# Add spotify-kids user to audio and bluetooth groups
+usermod -aG bluetooth,audio "$APP_USER"
+
+# Set Bluetooth to be discoverable and pairable
+bluetoothctl power on 2>/dev/null || true
+bluetoothctl agent on 2>/dev/null || true
+bluetoothctl default-agent 2>/dev/null || true
+bluetoothctl discoverable on 2>/dev/null || true
+bluetoothctl pairable on 2>/dev/null || true
+
 # Disable unnecessary services
 echo -e "${YELLOW}Optimizing system...${NC}"
-systemctl disable bluetooth.service 2>/dev/null || true
 systemctl disable cups.service 2>/dev/null || true
 
 # Create uninstall script
