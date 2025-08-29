@@ -5,6 +5,9 @@
 
 set -e
 
+# Get script directory for local file detection
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # Color codes for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -2020,8 +2023,8 @@ def login_logs():
     
     # Check if ncspot is running
     try:
-        # Check for web player server or ncspot
-        result = subprocess.run(['pgrep', '-f', 'spotify_server.py|ncspot'], capture_output=True, shell=True)
+        # Check for native player
+        result = subprocess.run(['pgrep', '-f', 'spotify_player.py'], capture_output=True)
         if result.returncode == 0:
             logs["status"] = "running"
         else:
@@ -2234,8 +2237,8 @@ def get_users():
                         # Check if ncspot is currently running for this user
                         is_logged_in = False
                         try:
-                            # Check if ncspot process is running for this user
-                            result = subprocess.run(['pgrep', '-u', username, '-f', 'ncspot'], 
+                            # Check if native player process is running for this user
+                            result = subprocess.run(['pgrep', '-u', username, '-f', 'spotify_player.py'], 
                                                   capture_output=True)
                             if result.returncode == 0:
                                 is_logged_in = True
@@ -2666,21 +2669,25 @@ EOF
     
     log_success "Web admin panel created"
     
-    # Copy web player files
-    log_info "Installing web player files..."
+    # Install native player
+    log_info "Installing native Spotify player..."
     
-    # Download from GitHub if local files don't exist
-    if [ -d "$SCRIPT_DIR/web" ]; then
-        log_info "Copying web player files from local directory..."
-        cp "$SCRIPT_DIR/spotify_player.py" "$INSTALL_DIR/" 2>/dev/null || true
+    # Check if running from local directory or downloaded script
+    if [ -f "$SCRIPT_DIR/spotify_player.py" ]; then
+        log_info "Copying native player from local directory..."
+        cp "$SCRIPT_DIR/spotify_player.py" "$INSTALL_DIR/" || {
+            log_error "Failed to copy spotify_player.py"
+            exit 1
+        }
+        chmod +x "$INSTALL_DIR/spotify_player.py"
     else
-        log_info "Downloading web player files from GitHub..."
-        for file in spotify_player.py; do
-            wget -q -O "$INSTALL_DIR/web/$file" \
-                "https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/main/web/$file" || {
-                    log_warning "Could not download $file"
-                }
-        done
+        log_info "Downloading native player from GitHub..."
+        wget -q -O "$INSTALL_DIR/spotify_player.py" \
+            "https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/main/spotify_player.py" || {
+            log_error "Failed to download spotify_player.py"
+            exit 1
+        }
+        chmod +x "$INSTALL_DIR/spotify_player.py"
     fi
     
     # Install Python dependencies for native player
