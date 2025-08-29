@@ -1965,6 +1965,37 @@ def bluetooth_toggle():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/bluetooth/enable', methods=['POST'])
+def bluetooth_enable():
+    """Enable Bluetooth"""
+    if 'logged_in' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    try:
+        # Enable Bluetooth
+        subprocess.run(['sudo', 'rfkill', 'unblock', 'bluetooth'], check=False)
+        subprocess.run(['sudo', 'systemctl', 'start', 'bluetooth'], check=False)
+        subprocess.run(['sudo', 'bluetoothctl', 'power', 'on'], check=False)
+        subprocess.run(['sudo', 'bluetoothctl', 'agent', 'on'], check=False)
+        subprocess.run(['sudo', 'bluetoothctl', 'default-agent'], check=False)
+        return jsonify({'success': True, 'message': 'Bluetooth enabled'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/bluetooth/disable', methods=['POST'])
+def bluetooth_disable():
+    """Disable Bluetooth"""
+    if 'logged_in' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    try:
+        # Disable Bluetooth
+        subprocess.run(['sudo', 'systemctl', 'stop', 'bluetooth'], check=False)
+        subprocess.run(['sudo', 'rfkill', 'block', 'bluetooth'], check=False)
+        return jsonify({'success': True, 'message': 'Bluetooth disabled'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/fix/<fix_id>', methods=['POST'])
 def run_fix(fix_id):
     """Run a remote fix - NO AUTH for emergency repairs"""
