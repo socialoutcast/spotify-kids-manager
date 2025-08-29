@@ -1015,17 +1015,30 @@ ADMIN_TEMPLATE = '''
                     client_id: document.getElementById('clientId').value,
                     client_secret: document.getElementById('clientSecret').value
                 })
-            }).then(r => r.json()).then(data => {
+            }).then(r => {
+                if (!r.ok) {
+                    return r.json().then(data => {
+                        throw new Error(data.error || 'Failed to save configuration');
+                    });
+                }
+                return r.json();
+            }).then(data => {
                 statusDiv.style.display = 'block';
-                statusBox.style.background = '#10b981';
-                statusBox.style.color = 'white';
-                statusMessage.innerHTML = '✓ Configuration saved successfully';
+                if (data.success) {
+                    statusBox.style.background = '#10b981';
+                    statusBox.style.color = 'white';
+                    statusMessage.innerHTML = '✓ ' + (data.message || 'Configuration saved successfully');
+                } else {
+                    statusBox.style.background = '#ef4444';
+                    statusBox.style.color = 'white';
+                    statusMessage.innerHTML = '✗ ' + (data.error || 'Failed to save configuration');
+                }
                 setTimeout(() => { statusDiv.style.display = 'none'; }, 3000);
             }).catch(err => {
                 statusDiv.style.display = 'block';
                 statusBox.style.background = '#ef4444';
                 statusBox.style.color = 'white';
-                statusMessage.innerHTML = '✗ Failed to save configuration';
+                statusMessage.innerHTML = '✗ Error: ' + err.message;
                 setTimeout(() => { statusDiv.style.display = 'none'; }, 5000);
             });
         }
@@ -1827,14 +1840,21 @@ def update_spotify_config():
         return jsonify({'error': 'Not authenticated'}), 401
     
     data = request.json
+    app.logger.info(f"Received Spotify config update: client_id={data.get('client_id', '')[:10]}...")
+    
     config = {
         'client_id': data.get('client_id', ''),
         'client_secret': data.get('client_secret', ''),
         'redirect_uri': 'http://localhost:8888/callback'
     }
     
-    save_spotify_config(config)
-    return jsonify({'success': True, 'message': 'Spotify configuration saved'})
+    try:
+        save_spotify_config(config)
+        app.logger.info("Spotify config saved successfully")
+        return jsonify({'success': True, 'message': 'Spotify configuration saved'})
+    except Exception as e:
+        app.logger.error(f"Failed to save Spotify config: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/spotify/test', methods=['POST'])
 def test_spotify_config():
