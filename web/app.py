@@ -12,6 +12,7 @@ import threading
 import queue
 import time
 import uuid
+import sys
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.urandom(24)
@@ -164,6 +165,92 @@ def save_schedule(schedule):
     os.makedirs(CONFIG_DIR, exist_ok=True)
     with open(SCHEDULE_FILE, 'w') as f:
         json.dump(schedule, f, indent=2)
+
+def get_default_config():
+    """Get default configuration"""
+    return {
+        'device_locked': False,
+        'volume_limit': 85,
+        'admin_user': 'admin',
+        'admin_pass': generate_password_hash('changeme'),
+        'time_restrictions': {
+            'start': '07:00',
+            'end': '20:00'
+        }
+    }
+
+def get_default_parental_config():
+    """Get default parental control configuration"""
+    return {
+        'content_filter': {
+            'explicit_blocked': True,
+            'blocked_artists': [],
+            'blocked_songs': [],
+            'blocked_albums': [],
+            'allowed_playlists': [],
+            'genre_whitelist': [],
+            'genre_blacklist': ['death metal', 'black metal'],
+            'require_playlist_approval': False
+        },
+        'listening_limits': {
+            'daily_limit_minutes': 120,
+            'session_limit_minutes': 60,
+            'break_time_minutes': 30,
+            'volume_max': 85,
+            'skip_limit_per_hour': 20
+        },
+        'remote_control': {
+            'allow_remote_stop': True,
+            'allow_messages': True,
+            'emergency_contacts': [],
+            'screenshot_enabled': False
+        }
+    }
+
+def get_default_usage_stats():
+    """Get default usage statistics"""
+    return {
+        'sessions': [],
+        'total_minutes_today': 0,
+        'last_reset': datetime.now().isoformat(),
+        'favorite_songs': {},
+        'skip_count': {},
+        'daily_history': []
+    }
+
+def get_default_schedule():
+    """Get default listening schedule"""
+    return {
+        'enabled': False,
+        'weekday': {
+            'morning': {'start': '07:00', 'end': '08:30'},
+            'afternoon': {'start': '15:00', 'end': '17:00'},
+            'evening': {'start': '18:30', 'end': '20:00'}
+        },
+        'weekend': {
+            'morning': {'start': '08:00', 'end': '10:00'},
+            'afternoon': {'start': '14:00', 'end': '17:00'},
+            'evening': {'start': '18:00', 'end': '20:30'}
+        },
+        'blackout_dates': [],
+        'special_occasions': []
+    }
+
+def get_default_rewards():
+    """Get default rewards configuration"""
+    return {
+        'enabled': False,
+        'points': 0,
+        'achievements': [],
+        'rewards_available': [],
+        'point_rules': {
+            'per_minute_listened': 0.1,
+            'daily_login': 5,
+            'no_skips_bonus': 3,
+            'good_behavior': 10
+        },
+        'redeemed_today': []
+    }
 
 def load_rewards():
     """Load rewards configuration"""
@@ -1857,6 +1944,254 @@ def check_updates():
         return jsonify({'success': True, 'message': message, 'count': len(upgradable)})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/diagnostics')
+def diagnostics():
+    """Comprehensive system diagnostics - NO AUTH REQUIRED for debugging"""
+    import json
+    import traceback
+    import platform
+    import socket
+    import pwd
+    import grp
+    
+    diagnostics_data = {
+        'timestamp': datetime.now().isoformat(),
+        'hostname': socket.gethostname(),
+        'ip': request.remote_addr,
+        'system': {},
+        'python': {},
+        'app': {},
+        'services': {},
+        'files': {},
+        'permissions': {},
+        'errors': [],
+        'javascript_debug': {},
+        'config': {},
+        'environment': {}
+    }
+    
+    try:
+        # System Info
+        diagnostics_data['system'] = {
+            'platform': platform.platform(),
+            'processor': platform.processor(),
+            'python_version': platform.python_version(),
+            'hostname': platform.node(),
+            'uptime': subprocess.run(['uptime'], capture_output=True, text=True).stdout.strip()
+        }
+        
+        # Python environment
+        diagnostics_data['python'] = {
+            'version': sys.version,
+            'executable': sys.executable,
+            'path': sys.path,
+            'modules': list(sys.modules.keys())[:50]  # First 50 modules
+        }
+        
+        # App configuration
+        try:
+            diagnostics_data['config'] = {
+                'config_dir': CONFIG_DIR,
+                'log_dir': LOG_DIR,
+                'app_user': APP_USER,
+                'config_exists': os.path.exists(CONFIG_DIR),
+                'log_dir_exists': os.path.exists(LOG_DIR)
+            }
+        except Exception as e:
+            diagnostics_data['errors'].append(f"Config error: {str(e)}")
+        
+        # Check services
+        services = ['spotify-player', 'spotify-admin', 'nginx', 'bluetooth']
+        for service in services:
+            try:
+                result = subprocess.run(['sudo', 'systemctl', 'is-active', service], 
+                                      capture_output=True, text=True)
+                diagnostics_data['services'][service] = result.stdout.strip()
+            except Exception as e:
+                diagnostics_data['services'][service] = f"Error: {str(e)}"
+        
+        # Check important files
+        important_files = [
+            '/opt/spotify-kids/web/app.py',
+            '/opt/spotify-kids/spotify_player.py',
+            '/opt/spotify-kids/config/config.json',
+            '/opt/spotify-kids/config/spotify_config.json',
+            '/etc/systemd/system/spotify-player.service',
+            '/etc/systemd/system/spotify-admin.service'
+        ]
+        
+        for filepath in important_files:
+            try:
+                if os.path.exists(filepath):
+                    stat = os.stat(filepath)
+                    try:
+                        owner = pwd.getpwuid(stat.st_uid).pw_name
+                        group = grp.getgrgid(stat.st_gid).gr_name
+                    except:
+                        owner = stat.st_uid
+                        group = stat.st_gid
+                    
+                    diagnostics_data['files'][filepath] = {
+                        'exists': True,
+                        'size': stat.st_size,
+                        'permissions': oct(stat.st_mode)[-3:],
+                        'owner': owner,
+                        'group': group,
+                        'modified': datetime.fromtimestamp(stat.st_mtime).isoformat()
+                    }
+                else:
+                    diagnostics_data['files'][filepath] = {'exists': False}
+            except Exception as e:
+                diagnostics_data['files'][filepath] = {'error': str(e)}
+        
+        # Check directory permissions
+        important_dirs = ['/opt/spotify-kids', '/opt/spotify-kids/config', '/var/log/spotify-kids']
+        for dirpath in important_dirs:
+            try:
+                if os.path.exists(dirpath):
+                    stat = os.stat(dirpath)
+                    try:
+                        owner = pwd.getpwuid(stat.st_uid).pw_name
+                        group = grp.getgrgid(stat.st_gid).gr_name
+                    except:
+                        owner = stat.st_uid
+                        group = stat.st_gid
+                    
+                    diagnostics_data['permissions'][dirpath] = {
+                        'exists': True,
+                        'permissions': oct(stat.st_mode)[-3:],
+                        'owner': owner,
+                        'group': group,
+                        'writable': os.access(dirpath, os.W_OK),
+                        'readable': os.access(dirpath, os.R_OK)
+                    }
+                else:
+                    diagnostics_data['permissions'][dirpath] = {'exists': False}
+            except Exception as e:
+                diagnostics_data['permissions'][dirpath] = {'error': str(e)}
+        
+        # JavaScript Debug - Render the page and check for issues
+        try:
+            with app.test_request_context():
+                # Get both logged in and logged out versions
+                from flask import render_template_string
+                
+                # Logged out version
+                logged_out_html = render_template_string(ADMIN_TEMPLATE,
+                                                        logged_in=False,
+                                                        config={},
+                                                        spotify_config={},
+                                                        parental_config={'content_filter': {'blocked_artists': [], 
+                                                                                           'genre_blacklist': [],
+                                                                                           'allowed_playlists': [],
+                                                                                           'genre_whitelist': []}},
+                                                        usage_stats={},
+                                                        schedule={},
+                                                        rewards={},
+                                                        player_status=False,
+                                                        cpu_usage=0,
+                                                        memory_usage=0,
+                                                        disk_usage=0,
+                                                        uptime="0h 0m",
+                                                        bluetooth_enabled=False,
+                                                        paired_devices=[],
+                                                        current_session_time=0,
+                                                        top_songs=[],
+                                                        total_skips_today=0,
+                                                        time_remaining=0,
+                                                        spotify_configured=False)
+                
+                # Check for functions in logged out version
+                logged_out_functions = []
+                for func in ['saveSpotifyConfig', 'testSpotifyConfig', 'restartServices', 'login']:
+                    if f'function {func}' in logged_out_html:
+                        logged_out_functions.append(func)
+                
+                diagnostics_data['javascript_debug']['logged_out'] = {
+                    'html_length': len(logged_out_html),
+                    'functions_defined': logged_out_functions,
+                    'has_syntax_error': 'SyntaxError' in logged_out_html,
+                    'line_count': len(logged_out_html.split('\n'))
+                }
+                
+                # Logged in version
+                logged_in_html = render_template_string(ADMIN_TEMPLATE,
+                                                       logged_in=True,
+                                                       config=load_config() if os.path.exists(os.path.join(CONFIG_DIR, 'config.json')) else get_default_config(),
+                                                       spotify_config=load_spotify_config() if os.path.exists(os.path.join(CONFIG_DIR, 'spotify_config.json')) else {},
+                                                       parental_config=load_parental_config() if os.path.exists(os.path.join(CONFIG_DIR, 'parental_controls.json')) else get_default_parental_config(),
+                                                       usage_stats=load_usage_stats() if os.path.exists(os.path.join(CONFIG_DIR, 'usage_stats.json')) else get_default_usage_stats(),
+                                                       schedule=load_schedule() if os.path.exists(os.path.join(CONFIG_DIR, 'schedule.json')) else get_default_schedule(),
+                                                       rewards=load_rewards() if os.path.exists(os.path.join(CONFIG_DIR, 'rewards.json')) else get_default_rewards(),
+                                                       player_status=False,
+                                                       cpu_usage=psutil.cpu_percent(interval=1),
+                                                       memory_usage=psutil.virtual_memory().percent,
+                                                       disk_usage=psutil.disk_usage('/').percent,
+                                                       uptime="1h 0m",
+                                                       bluetooth_enabled=False,
+                                                       paired_devices=[],
+                                                       current_session_time=0,
+                                                       top_songs=[],
+                                                       total_skips_today=0,
+                                                       time_remaining=120,
+                                                       spotify_configured=True)
+                
+                # Check for functions in logged in version
+                logged_in_functions = []
+                for func in ['saveSpotifyConfig', 'testSpotifyConfig', 'restartServices', 'logout',
+                           'saveAdminSettings', 'saveContentFilter', 'connectBluetooth', 'disconnectBluetooth']:
+                    if f'function {func}' in logged_in_html:
+                        logged_in_functions.append(func)
+                
+                # Find line 808
+                lines = logged_in_html.split('\n')
+                line_808_context = {}
+                if len(lines) > 810:
+                    for i in range(max(0, 805), min(len(lines), 812)):
+                        line_808_context[f'line_{i+1}'] = lines[i][:200]  # First 200 chars
+                
+                diagnostics_data['javascript_debug']['logged_in'] = {
+                    'html_length': len(logged_in_html),
+                    'functions_defined': logged_in_functions,
+                    'has_syntax_error': 'SyntaxError' in logged_in_html,
+                    'line_count': len(lines),
+                    'line_808_context': line_808_context
+                }
+                
+                # Check for specific issues
+                issues = []
+                if 'testSpotifyConfig' not in logged_in_functions:
+                    issues.append("testSpotifyConfig function not found in logged in version")
+                if 'saveSpotifyConfig' not in logged_in_functions:
+                    issues.append("saveSpotifyConfig function not found in logged in version")
+                
+                diagnostics_data['javascript_debug']['issues'] = issues
+                
+        except Exception as e:
+            diagnostics_data['javascript_debug']['error'] = str(e)
+            diagnostics_data['javascript_debug']['traceback'] = traceback.format_exc()
+        
+        # Environment variables (filtered for security)
+        safe_env_vars = ['PATH', 'HOME', 'USER', 'SHELL', 'PWD', 'LANG', 'LC_ALL']
+        diagnostics_data['environment'] = {k: os.environ.get(k, 'Not set') for k in safe_env_vars}
+        
+        # Recent errors from logs
+        try:
+            if os.path.exists('/var/log/spotify-kids/player.log'):
+                result = subprocess.run(['sudo', 'tail', '-n', '20', '/var/log/spotify-kids/player.log'],
+                                      capture_output=True, text=True)
+                diagnostics_data['recent_player_logs'] = result.stdout.split('\n')[-10:]  # Last 10 lines
+        except:
+            pass
+        
+    except Exception as e:
+        diagnostics_data['errors'].append(f"Fatal error: {str(e)}")
+        diagnostics_data['errors'].append(traceback.format_exc())
+    
+    # Return as JSON for easy reading
+    return Response(json.dumps(diagnostics_data, indent=2, default=str), 
+                   mimetype='application/json')
 
 @app.route('/api/system/update-stream')
 def update_stream():
