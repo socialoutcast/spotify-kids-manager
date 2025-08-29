@@ -191,16 +191,18 @@ cat > /etc/sudoers.d/spotify-admin << EOF
 # Allow spotify-admin user to run system commands without password
 $ADMIN_USER ALL=(ALL) NOPASSWD: /usr/bin/apt-get update, /usr/bin/apt-get upgrade*, /usr/bin/apt-get autoremove*, /usr/bin/apt-get autoclean*
 $ADMIN_USER ALL=(ALL) NOPASSWD: /usr/bin/apt list*
-$ADMIN_USER ALL=(ALL) NOPASSWD: /bin/systemctl restart spotify-player
-$ADMIN_USER ALL=(ALL) NOPASSWD: /bin/systemctl stop spotify-player
-$ADMIN_USER ALL=(ALL) NOPASSWD: /bin/systemctl start spotify-player
-$ADMIN_USER ALL=(ALL) NOPASSWD: /bin/systemctl status spotify-player
-$ADMIN_USER ALL=(ALL) NOPASSWD: /bin/systemctl start bluetooth
-$ADMIN_USER ALL=(ALL) NOPASSWD: /bin/systemctl stop bluetooth
-$ADMIN_USER ALL=(ALL) NOPASSWD: /bin/systemctl is-active bluetooth
+$ADMIN_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart spotify-player
+$ADMIN_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop spotify-player
+$ADMIN_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl start spotify-player
+$ADMIN_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl status spotify-player
+$ADMIN_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl start bluetooth
+$ADMIN_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop bluetooth
+$ADMIN_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl is-active bluetooth
+$ADMIN_USER ALL=(ALL) NOPASSWD: /bin/systemctl*
 $ADMIN_USER ALL=(ALL) NOPASSWD: /usr/bin/bluetoothctl*
 $ADMIN_USER ALL=(ALL) NOPASSWD: /usr/sbin/rfkill*
 $ADMIN_USER ALL=(ALL) NOPASSWD: /usr/bin/journalctl*
+$ADMIN_USER ALL=(ALL) NOPASSWD: /bin/journalctl*
 $ADMIN_USER ALL=(ALL) NOPASSWD: /usr/bin/tail*
 $ADMIN_USER ALL=(ALL) NOPASSWD: /usr/bin/truncate*
 EOF
@@ -211,6 +213,7 @@ echo -e "${YELLOW}Creating application directories...${NC}"
 mkdir -p "$APP_DIR"
 mkdir -p "$CONFIG_DIR"
 mkdir -p "/var/log/spotify-kids"
+mkdir -p "/var/log/nginx"
 
 # Copy or download application files
 echo -e "${YELLOW}Installing application files...${NC}"
@@ -231,10 +234,12 @@ fi
 chown -R "$APP_USER:$APP_USER" "$APP_DIR"
 chown -R "$ADMIN_USER:$ADMIN_USER" "$APP_DIR/web"
 chown -R "$ADMIN_USER:$ADMIN_USER" "$CONFIG_DIR"
-chown -R "$ADMIN_USER:$ADMIN_USER" "/var/log/spotify-kids"
-# Player needs read access to config
-chmod 755 "$CONFIG_DIR"
-chmod 644 "$CONFIG_DIR"/* 2>/dev/null || true
+chown -R "$APP_USER:$APP_USER" "/var/log/spotify-kids"
+# Player needs read access to config, admin needs write
+chmod 775 "$CONFIG_DIR"
+chmod 664 "$CONFIG_DIR"/* 2>/dev/null || true
+# Both users need access to logs
+chmod 775 "/var/log/spotify-kids"
 
 # Configure auto-login
 echo -e "${YELLOW}Configuring auto-login...${NC}"
