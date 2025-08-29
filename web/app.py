@@ -524,22 +524,22 @@ ADMIN_TEMPLATE = '''
                         </div>
                         <div class="form-group" style="margin-top: 15px;">
                             <label>Blocked Artists (one per line)</label>
-                            <textarea id="blockedArtists" rows="3" style="font-size: 12px;">{{ parental_config.content_filter.blocked_artists|join('\n') }}</textarea>
+                            <textarea id="blockedArtists" rows="3" style="font-size: 12px;">{{ parental_config.content_filter.blocked_artists|join('\n')|e }}</textarea>
                         </div>
                         <div class="form-group">
                             <label>Blocked Genres (comma separated)</label>
-                            <input type="text" id="blockedGenres" value="{{ parental_config.content_filter.genre_blacklist|join(', ') }}">
+                            <input type="text" id="blockedGenres" value="{{ parental_config.content_filter.genre_blacklist|join(', ')|e }}">
                         </div>
                     </div>
                     <div>
                         <h3 style="font-size: 16px; margin-bottom: 10px;">Approved Content</h3>
                         <div class="form-group">
                             <label>Allowed Playlists (Spotify URIs)</label>
-                            <textarea id="allowedPlaylists" rows="4" style="font-size: 12px;" placeholder="spotify:playlist:xxxxx">{{ parental_config.content_filter.allowed_playlists|join('\n') }}</textarea>
+                            <textarea id="allowedPlaylists" rows="4" style="font-size: 12px;" placeholder="spotify:playlist:xxxxx">{{ parental_config.content_filter.allowed_playlists|join('\n')|e }}</textarea>
                         </div>
                         <div class="form-group">
                             <label>Allowed Genres (comma separated)</label>
-                            <input type="text" id="allowedGenres" value="{{ parental_config.content_filter.genre_whitelist|join(', ') }}" placeholder="pop, kids, disney">
+                            <input type="text" id="allowedGenres" value="{{ parental_config.content_filter.genre_whitelist|join(', ')|e }}" placeholder="pop, kids, disney">
                         </div>
                         <button onclick="saveContentFilter()" style="margin-top: 10px;">Save Content Settings</button>
                     </div>
@@ -816,14 +816,14 @@ ADMIN_TEMPLATE = '''
                     <div id="pairedList" style="max-height: 150px; overflow-y: auto; border: 1px solid #ddd; border-radius: 5px; padding: 10px;">
                         {% for device in paired_devices %}
                         <div class="device-item" style="padding: 8px; background: #f3f4f6; border-radius: 3px; margin-bottom: 5px; display: flex; justify-content: space-between; align-items: center;">
-                            <span>{{ device.name }} ({{ device.address }})</span>
+                            <span>{{ device.name|e }} ({{ device.address|e }})</span>
                             <div>
                                 {% if device.connected %}
-                                <button onclick="disconnectBluetooth('{{ device.address }}')" style="font-size: 12px; padding: 5px 10px;">Disconnect</button>
+                                <button onclick="disconnectBluetooth('{{ device.address|e }}')" style="font-size: 12px; padding: 5px 10px;">Disconnect</button>
                                 {% else %}
-                                <button onclick="connectBluetooth('{{ device.address }}')" style="font-size: 12px; padding: 5px 10px;">Connect</button>
+                                <button onclick="connectBluetooth('{{ device.address|e }}')" style="font-size: 12px; padding: 5px 10px;">Connect</button>
                                 {% endif %}
-                                <button onclick="removeBluetooth('{{ device.address }}')" class="danger" style="font-size: 12px; padding: 5px 10px; margin-left: 5px;">Remove</button>
+                                <button onclick="removeBluetooth('{{ device.address|e }}')" class="danger" style="font-size: 12px; padding: 5px 10px; margin-left: 5px;">Remove</button>
                             </div>
                         </div>
                         {% else %}
