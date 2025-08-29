@@ -910,10 +910,7 @@ ADMIN_TEMPLATE = '''
     
     <script>
         {% if logged_in %}
-        // Update volume display
-        document.getElementById('volumeLimit').addEventListener('input', function(e) {
-            document.getElementById('volumeValue').textContent = e.target.value + '%';
-        });
+        // Define all functions first (before DOM is ready)
         
         // Save settings functions
         function saveSpotifyConfig() {
@@ -1255,25 +1252,6 @@ ADMIN_TEMPLATE = '''
             window.location.href = '/api/logs/download';
         }
         
-        // Setup modal event listeners after DOM is ready
-        window.addEventListener('DOMContentLoaded', function() {
-            // Auto-refresh toggle for modal
-            const modalAutoRefresh = document.getElementById('modalAutoRefresh');
-            if (modalAutoRefresh) {
-                modalAutoRefresh.addEventListener('change', function(e) {
-                    if (e.target.checked && currentLogType) {
-                        clearInterval(logRefreshInterval);
-                        logRefreshInterval = setInterval(() => {
-                            loadModalLog(currentLogType);
-                        }, 5000);
-                    } else {
-                        clearInterval(logRefreshInterval);
-                        logRefreshInterval = null;
-                    }
-                });
-            }
-        });
-        
         // Close modal on ESC key
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
@@ -1501,37 +1479,87 @@ ADMIN_TEMPLATE = '''
                 .catch(err => alert('Error: ' + err));
         }
         
-        // Auto-save toggles
-        document.getElementById('explicitBlock').addEventListener('change', saveContentFilter);
-        document.getElementById('playlistApproval').addEventListener('change', saveContentFilter);
-        document.getElementById('scheduleEnabled').addEventListener('change', saveSchedule);
-        document.getElementById('remoteStop').addEventListener('change', function() {
-            fetch('/api/parental/remote-settings', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    allow_remote_stop: this.checked,
-                    allow_messages: document.getElementById('allowMessages').checked
-                })
-            });
-        });
-        document.getElementById('allowMessages').addEventListener('change', function() {
-            fetch('/api/parental/remote-settings', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    allow_remote_stop: document.getElementById('remoteStop').checked,
-                    allow_messages: this.checked
-                })
-            });
-        });
-        document.getElementById('rewardsEnabled').addEventListener('change', function() {
-            fetch('/api/parental/toggle-rewards', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({enabled: this.checked})
-            });
-        });
+        // Setup event listeners when DOM is ready
+        window.addEventListener('DOMContentLoaded', function() {
+            // Update volume display
+            const volumeLimit = document.getElementById('volumeLimit');
+            if (volumeLimit) {
+                volumeLimit.addEventListener('input', function(e) {
+                    document.getElementById('volumeValue').textContent = e.target.value + '%';
+                });
+            }
+            
+            // Auto-save toggles
+            const explicitBlock = document.getElementById('explicitBlock');
+            if (explicitBlock) {
+                explicitBlock.addEventListener('change', saveContentFilter);
+            }
+            
+            const playlistApproval = document.getElementById('playlistApproval');
+            if (playlistApproval) {
+                playlistApproval.addEventListener('change', saveContentFilter);
+            }
+            
+            const scheduleEnabled = document.getElementById('scheduleEnabled');
+            if (scheduleEnabled) {
+                scheduleEnabled.addEventListener('change', saveSchedule);
+            }
+            
+            const remoteStop = document.getElementById('remoteStop');
+            if (remoteStop) {
+                remoteStop.addEventListener('change', function() {
+                    fetch('/api/parental/remote-settings', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            allow_remote_stop: this.checked,
+                            allow_messages: document.getElementById('allowMessages').checked
+                        })
+                    });
+                });
+            }
+            
+            const allowMessages = document.getElementById('allowMessages');
+            if (allowMessages) {
+                allowMessages.addEventListener('change', function() {
+                    fetch('/api/parental/remote-settings', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            allow_remote_stop: document.getElementById('remoteStop').checked,
+                            allow_messages: this.checked
+                        })
+                    });
+                });
+            }
+            
+            const rewardsEnabled = document.getElementById('rewardsEnabled');
+            if (rewardsEnabled) {
+                rewardsEnabled.addEventListener('change', function() {
+                    fetch('/api/parental/toggle-rewards', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({enabled: this.checked})
+                    });
+                });
+            }
+            
+            // Auto-refresh toggle for modal
+            const modalAutoRefresh = document.getElementById('modalAutoRefresh');
+            if (modalAutoRefresh) {
+                modalAutoRefresh.addEventListener('change', function(e) {
+                    if (e.target.checked && currentLogType) {
+                        clearInterval(logRefreshInterval);
+                        logRefreshInterval = setInterval(() => {
+                            loadModalLog(currentLogType);
+                        }, 5000);
+                    } else {
+                        clearInterval(logRefreshInterval);
+                        logRefreshInterval = null;
+                    }
+                });
+            }
+        }); // End of DOMContentLoaded
         
         {% else %}
         function login() {
