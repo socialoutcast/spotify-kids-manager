@@ -1493,10 +1493,10 @@ def control_player(action):
     
     try:
         if action == 'restart':
-            subprocess.run(['systemctl', 'restart', 'spotify-player'], check=False)
+            subprocess.run(['sudo', 'systemctl', 'restart', 'spotify-player'], check=False)
             return jsonify({'success': True, 'message': 'Player restarting'})
         elif action == 'stop':
-            subprocess.run(['systemctl', 'stop', 'spotify-player'], check=False)
+            subprocess.run(['sudo', 'systemctl', 'stop', 'spotify-player'], check=False)
             return jsonify({'success': True, 'message': 'Player stopped'})
         elif action in ['play', 'pause', 'next']:
             # These would need to communicate with the player via IPC
