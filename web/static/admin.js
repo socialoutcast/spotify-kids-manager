@@ -360,6 +360,28 @@ async function toggleBluetooth() {
     }
 }
 
+async function enableBluetooth() {
+    const result = await apiCall('/api/bluetooth/enable', 'POST');
+    
+    if (result.success) {
+        alert('Bluetooth enabled');
+        location.reload();
+    } else {
+        alert('Failed to enable Bluetooth: ' + (result.error || 'Unknown error'));
+    }
+}
+
+async function disableBluetooth() {
+    const result = await apiCall('/api/bluetooth/disable', 'POST');
+    
+    if (result.success) {
+        alert('Bluetooth disabled');
+        location.reload();
+    } else {
+        alert('Failed to disable Bluetooth: ' + (result.error || 'Unknown error'));
+    }
+}
+
 // System functions
 async function checkUpdates() {
     document.getElementById('updateMessage').textContent = 'Checking...';
