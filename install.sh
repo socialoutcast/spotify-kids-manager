@@ -46,8 +46,8 @@ fi
 
 # Reset function
 if [ "$RESET_MODE" = true ]; then
-    echo -e "${YELLOW}RESET MODE: Removing existing installation...${NC}"
-    echo -e "${RED}This will remove all configuration and data!${NC}"
+    echo -e "${YELLOW}RESET MODE: Force removing ALL Spotify installations...${NC}"
+    echo -e "${RED}This will remove ALL configuration and data!${NC}"
     read -p "Are you sure? (yes/no): " confirm
     
     if [ "$confirm" != "yes" ]; then
@@ -55,47 +55,76 @@ if [ "$RESET_MODE" = true ]; then
         exit 0
     fi
     
-    # Stop services
-    echo -e "${YELLOW}Stopping services...${NC}"
-    systemctl stop spotify-player 2>/dev/null || true
-    systemctl stop spotify-admin 2>/dev/null || true
-    systemctl disable spotify-player 2>/dev/null || true
-    systemctl disable spotify-admin 2>/dev/null || true
+    echo -e "${YELLOW}Stopping ALL Spotify services...${NC}"
+    # Stop ANY service with spotify in the name
+    systemctl list-units --all --type=service | grep -i spotify | awk '{print $1}' | while read service; do
+        systemctl stop "$service" 2>/dev/null || true
+        systemctl disable "$service" 2>/dev/null || true
+    done
     
-    # Remove files
-    echo -e "${YELLOW}Removing files...${NC}"
-    rm -rf "$APP_DIR"
-    rm -f /etc/systemd/system/spotify-player.service
-    rm -f /etc/systemd/system/spotify-admin.service
+    echo -e "${YELLOW}Removing ALL Spotify files...${NC}"
+    # Remove ALL spotify-related directories
+    rm -rf /opt/spotify*
+    rm -rf /opt/spotify-terminal
+    rm -rf /opt/spotify-kids
+    
+    # Remove ALL service files
+    rm -f /etc/systemd/system/spotify*.service
+    rm -f /lib/systemd/system/spotify*.service
     rm -f /etc/systemd/system/getty@tty1.service.d/autologin.conf
+    
+    # Remove ALL nginx configs
+    rm -f /etc/nginx/sites-available/spotify*
+    rm -f /etc/nginx/sites-enabled/spotify*
     rm -f /etc/nginx/sites-available/spotify-admin
     rm -f /etc/nginx/sites-enabled/spotify-admin
-    rm -f /etc/sudoers.d/spotify-admin
-    rm -f /usr/local/bin/spotify-kids-uninstall
+    
+    # Restore default nginx site if needed
+    if [ ! -f /etc/nginx/sites-enabled/default ] && [ -f /etc/nginx/sites-available/default ]; then
+        ln -s /etc/nginx/sites-available/default /etc/nginx/sites-enabled/
+    fi
+    
+    # Remove ALL sudoers entries
+    rm -f /etc/sudoers.d/spotify*
+    
+    # Remove ALL uninstall scripts
+    rm -f /usr/local/bin/spotify*
+    
+    # Remove X11 configs we may have added
     rm -f /etc/X11/xorg.conf.d/99-calibration.conf
     
-    # Remove users
-    echo -e "${YELLOW}Removing users...${NC}"
-    if id "$APP_USER" &>/dev/null; then
-        # Kill all processes owned by the user
-        pkill -u "$APP_USER" 2>/dev/null || true
-        sleep 2
-        userdel "$APP_USER" 2>/dev/null || true
-        rm -rf "/home/$APP_USER"
-    fi
+    echo -e "${YELLOW}Removing ALL Spotify users...${NC}"
+    # Remove ANY user with spotify in the name
+    for user in spotify-kids spotify-admin spotify-terminal; do
+        if id "$user" &>/dev/null; then
+            pkill -u "$user" 2>/dev/null || true
+            sleep 1
+            userdel -r "$user" 2>/dev/null || true
+        fi
+    done
     
-    if id "spotify-admin" &>/dev/null; then
-        pkill -u "spotify-admin" 2>/dev/null || true
-        sleep 2
-        userdel "spotify-admin" 2>/dev/null || true
-    fi
+    # Clean up home directories
+    rm -rf /home/spotify*
     
     # Clean up logs
-    rm -rf /var/log/spotify-kids
+    rm -rf /var/log/spotify*
     
+    # Clean up any .bash_profile or .xinitrc we created
+    for homedir in /home/*; do
+        if [ -f "$homedir/.xinitrc" ] && grep -q "spotify" "$homedir/.xinitrc" 2>/dev/null; then
+            rm -f "$homedir/.xinitrc"
+        fi
+        if [ -f "$homedir/.bash_profile" ] && grep -q "spotify" "$homedir/.bash_profile" 2>/dev/null; then
+            rm -f "$homedir/.bash_profile"
+        fi
+    done
+    
+    # Reload everything
     systemctl daemon-reload
+    systemctl restart nginx 2>/dev/null || true
     
-    echo -e "${GREEN}Reset complete. Starting fresh installation...${NC}"
+    echo -e "${GREEN}COMPLETE RESET DONE! All Spotify installations removed.${NC}"
+    echo -e "${GREEN}Starting fresh installation...${NC}"
     echo ""
     sleep 2
 fi
