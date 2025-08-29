@@ -127,8 +127,11 @@ fi
 
 # Update system
 echo -e "${YELLOW}Updating system packages...${NC}"
+echo "Running apt-get update..."
 apt-get update || true
+echo "Running apt-get upgrade..."
 DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -q || true
+echo "System update complete"
 
 # Install dependencies
 echo -e "${YELLOW}Installing dependencies...${NC}"
@@ -177,8 +180,9 @@ chown $APP_USER:$APP_USER /home/$APP_USER
 ADMIN_USER="spotify-admin"
 echo -e "${YELLOW}Creating admin user for web panel...${NC}"
 if ! id "$ADMIN_USER" &>/dev/null; then
-    useradd -r -s /bin/false "$ADMIN_USER"
-    usermod -aG sudo "$ADMIN_USER"
+    useradd -r -M -s /bin/false "$ADMIN_USER"
+else
+    echo "User $ADMIN_USER already exists"
 fi
 
 # Add sudo permissions for admin user only
