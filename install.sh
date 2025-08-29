@@ -31,6 +31,19 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
+# Clean up old spotify-terminal installation if exists
+if [ -d "/opt/spotify-terminal" ] || systemctl list-units --all | grep -q "spotify-terminal"; then
+    echo -e "${YELLOW}Found old spotify-terminal installation. Cleaning up...${NC}"
+    systemctl stop spotify-terminal-admin 2>/dev/null || true
+    systemctl stop spotify-terminal 2>/dev/null || true
+    systemctl disable spotify-terminal-admin 2>/dev/null || true
+    systemctl disable spotify-terminal 2>/dev/null || true
+    rm -f /etc/systemd/system/spotify-terminal*.service
+    rm -rf /opt/spotify-terminal
+    rm -f /etc/nginx/sites-*/spotify-terminal
+    systemctl daemon-reload
+fi
+
 # Reset function
 if [ "$RESET_MODE" = true ]; then
     echo -e "${YELLOW}RESET MODE: Removing existing installation...${NC}"
