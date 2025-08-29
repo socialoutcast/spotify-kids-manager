@@ -48,6 +48,11 @@ sudo userdel spotify-kids 2>/dev/null || true
 sudo userdel spotify-admin 2>/dev/null || true
 sudo userdel spotify-terminal 2>/dev/null || true
 
+# Remove groups (after users are removed)
+sudo groupdel spotify-kids 2>/dev/null || true
+sudo groupdel spotify-admin 2>/dev/null || true
+sudo groupdel spotify-terminal 2>/dev/null || true
+
 # Clean home directories
 sudo rm -rf /home/spotify*
 
