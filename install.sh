@@ -111,8 +111,7 @@ install_dependencies() {
         xserver-xorg \
         xserver-xorg-input-libinput \
         unclutter \
-        xinput \
-        chromium-browser
+        xinput
     
     # Additional packages for native player
     apt-get install -y \
@@ -771,7 +770,6 @@ else
     cd /opt/spotify-terminal
     
     # Kill any existing instances
-    pkill -f chromium 2>/dev/null
     pkill -f spotify_player.py 2>/dev/null
     sleep 1
     
@@ -3303,13 +3301,11 @@ uninstall_all() {
     pkill -9 -f "app.py" 2>/dev/null || true
     pkill -9 -f "ncspot" 2>/dev/null || true
     pkill -9 -f "spotify_player.py" 2>/dev/null || true
-    pkill -9 -f "chromium" 2>/dev/null || true
     pkill -9 -f "start-web-player" 2>/dev/null || true
     pkill -9 -f "start-touchscreen" 2>/dev/null || true
     pkill -9 -u "$SPOTIFY_USER" 2>/dev/null || true
     
     # Clean up any lingering browser processes
-    pkill -9 chromium-browser 2>/dev/null || true
     pkill -9 chrome 2>/dev/null || true
     
     # Find and remove ALL users created by our system
@@ -3556,7 +3552,6 @@ main() {
         pkill -f "app.py" 2>/dev/null || true
         pkill -f "ncspot" 2>/dev/null || true
         pkill -f "spotify_player.py" 2>/dev/null || true
-        pkill -f "chromium" 2>/dev/null || true
         pkill -u "$SPOTIFY_USER" 2>/dev/null || true
         
         # Find and remove ALL users created by our system
