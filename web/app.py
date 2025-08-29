@@ -7,9 +7,11 @@ import os
 import json
 import subprocess
 import psutil
-from datetime import datetime
+from datetime import datetime, timedelta
 import threading
 import queue
+import time
+import uuid
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.urandom(24)
@@ -19,6 +21,10 @@ CORS(app)
 CONFIG_DIR = os.environ.get('SPOTIFY_CONFIG_DIR', '/opt/spotify-kids/config')
 CONFIG_FILE = os.path.join(CONFIG_DIR, 'admin_config.json')
 SPOTIFY_CONFIG_FILE = os.path.join(CONFIG_DIR, 'spotify_config.json')
+PARENTAL_CONFIG_FILE = os.path.join(CONFIG_DIR, 'parental_controls.json')
+USAGE_STATS_FILE = os.path.join(CONFIG_DIR, 'usage_stats.json')
+SCHEDULE_FILE = os.path.join(CONFIG_DIR, 'schedule.json')
+REWARDS_FILE = os.path.join(CONFIG_DIR, 'rewards.json')
 
 # Default admin credentials
 DEFAULT_ADMIN_USER = 'admin'
@@ -65,6 +71,131 @@ def save_spotify_config(config):
     os.makedirs(CONFIG_DIR, exist_ok=True)
     with open(SPOTIFY_CONFIG_FILE, 'w') as f:
         json.dump(config, f, indent=2)
+
+def load_parental_config():
+    """Load parental control configuration"""
+    if os.path.exists(PARENTAL_CONFIG_FILE):
+        with open(PARENTAL_CONFIG_FILE, 'r') as f:
+            return json.load(f)
+    else:
+        # Default parental control settings
+        default_config = {
+            'content_filter': {
+                'explicit_blocked': True,
+                'blocked_artists': [],
+                'blocked_songs': [],
+                'blocked_albums': [],
+                'allowed_playlists': [],
+                'genre_whitelist': [],
+                'genre_blacklist': ['death metal', 'black metal'],
+                'require_playlist_approval': False
+            },
+            'listening_limits': {
+                'daily_limit_minutes': 120,
+                'session_limit_minutes': 60,
+                'break_time_minutes': 30,
+                'volume_max': 85,
+                'skip_limit_per_hour': 20
+            },
+            'remote_control': {
+                'allow_remote_stop': True,
+                'allow_messages': True,
+                'emergency_contacts': [],
+                'screenshot_enabled': False
+            }
+        }
+        save_parental_config(default_config)
+        return default_config
+
+def save_parental_config(config):
+    """Save parental control configuration"""
+    os.makedirs(CONFIG_DIR, exist_ok=True)
+    with open(PARENTAL_CONFIG_FILE, 'w') as f:
+        json.dump(config, f, indent=2)
+
+def load_usage_stats():
+    """Load usage statistics"""
+    if os.path.exists(USAGE_STATS_FILE):
+        with open(USAGE_STATS_FILE, 'r') as f:
+            return json.load(f)
+    else:
+        return {
+            'sessions': [],
+            'total_minutes_today': 0,
+            'last_reset': datetime.now().isoformat(),
+            'favorite_songs': {},
+            'skip_count': {},
+            'daily_history': []
+        }
+
+def save_usage_stats(stats):
+    """Save usage statistics"""
+    os.makedirs(CONFIG_DIR, exist_ok=True)
+    with open(USAGE_STATS_FILE, 'w') as f:
+        json.dump(stats, f, indent=2)
+
+def load_schedule():
+    """Load listening schedule"""
+    if os.path.exists(SCHEDULE_FILE):
+        with open(SCHEDULE_FILE, 'r') as f:
+            return json.load(f)
+    else:
+        # Default schedule - weekday and weekend times
+        default_schedule = {
+            'enabled': False,
+            'weekday': {
+                'morning': {'start': '07:00', 'end': '08:30'},
+                'afternoon': {'start': '15:00', 'end': '17:00'},
+                'evening': {'start': '18:30', 'end': '20:00'}
+            },
+            'weekend': {
+                'morning': {'start': '08:00', 'end': '10:00'},
+                'afternoon': {'start': '14:00', 'end': '17:00'},
+                'evening': {'start': '18:00', 'end': '20:30'}
+            },
+            'blackout_dates': [],
+            'special_occasions': []
+        }
+        save_schedule(default_schedule)
+        return default_schedule
+
+def save_schedule(schedule):
+    """Save listening schedule"""
+    os.makedirs(CONFIG_DIR, exist_ok=True)
+    with open(SCHEDULE_FILE, 'w') as f:
+        json.dump(schedule, f, indent=2)
+
+def load_rewards():
+    """Load rewards configuration"""
+    if os.path.exists(REWARDS_FILE):
+        with open(REWARDS_FILE, 'r') as f:
+            return json.load(f)
+    else:
+        default_rewards = {
+            'enabled': False,
+            'points': 0,
+            'achievements': [],
+            'rewards_available': [
+                {'name': 'Extra 30 minutes', 'cost': 10, 'type': 'time_bonus', 'value': 30},
+                {'name': 'Skip limit +5', 'cost': 5, 'type': 'skip_bonus', 'value': 5},
+                {'name': 'Choose any playlist', 'cost': 15, 'type': 'playlist_unlock', 'value': 1}
+            ],
+            'point_rules': {
+                'per_minute_listened': 0.1,
+                'daily_login': 5,
+                'no_skips_bonus': 3,
+                'good_behavior': 10
+            },
+            'redeemed_today': []
+        }
+        save_rewards(default_rewards)
+        return default_rewards
+
+def save_rewards(rewards):
+    """Save rewards configuration"""
+    os.makedirs(CONFIG_DIR, exist_ok=True)
+    with open(REWARDS_FILE, 'w') as f:
+        json.dump(rewards, f, indent=2)
 
 # HTML Template
 ADMIN_TEMPLATE = '''
@@ -407,6 +538,219 @@ ADMIN_TEMPLATE = '''
                 </div>
                 <div id="logOutput" style="background: #1e1e1e; color: #00ff00; font-family: 'Courier New', monospace; font-size: 11px; padding: 15px; border-radius: 5px; height: 400px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word;">
                     Select a log type to view...
+                </div>
+            </div>
+            
+            <!-- Content Filtering -->
+            <div class="card" style="grid-column: span 2;">
+                <h2>🚫 Content Filtering & Parental Controls</h2>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div>
+                        <h3 style="font-size: 16px; margin-bottom: 10px;">Content Restrictions</h3>
+                        <div class="toggle">
+                            <label>Block Explicit Content</label>
+                            <label class="switch">
+                                <input type="checkbox" id="explicitBlock" {{ 'checked' if parental_config.content_filter.explicit_blocked else '' }}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="toggle" style="margin-top: 10px;">
+                            <label>Require Playlist Approval</label>
+                            <label class="switch">
+                                <input type="checkbox" id="playlistApproval" {{ 'checked' if parental_config.content_filter.require_playlist_approval else '' }}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="form-group" style="margin-top: 15px;">
+                            <label>Blocked Artists (one per line)</label>
+                            <textarea id="blockedArtists" rows="3" style="font-size: 12px;">{{ '\\n'.join(parental_config.content_filter.blocked_artists) }}</textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Blocked Genres (comma separated)</label>
+                            <input type="text" id="blockedGenres" value="{{ ', '.join(parental_config.content_filter.genre_blacklist) }}">
+                        </div>
+                    </div>
+                    <div>
+                        <h3 style="font-size: 16px; margin-bottom: 10px;">Approved Content</h3>
+                        <div class="form-group">
+                            <label>Allowed Playlists (Spotify URIs)</label>
+                            <textarea id="allowedPlaylists" rows="4" style="font-size: 12px;" placeholder="spotify:playlist:xxxxx">{{ '\\n'.join(parental_config.content_filter.allowed_playlists) }}</textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Allowed Genres (comma separated)</label>
+                            <input type="text" id="allowedGenres" value="{{ ', '.join(parental_config.content_filter.genre_whitelist) }}" placeholder="pop, kids, disney">
+                        </div>
+                        <button onclick="saveContentFilter()" style="margin-top: 10px;">Save Content Settings</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Usage Statistics -->
+            <div class="card" style="grid-column: span 2;">
+                <h2>📊 Usage Statistics & History</h2>
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px;">
+                    <div class="stat">
+                        <div class="stat-value">{{ usage_stats.total_minutes_today }}</div>
+                        <div class="stat-label">Minutes Today</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">{{ current_session_time }}</div>
+                        <div class="stat-label">Current Session</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">{{ len(usage_stats.sessions) }}</div>
+                        <div class="stat-label">Sessions Today</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">{{ total_skips_today }}</div>
+                        <div class="stat-label">Skips Today</div>
+                    </div>
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <h3 style="font-size: 16px; margin-bottom: 10px;">Most Played Songs</h3>
+                    <div style="max-height: 200px; overflow-y: auto; border: 1px solid #ddd; border-radius: 5px; padding: 10px;">
+                        {% for song, count in top_songs %}
+                        <div class="playlist-item">
+                            <span>{{ song }}</span>
+                            <span style="color: #667eea; font-weight: bold;">{{ count }} plays</span>
+                        </div>
+                        {% else %}
+                        <p style="color: #999; font-size: 12px;">No play history yet</p>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button onclick="exportUsageStats()">Export History (CSV)</button>
+                    <button onclick="clearUsageStats()" class="danger">Clear History</button>
+                    <button onclick="refreshUsageStats()">Refresh Stats</button>
+                </div>
+            </div>
+            
+            <!-- Scheduling -->
+            <div class="card">
+                <h2>📅 Listening Schedule</h2>
+                <div class="toggle">
+                    <label>Enable Schedule</label>
+                    <label class="switch">
+                        <input type="checkbox" id="scheduleEnabled" {{ 'checked' if schedule.enabled else '' }}>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div style="margin-top: 15px;">
+                    <h3 style="font-size: 14px; margin-bottom: 10px;">Weekday Schedule</h3>
+                    <div class="form-group">
+                        <label>Morning</label>
+                        <div style="display: flex; gap: 10px;">
+                            <input type="time" id="weekdayMorningStart" value="{{ schedule.weekday.morning.start }}" style="flex: 1;">
+                            <span style="align-self: center;">to</span>
+                            <input type="time" id="weekdayMorningEnd" value="{{ schedule.weekday.morning.end }}" style="flex: 1;">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Afternoon</label>
+                        <div style="display: flex; gap: 10px;">
+                            <input type="time" id="weekdayAfternoonStart" value="{{ schedule.weekday.afternoon.start }}" style="flex: 1;">
+                            <span style="align-self: center;">to</span>
+                            <input type="time" id="weekdayAfternoonEnd" value="{{ schedule.weekday.afternoon.end }}" style="flex: 1;">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Evening</label>
+                        <div style="display: flex; gap: 10px;">
+                            <input type="time" id="weekdayEveningStart" value="{{ schedule.weekday.evening.start }}" style="flex: 1;">
+                            <span style="align-self: center;">to</span>
+                            <input type="time" id="weekdayEveningEnd" value="{{ schedule.weekday.evening.end }}" style="flex: 1;">
+                        </div>
+                    </div>
+                </div>
+                <button onclick="saveSchedule()">Save Schedule</button>
+            </div>
+            
+            <!-- Listening Limits -->
+            <div class="card">
+                <h2>⏱️ Listening Limits</h2>
+                <div class="form-group">
+                    <label>Daily Limit (minutes)</label>
+                    <input type="number" id="dailyLimit" value="{{ parental_config.listening_limits.daily_limit_minutes }}" min="0" max="480">
+                </div>
+                <div class="form-group">
+                    <label>Session Limit (minutes)</label>
+                    <input type="number" id="sessionLimit" value="{{ parental_config.listening_limits.session_limit_minutes }}" min="0" max="240">
+                </div>
+                <div class="form-group">
+                    <label>Break Time (minutes)</label>
+                    <input type="number" id="breakTime" value="{{ parental_config.listening_limits.break_time_minutes }}" min="0" max="120">
+                </div>
+                <div class="form-group">
+                    <label>Skip Limit (per hour)</label>
+                    <input type="number" id="skipLimit" value="{{ parental_config.listening_limits.skip_limit_per_hour }}" min="0" max="100">
+                </div>
+                <button onclick="saveLimits()">Save Limits</button>
+                <div style="margin-top: 15px; padding: 10px; background: #f3f4f6; border-radius: 5px;">
+                    <p style="font-size: 12px; color: #666;">
+                        Time remaining today: <strong id="timeRemaining">{{ time_remaining }} minutes</strong>
+                    </p>
+                </div>
+            </div>
+            
+            <!-- Remote Management -->
+            <div class="card">
+                <h2>📱 Remote Management</h2>
+                <div class="toggle">
+                    <label>Emergency Stop</label>
+                    <label class="switch">
+                        <input type="checkbox" id="remoteStop" {{ 'checked' if parental_config.remote_control.allow_remote_stop else '' }}>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="toggle" style="margin-top: 10px;">
+                    <label>Send Messages</label>
+                    <label class="switch">
+                        <input type="checkbox" id="allowMessages" {{ 'checked' if parental_config.remote_control.allow_messages else '' }}>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="form-group" style="margin-top: 15px;">
+                    <label>Send Message to Player</label>
+                    <textarea id="playerMessage" rows="2" placeholder="Time for dinner!"></textarea>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button onclick="sendMessage()">Send Message</button>
+                    <button onclick="emergencyStop()" class="danger">Emergency Stop</button>
+                </div>
+                <button onclick="takeScreenshot()" style="margin-top: 10px; width: 100%;">Take Screenshot</button>
+            </div>
+            
+            <!-- Rewards System -->
+            <div class="card">
+                <h2>🏆 Rewards & Achievements</h2>
+                <div class="toggle">
+                    <label>Enable Rewards</label>
+                    <label class="switch">
+                        <input type="checkbox" id="rewardsEnabled" {{ 'checked' if rewards.enabled else '' }}>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div style="margin-top: 15px;">
+                    <div class="stat" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                        <div class="stat-value" style="color: white;">{{ rewards.points }}</div>
+                        <div class="stat-label" style="color: white;">Points Earned</div>
+                    </div>
+                </div>
+                <div style="margin-top: 15px;">
+                    <h3 style="font-size: 14px; margin-bottom: 10px;">Available Rewards</h3>
+                    <div style="max-height: 150px; overflow-y: auto;">
+                        {% for reward in rewards.rewards_available %}
+                        <div class="playlist-item">
+                            <span>{{ reward.name }}</span>
+                            <span style="color: #667eea;">{{ reward.cost }} points</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 15px;">
+                    <button onclick="addBonusPoints()">Add Bonus Points</button>
+                    <button onclick="resetPoints()" class="danger">Reset Points</button>
                 </div>
             </div>
             
@@ -757,6 +1101,205 @@ ADMIN_TEMPLATE = '''
             }
         });
         
+        // Parental Control Functions
+        function saveContentFilter() {
+            const config = {
+                explicit_blocked: document.getElementById('explicitBlock').checked,
+                require_playlist_approval: document.getElementById('playlistApproval').checked,
+                blocked_artists: document.getElementById('blockedArtists').value.split('\n').filter(a => a.trim()),
+                genre_blacklist: document.getElementById('blockedGenres').value.split(',').map(g => g.trim()).filter(g => g),
+                allowed_playlists: document.getElementById('allowedPlaylists').value.split('\n').filter(p => p.trim()),
+                genre_whitelist: document.getElementById('allowedGenres').value.split(',').map(g => g.trim()).filter(g => g)
+            };
+            
+            fetch('/api/parental/content-filter', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(config)
+            })
+            .then(r => r.json())
+            .then(data => {
+                alert(data.message || 'Content filter saved');
+            })
+            .catch(err => alert('Error: ' + err));
+        }
+        
+        function saveSchedule() {
+            const schedule = {
+                enabled: document.getElementById('scheduleEnabled').checked,
+                weekday: {
+                    morning: {
+                        start: document.getElementById('weekdayMorningStart').value,
+                        end: document.getElementById('weekdayMorningEnd').value
+                    },
+                    afternoon: {
+                        start: document.getElementById('weekdayAfternoonStart').value,
+                        end: document.getElementById('weekdayAfternoonEnd').value
+                    },
+                    evening: {
+                        start: document.getElementById('weekdayEveningStart').value,
+                        end: document.getElementById('weekdayEveningEnd').value
+                    }
+                }
+            };
+            
+            fetch('/api/parental/schedule', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(schedule)
+            })
+            .then(r => r.json())
+            .then(data => {
+                alert(data.message || 'Schedule saved');
+            })
+            .catch(err => alert('Error: ' + err));
+        }
+        
+        function saveLimits() {
+            const limits = {
+                daily_limit_minutes: parseInt(document.getElementById('dailyLimit').value),
+                session_limit_minutes: parseInt(document.getElementById('sessionLimit').value),
+                break_time_minutes: parseInt(document.getElementById('breakTime').value),
+                skip_limit_per_hour: parseInt(document.getElementById('skipLimit').value)
+            };
+            
+            fetch('/api/parental/limits', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(limits)
+            })
+            .then(r => r.json())
+            .then(data => {
+                alert(data.message || 'Limits saved');
+            })
+            .catch(err => alert('Error: ' + err));
+        }
+        
+        function sendMessage() {
+            const message = document.getElementById('playerMessage').value;
+            if (!message.trim()) {
+                alert('Please enter a message');
+                return;
+            }
+            
+            fetch('/api/parental/send-message', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({message: message})
+            })
+            .then(r => r.json())
+            .then(data => {
+                alert(data.message || 'Message sent');
+                document.getElementById('playerMessage').value = '';
+            })
+            .catch(err => alert('Error: ' + err));
+        }
+        
+        function emergencyStop() {
+            if (!confirm('Stop music playback immediately?')) return;
+            
+            fetch('/api/parental/emergency-stop', {method: 'POST'})
+                .then(r => r.json())
+                .then(data => {
+                    alert(data.message || 'Emergency stop activated');
+                })
+                .catch(err => alert('Error: ' + err));
+        }
+        
+        function takeScreenshot() {
+            fetch('/api/parental/screenshot', {method: 'POST'})
+                .then(r => r.json())
+                .then(data => {
+                    if (data.screenshot) {
+                        window.open(data.screenshot, '_blank');
+                    } else {
+                        alert('Screenshot captured');
+                    }
+                })
+                .catch(err => alert('Error: ' + err));
+        }
+        
+        function exportUsageStats() {
+            window.location.href = '/api/parental/export-stats';
+        }
+        
+        function clearUsageStats() {
+            if (!confirm('Clear all usage history?')) return;
+            
+            fetch('/api/parental/clear-stats', {method: 'POST'})
+                .then(r => r.json())
+                .then(data => {
+                    alert(data.message || 'Stats cleared');
+                    location.reload();
+                })
+                .catch(err => alert('Error: ' + err));
+        }
+        
+        function refreshUsageStats() {
+            location.reload();
+        }
+        
+        function addBonusPoints() {
+            const points = prompt('How many bonus points to add?', '10');
+            if (!points) return;
+            
+            fetch('/api/parental/add-points', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({points: parseInt(points)})
+            })
+            .then(r => r.json())
+            .then(data => {
+                alert(data.message || 'Points added');
+                location.reload();
+            })
+            .catch(err => alert('Error: ' + err));
+        }
+        
+        function resetPoints() {
+            if (!confirm('Reset all points to 0?')) return;
+            
+            fetch('/api/parental/reset-points', {method: 'POST'})
+                .then(r => r.json())
+                .then(data => {
+                    alert(data.message || 'Points reset');
+                    location.reload();
+                })
+                .catch(err => alert('Error: ' + err));
+        }
+        
+        // Auto-save toggles
+        document.getElementById('explicitBlock').addEventListener('change', saveContentFilter);
+        document.getElementById('playlistApproval').addEventListener('change', saveContentFilter);
+        document.getElementById('scheduleEnabled').addEventListener('change', saveSchedule);
+        document.getElementById('remoteStop').addEventListener('change', function() {
+            fetch('/api/parental/remote-settings', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    allow_remote_stop: this.checked,
+                    allow_messages: document.getElementById('allowMessages').checked
+                })
+            });
+        });
+        document.getElementById('allowMessages').addEventListener('change', function() {
+            fetch('/api/parental/remote-settings', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    allow_remote_stop: document.getElementById('remoteStop').checked,
+                    allow_messages: this.checked
+                })
+            });
+        });
+        document.getElementById('rewardsEnabled').addEventListener('change', function() {
+            fetch('/api/parental/toggle-rewards', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({enabled: this.checked})
+            });
+        });
+        
         {% else %}
         function login() {
             fetch('/api/login', {
@@ -824,6 +1367,10 @@ def index():
     """Main admin panel page"""
     config = load_config()
     spotify_config = load_spotify_config()
+    parental_config = load_parental_config()
+    usage_stats = load_usage_stats()
+    schedule = load_schedule()
+    rewards = load_rewards()
     
     # Check if player is running
     player_status = False
@@ -842,17 +1389,46 @@ def index():
     # Get Bluetooth status
     bluetooth_enabled, paired_devices = get_bluetooth_status()
     
+    # Calculate usage statistics
+    current_session_time = 0
+    if usage_stats.get('sessions'):
+        last_session = usage_stats['sessions'][-1]
+        if not last_session.get('end'):
+            # Session is ongoing
+            start_time = datetime.fromisoformat(last_session['start'])
+            current_session_time = int((datetime.now() - start_time).total_seconds() / 60)
+    
+    # Get top songs
+    top_songs = sorted(usage_stats.get('favorite_songs', {}).items(), 
+                      key=lambda x: x[1], reverse=True)[:10]
+    
+    # Calculate total skips today
+    total_skips_today = sum(usage_stats.get('skip_count', {}).values())
+    
+    # Calculate time remaining
+    time_remaining = parental_config['listening_limits']['daily_limit_minutes'] - usage_stats.get('total_minutes_today', 0)
+    time_remaining = max(0, time_remaining)
+    
     return render_template_string(ADMIN_TEMPLATE,
                                  logged_in='logged_in' in session,
                                  config=config,
                                  spotify_config=spotify_config,
+                                 parental_config=parental_config,
+                                 usage_stats=usage_stats,
+                                 schedule=schedule,
+                                 rewards=rewards,
                                  player_status=player_status,
                                  cpu_usage=cpu_usage,
                                  memory_usage=memory_usage,
                                  disk_usage=disk_usage,
                                  uptime=uptime,
                                  bluetooth_enabled=bluetooth_enabled,
-                                 paired_devices=paired_devices)
+                                 paired_devices=paired_devices,
+                                 current_session_time=current_session_time,
+                                 top_songs=top_songs,
+                                 total_skips_today=total_skips_today,
+                                 time_remaining=time_remaining,
+                                 len=len)
 
 @app.route('/api/login', methods=['POST'])
 def login():
@@ -1323,6 +1899,215 @@ def download_logs():
         return f"Error generating log file: {str(e)}", 500
 
 import time
+
+# Parental Control API Endpoints
+@app.route('/api/parental/content-filter', methods=['POST'])
+def update_content_filter():
+    """Update content filter settings"""
+    if 'logged_in' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    data = request.json
+    config = load_parental_config()
+    config['content_filter'].update(data)
+    save_parental_config(config)
+    
+    return jsonify({'success': True, 'message': 'Content filter updated'})
+
+@app.route('/api/parental/schedule', methods=['POST'])
+def update_schedule():
+    """Update listening schedule"""
+    if 'logged_in' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    data = request.json
+    schedule = load_schedule()
+    schedule['enabled'] = data.get('enabled', schedule['enabled'])
+    if 'weekday' in data:
+        schedule['weekday'] = data['weekday']
+    if 'weekend' in data:
+        schedule['weekend'] = data.get('weekend', schedule['weekend'])
+    save_schedule(schedule)
+    
+    return jsonify({'success': True, 'message': 'Schedule updated'})
+
+@app.route('/api/parental/limits', methods=['POST'])
+def update_limits():
+    """Update listening limits"""
+    if 'logged_in' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    data = request.json
+    config = load_parental_config()
+    config['listening_limits'].update(data)
+    save_parental_config(config)
+    
+    return jsonify({'success': True, 'message': 'Limits updated'})
+
+@app.route('/api/parental/send-message', methods=['POST'])
+def send_message_to_player():
+    """Send a message to the player screen"""
+    if 'logged_in' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    data = request.json
+    message = data.get('message', '')
+    
+    if not message:
+        return jsonify({'error': 'No message provided'}), 400
+    
+    # Save message to a file that the player can read
+    message_file = os.path.join(CONFIG_DIR, 'parent_message.json')
+    with open(message_file, 'w') as f:
+        json.dump({
+            'message': message,
+            'timestamp': datetime.now().isoformat(),
+            'id': str(uuid.uuid4())
+        }, f)
+    
+    return jsonify({'success': True, 'message': 'Message sent to player'})
+
+@app.route('/api/parental/emergency-stop', methods=['POST'])
+def emergency_stop():
+    """Emergency stop playback"""
+    if 'logged_in' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    config = load_parental_config()
+    if not config['remote_control']['allow_remote_stop']:
+        return jsonify({'error': 'Remote stop is disabled'}), 403
+    
+    # Create emergency stop file
+    stop_file = os.path.join(CONFIG_DIR, 'emergency_stop')
+    with open(stop_file, 'w') as f:
+        f.write(datetime.now().isoformat())
+    
+    # Also stop the service
+    subprocess.run(['sudo', 'systemctl', 'stop', 'spotify-player'], check=False)
+    
+    return jsonify({'success': True, 'message': 'Emergency stop activated'})
+
+@app.route('/api/parental/screenshot', methods=['POST'])
+def take_screenshot():
+    """Take a screenshot of the player"""
+    if 'logged_in' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    try:
+        # Take screenshot using scrot or similar
+        screenshot_path = f'/tmp/screenshot_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png'
+        result = subprocess.run(['DISPLAY=:0', 'scrot', screenshot_path], 
+                              capture_output=True, text=True, shell=True)
+        
+        if os.path.exists(screenshot_path):
+            # Could encode to base64 and return, or save to accessible location
+            return jsonify({'success': True, 'message': 'Screenshot captured', 'path': screenshot_path})
+        else:
+            return jsonify({'error': 'Screenshot failed'}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/parental/export-stats')
+def export_usage_stats():
+    """Export usage statistics as CSV"""
+    if 'logged_in' not in session:
+        return 'Not authenticated', 401
+    
+    stats = load_usage_stats()
+    
+    # Create CSV content
+    csv_lines = ['Date,Session Start,Session End,Duration (min),Songs Played,Skips']
+    
+    for session in stats.get('sessions', []):
+        start = session.get('start', '')
+        end = session.get('end', 'Ongoing')
+        duration = session.get('duration_minutes', 0)
+        songs = session.get('songs_played', 0)
+        skips = session.get('skips', 0)
+        date = start.split('T')[0] if 'T' in start else start
+        
+        csv_lines.append(f'{date},{start},{end},{duration},{songs},{skips}')
+    
+    csv_content = '\n'.join(csv_lines)
+    
+    response = Response(csv_content, mimetype='text/csv')
+    response.headers['Content-Disposition'] = f'attachment; filename=usage_stats_{datetime.now().strftime("%Y%m%d")}.csv'
+    return response
+
+@app.route('/api/parental/clear-stats', methods=['POST'])
+def clear_usage_stats():
+    """Clear usage statistics"""
+    if 'logged_in' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    # Reset stats but keep structure
+    stats = {
+        'sessions': [],
+        'total_minutes_today': 0,
+        'last_reset': datetime.now().isoformat(),
+        'favorite_songs': {},
+        'skip_count': {},
+        'daily_history': []
+    }
+    save_usage_stats(stats)
+    
+    return jsonify({'success': True, 'message': 'Statistics cleared'})
+
+@app.route('/api/parental/add-points', methods=['POST'])
+def add_bonus_points():
+    """Add bonus points to rewards"""
+    if 'logged_in' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    data = request.json
+    points = data.get('points', 0)
+    
+    rewards = load_rewards()
+    rewards['points'] += points
+    save_rewards(rewards)
+    
+    return jsonify({'success': True, 'message': f'{points} points added'})
+
+@app.route('/api/parental/reset-points', methods=['POST'])
+def reset_points():
+    """Reset reward points"""
+    if 'logged_in' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    rewards = load_rewards()
+    rewards['points'] = 0
+    rewards['achievements'] = []
+    rewards['redeemed_today'] = []
+    save_rewards(rewards)
+    
+    return jsonify({'success': True, 'message': 'Points reset'})
+
+@app.route('/api/parental/remote-settings', methods=['POST'])
+def update_remote_settings():
+    """Update remote control settings"""
+    if 'logged_in' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    data = request.json
+    config = load_parental_config()
+    config['remote_control']['allow_remote_stop'] = data.get('allow_remote_stop', config['remote_control']['allow_remote_stop'])
+    config['remote_control']['allow_messages'] = data.get('allow_messages', config['remote_control']['allow_messages'])
+    save_parental_config(config)
+    
+    return jsonify({'success': True, 'message': 'Remote settings updated'})
+
+@app.route('/api/parental/toggle-rewards', methods=['POST'])
+def toggle_rewards():
+    """Toggle rewards system"""
+    if 'logged_in' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    data = request.json
+    rewards = load_rewards()
+    rewards['enabled'] = data.get('enabled', rewards['enabled'])
+    save_rewards(rewards)
+    
+    return jsonify({'success': True, 'message': 'Rewards system updated'})
 
 if __name__ == '__main__':
     os.makedirs(CONFIG_DIR, exist_ok=True)

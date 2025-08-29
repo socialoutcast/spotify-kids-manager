@@ -150,7 +150,8 @@ apt-get install -y \
     bluez \
     bluez-tools \
     pulseaudio-module-bluetooth \
-    rfkill
+    rfkill \
+    scrot
 
 # Install Python packages
 echo -e "${YELLOW}Installing Python packages...${NC}"
