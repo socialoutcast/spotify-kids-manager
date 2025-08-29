@@ -27,8 +27,15 @@ REDIRECT_URI = 'http://localhost:8888/callback'
 DEBUG_MODE = os.environ.get('SPOTIFY_DEBUG', 'true').lower() == 'true'  # Enable debug by default
 
 # Setup logging
-os.makedirs(LOG_DIR, exist_ok=True)
-log_file = os.path.join(LOG_DIR, 'player.log')
+try:
+    os.makedirs(LOG_DIR, exist_ok=True)
+    log_file = os.path.join(LOG_DIR, 'player.log')
+except PermissionError:
+    # Fallback to /tmp if no permission
+    LOG_DIR = '/tmp/spotify-kids'
+    os.makedirs(LOG_DIR, exist_ok=True)
+    log_file = os.path.join(LOG_DIR, 'player.log')
+    print(f"Warning: Using fallback log directory {LOG_DIR}")
 
 # Configure logger
 logger = logging.getLogger('SpotifyPlayer')
