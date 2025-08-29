@@ -224,6 +224,12 @@ $ADMIN_USER ALL=(ALL) NOPASSWD: /usr/bin/dmesg*
 $ADMIN_USER ALL=(ALL) NOPASSWD: /bin/dmesg*
 $ADMIN_USER ALL=(ALL) NOPASSWD: /usr/bin/head*
 $ADMIN_USER ALL=(ALL) NOPASSWD: /bin/head*
+$ADMIN_USER ALL=(ALL) NOPASSWD: /sbin/shutdown*
+$ADMIN_USER ALL=(ALL) NOPASSWD: /usr/sbin/shutdown*
+$ADMIN_USER ALL=(ALL) NOPASSWD: /sbin/reboot
+$ADMIN_USER ALL=(ALL) NOPASSWD: /usr/sbin/reboot
+$ADMIN_USER ALL=(ALL) NOPASSWD: /sbin/poweroff
+$ADMIN_USER ALL=(ALL) NOPASSWD: /usr/sbin/poweroff
 EOF
 chmod 0440 /etc/sudoers.d/spotify-admin
 
