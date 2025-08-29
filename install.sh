@@ -127,8 +127,8 @@ fi
 
 # Update system
 echo -e "${YELLOW}Updating system packages...${NC}"
-apt-get update
-apt-get upgrade -y
+apt-get update || true
+DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -q || true
 
 # Install dependencies
 echo -e "${YELLOW}Installing dependencies...${NC}"
