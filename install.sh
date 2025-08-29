@@ -87,6 +87,8 @@ if [ "$RESET_MODE" = true ]; then
     
     # Remove X11 configs we may have added
     rm -f /etc/X11/xorg.conf.d/99-calibration.conf
+    rm -f /etc/X11/xorg.conf.d/10-serverflags.conf
+    rm -f /etc/X11/xorg.conf.d/20-display.conf
     
     echo -e "${YELLOW}Removing ALL Spotify users...${NC}"
     # Remove ANY user with spotify in the name
@@ -142,8 +144,12 @@ apt-get install -y \
     python3-pil \
     python3-pil.imagetk \
     xserver-xorg \
+    xserver-xorg-video-all \
+    xserver-xorg-input-all \
     xinit \
     x11-xserver-utils \
+    x11-utils \
+    x11-apps \
     nginx \
     git \
     unclutter \
@@ -151,7 +157,8 @@ apt-get install -y \
     bluez-tools \
     pulseaudio-module-bluetooth \
     rfkill \
-    scrot
+    scrot \
+    xterm
 
 # Install Python packages
 echo -e "${YELLOW}Installing Python packages...${NC}"
@@ -256,18 +263,26 @@ echo -e "${YELLOW}Creating systemd service for player...${NC}"
 cat > /etc/systemd/system/spotify-player.service << EOF
 [Unit]
 Description=Spotify Kids Player
-After=multi-user.target
+After=multi-user.target graphical.target
+Wants=graphical.target
 
 [Service]
 Type=simple
 User=$APP_USER
+Group=$APP_USER
 Environment="DISPLAY=:0"
+Environment="XAUTHORITY=/home/$APP_USER/.Xauthority"
+Environment="HOME=/home/$APP_USER"
 Environment="SPOTIFY_CONFIG_DIR=$CONFIG_DIR"
 Environment="SPOTIFY_DEBUG=true"
-ExecStartPre=/bin/sleep 5
+Environment="PYTHONUNBUFFERED=1"
+WorkingDirectory=$APP_DIR
+ExecStartPre=/bin/bash -c 'until [ -S /tmp/.X11-unix/X0 ]; do sleep 1; done'
 ExecStart=/usr/bin/python3 -u $APP_DIR/spotify_player.py
 Restart=always
 RestartSec=10
+StartLimitInterval=60
+StartLimitBurst=3
 StandardOutput=journal
 StandardError=journal
 
@@ -330,16 +345,32 @@ mkdir -p /home/$APP_USER
 cat > /home/$APP_USER/.xinitrc << EOF
 #!/bin/sh
 
-# Disable screen blanking
-xset s off
-xset -dpms
-xset s noblank
+# Log X session startup
+echo "Starting X session at \$(date)" >> /var/log/spotify-kids/xsession.log
+
+# Set display environment
+export DISPLAY=:0
+export XAUTHORITY=/home/$APP_USER/.Xauthority
+
+# Wait for X server to be ready
+sleep 2
+
+# Disable screen blanking and power management
+xset s off 2>/dev/null || true
+xset -dpms 2>/dev/null || true
+xset s noblank 2>/dev/null || true
 
 # Hide cursor after 3 seconds of inactivity
-unclutter -idle 3 &
+unclutter -idle 3 -root &
 
-# Start the Spotify player
-exec python3 $APP_DIR/spotify_player.py
+# Set background color to black
+xsetroot -solid '#000000' 2>/dev/null || true
+
+# Log before starting player
+echo "Starting Spotify player at \$(date)" >> /var/log/spotify-kids/xsession.log
+
+# Start the Spotify player with error logging
+exec python3 $APP_DIR/spotify_player.py 2>&1 | tee -a /var/log/spotify-kids/player.log
 EOF
 
 chmod +x /home/$APP_USER/.xinitrc
@@ -367,6 +398,45 @@ systemctl enable nginx
 systemctl start spotify-admin.service
 systemctl restart nginx
 
+# Configure X11
+echo -e "${YELLOW}Configuring X11 display server...${NC}"
+mkdir -p /etc/X11/xorg.conf.d/
+
+# Create basic X11 configuration
+cat > /etc/X11/xorg.conf.d/10-serverflags.conf << EOF
+Section "ServerFlags"
+    Option "BlankTime" "0"
+    Option "StandbyTime" "0"
+    Option "SuspendTime" "0"
+    Option "OffTime" "0"
+    Option "DontZap" "false"
+    Option "AllowMouseOpenFail" "true"
+EndSection
+EOF
+
+# Configure display
+cat > /etc/X11/xorg.conf.d/20-display.conf << EOF
+Section "Monitor"
+    Identifier "Monitor0"
+    Option "DPMS" "false"
+EndSection
+
+Section "Screen"
+    Identifier "Screen0"
+    Monitor "Monitor0"
+    DefaultDepth 24
+    SubSection "Display"
+        Depth 24
+        Modes "1920x1080" "1280x720" "1024x768" "800x600"
+    EndSubSection
+EndSection
+
+Section "ServerLayout"
+    Identifier "Layout0"
+    Screen "Screen0"
+EndSection
+EOF
+
 # Configure touchscreen if available
 if [ -e "/dev/input/touchscreen0" ] || [ -e "/dev/input/event0" ]; then
     echo -e "${YELLOW}Configuring touchscreen...${NC}"
@@ -378,6 +448,7 @@ Section "InputClass"
     MatchProduct "touchscreen"
     Option "Calibration" "0 800 0 480"
     Option "SwapAxes" "0"
+EndSection
 EOF
 fi
 
