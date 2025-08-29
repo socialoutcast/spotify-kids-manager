@@ -122,6 +122,7 @@ if [ "$RESET_MODE" = true ]; then
     echo -e "${GREEN}Starting fresh installation...${NC}"
     echo ""
     sleep 2
+    # DON'T EXIT - CONTINUE WITH INSTALLATION BELOW
 fi
 
 # Update system
