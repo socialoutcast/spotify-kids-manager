@@ -106,7 +106,6 @@ apt-get install -y \
     nginx \
     git \
     unclutter \
-    chromium-browser \
     bluez \
     bluez-tools \
     pulseaudio-module-bluetooth \
