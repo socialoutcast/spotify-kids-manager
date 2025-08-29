@@ -2929,6 +2929,9 @@ EOF
     log_success "Simple boot splash configured"
     return  # Exit here, skip all the complex Plymouth stuff
 }
+
+# Test and repair web admin panel
+test_and_repair_web() {
     log_info "Testing web admin panel..."
     
     # Give services time to start
