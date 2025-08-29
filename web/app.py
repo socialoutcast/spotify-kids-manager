@@ -511,6 +511,30 @@ ADMIN_TEMPLATE = '''
                 </div>
             </div>
             
+            <!-- System Control -->
+            <div class="card">
+                <h2>⚡ System Control</h2>
+                <p style="color: #666; font-size: 12px; margin-bottom: 15px;">
+                    Manage system power and restart services.
+                </p>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <button onclick="rebootSystem()" style="background: #f59e0b;">
+                        🔄 Reboot System
+                    </button>
+                    <button onclick="powerOffSystem()" class="danger">
+                        ⏻ Power Off
+                    </button>
+                    <button onclick="restartServices()" style="grid-column: span 2;">
+                        🔧 Restart All Services
+                    </button>
+                </div>
+                <div style="margin-top: 15px; padding: 10px; background: #fef3c7; border-radius: 5px; border: 1px solid #fbbf24;">
+                    <p style="font-size: 11px; color: #92400e; margin: 0;">
+                        <strong>Warning:</strong> Reboot and power off will immediately affect the system. Save any work before proceeding.
+                    </p>
+                </div>
+            </div>
+            
             <!-- System Logs -->
             <div class="card">
                 <h2>📋 System Logs & Diagnostics</h2>
@@ -1149,16 +1173,22 @@ ADMIN_TEMPLATE = '''
             window.location.href = '/api/logs/download';
         }
         
-        // Auto-refresh toggle for modal
-        document.getElementById('modalAutoRefresh').addEventListener('change', function(e) {
-            if (e.target.checked && currentLogType) {
-                clearInterval(logRefreshInterval);
-                logRefreshInterval = setInterval(() => {
-                    loadModalLog(currentLogType);
-                }, 5000);
-            } else {
-                clearInterval(logRefreshInterval);
-                logRefreshInterval = null;
+        // Setup modal event listeners after DOM is ready
+        window.addEventListener('DOMContentLoaded', function() {
+            // Auto-refresh toggle for modal
+            const modalAutoRefresh = document.getElementById('modalAutoRefresh');
+            if (modalAutoRefresh) {
+                modalAutoRefresh.addEventListener('change', function(e) {
+                    if (e.target.checked && currentLogType) {
+                        clearInterval(logRefreshInterval);
+                        logRefreshInterval = setInterval(() => {
+                            loadModalLog(currentLogType);
+                        }, 5000);
+                    } else {
+                        clearInterval(logRefreshInterval);
+                        logRefreshInterval = null;
+                    }
+                });
             }
         });
         
@@ -1168,6 +1198,59 @@ ADMIN_TEMPLATE = '''
                 closeLogModal();
             }
         });
+        
+        // System Control Functions
+        function rebootSystem() {
+            if (!confirm('Are you sure you want to reboot the system?\n\nThe device will restart immediately.')) {
+                return;
+            }
+            
+            fetch('/api/system/reboot', {method: 'POST'})
+                .then(r => r.json())
+                .then(data => {
+                    alert(data.message || 'System is rebooting...');
+                })
+                .catch(err => {
+                    alert('Error: ' + err);
+                });
+        }
+        
+        function powerOffSystem() {
+            if (!confirm('Are you sure you want to power off the system?\n\nThe device will shut down completely.')) {
+                return;
+            }
+            
+            if (!confirm('This will POWER OFF the device.\n\nAre you REALLY sure?')) {
+                return;
+            }
+            
+            fetch('/api/system/poweroff', {method: 'POST'})
+                .then(r => r.json())
+                .then(data => {
+                    alert(data.message || 'System is shutting down...');
+                })
+                .catch(err => {
+                    alert('Error: ' + err);
+                });
+        }
+        
+        function restartServices() {
+            if (!confirm('Restart all Spotify Kids services?')) {
+                return;
+            }
+            
+            fetch('/api/system/restart-services', {method: 'POST'})
+                .then(r => r.json())
+                .then(data => {
+                    alert(data.message || 'Services restarted');
+                    setTimeout(() => {
+                        location.reload();
+                    }, 2000);
+                })
+                .catch(err => {
+                    alert('Error: ' + err);
+                });
+        }
         
         // Parental Control Functions
         function saveContentFilter() {
@@ -2235,6 +2318,58 @@ def toggle_rewards():
     save_rewards(rewards)
     
     return jsonify({'success': True, 'message': 'Rewards system updated'})
+
+@app.route('/api/system/reboot', methods=['POST'])
+def reboot_system():
+    """Reboot the system"""
+    if 'logged_in' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    try:
+        # Schedule reboot in 5 seconds to allow response to be sent
+        subprocess.Popen(['sudo', 'shutdown', '-r', '+0'], 
+                        stdout=subprocess.DEVNULL, 
+                        stderr=subprocess.DEVNULL)
+        return jsonify({'success': True, 'message': 'System will reboot in a moment...'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/system/poweroff', methods=['POST'])
+def poweroff_system():
+    """Power off the system"""
+    if 'logged_in' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    try:
+        # Schedule shutdown in 5 seconds to allow response to be sent
+        subprocess.Popen(['sudo', 'shutdown', '-h', '+0'], 
+                        stdout=subprocess.DEVNULL, 
+                        stderr=subprocess.DEVNULL)
+        return jsonify({'success': True, 'message': 'System will power off in a moment...'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/system/restart-services', methods=['POST'])
+def restart_services():
+    """Restart all Spotify Kids services"""
+    if 'logged_in' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    try:
+        # Restart player service
+        subprocess.run(['sudo', 'systemctl', 'restart', 'spotify-player'], check=False)
+        
+        # Restart admin service (this will interrupt the connection briefly)
+        subprocess.Popen(['sudo', 'systemctl', 'restart', 'spotify-admin'],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL)
+        
+        # Restart nginx
+        subprocess.run(['sudo', 'systemctl', 'restart', 'nginx'], check=False)
+        
+        return jsonify({'success': True, 'message': 'All services restarting...'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     os.makedirs(CONFIG_DIR, exist_ok=True)
