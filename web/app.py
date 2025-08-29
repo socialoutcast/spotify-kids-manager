@@ -1147,14 +1147,14 @@ ADMIN_TEMPLATE = '''
             
             eventSource.onmessage = function(event) {
                 const output = document.getElementById('updateOutput');
-                output.textContent += event.data + '\n';
+                output.textContent += event.data + String.fromCharCode(10);
                 output.scrollTop = output.scrollHeight;
             };
             
             eventSource.onerror = function(error) {
                 eventSource.close();
                 const output = document.getElementById('updateOutput');
-                output.textContent += '\n=== Update Complete ===\n';
+                output.textContent += String.fromCharCode(10) + '=== Update Complete ===' + String.fromCharCode(10);
                 document.getElementById('closeUpdateModal').style.display = 'inline-block';
             };
         }
