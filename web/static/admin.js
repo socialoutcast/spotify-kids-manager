@@ -21,15 +21,24 @@ async function apiCall(url, method = 'GET', data = null) {
 
 // Show status message
 function showStatus(elementId, message, isError = false) {
-    const element = document.getElementById(elementId);
-    if (element) {
-        element.style.display = 'block';
-        element.style.background = isError ? '#ef4444' : '#10b981';
-        element.style.color = 'white';
-        element.style.padding = '10px';
-        element.style.borderRadius = '5px';
-        element.innerHTML = message;
-        setTimeout(() => { element.style.display = 'none'; }, 3000);
+    const statusDiv = document.getElementById(elementId);
+    const statusBox = document.getElementById(elementId + 'Box');
+    const statusMessage = document.getElementById(elementId + 'Message');
+    
+    if (statusDiv && statusBox && statusMessage) {
+        statusDiv.style.display = 'block';
+        statusBox.style.background = isError ? '#ef4444' : '#10b981';
+        statusBox.style.color = 'white';
+        statusMessage.innerHTML = message;
+        setTimeout(() => { statusDiv.style.display = 'none'; }, 3000);
+    } else if (statusDiv) {
+        // Fallback if structure is different
+        statusDiv.style.display = 'block';
+        statusDiv.style.background = isError ? '#ef4444' : '#10b981';
+        statusDiv.style.color = 'white';
+        statusDiv.style.padding = '10px';
+        statusDiv.innerHTML = message;
+        setTimeout(() => { statusDiv.style.display = 'none'; }, 3000);
     }
 }
 
