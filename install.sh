@@ -193,7 +193,14 @@ chown $APP_USER:$APP_USER /home/$APP_USER
 ADMIN_USER="spotify-admin"
 echo -e "${YELLOW}Creating admin user for web panel...${NC}"
 if ! id "$ADMIN_USER" &>/dev/null; then
-    useradd -r -M -s /bin/false "$ADMIN_USER"
+    # Check if group exists first
+    if getent group "$ADMIN_USER" >/dev/null 2>&1; then
+        # Group exists, use it
+        useradd -r -M -s /bin/false -g "$ADMIN_USER" "$ADMIN_USER"
+    else
+        # Create both group and user
+        useradd -r -M -s /bin/false "$ADMIN_USER"
+    fi
 else
     echo "User $ADMIN_USER already exists"
 fi
