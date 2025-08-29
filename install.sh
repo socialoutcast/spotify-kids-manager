@@ -165,7 +165,13 @@ echo -e "${YELLOW}Creating application user...${NC}"
 if ! id "$APP_USER" &>/dev/null; then
     useradd -m -s /bin/bash "$APP_USER"
     usermod -aG audio,video,input "$APP_USER"
+else
+    echo "User $APP_USER already exists"
 fi
+
+# ALWAYS ensure home directory exists
+mkdir -p /home/$APP_USER
+chown $APP_USER:$APP_USER /home/$APP_USER
 
 # Create admin user for the web panel
 ADMIN_USER="spotify-admin"
