@@ -7,13 +7,13 @@ A secure, touchscreen-optimized Spotify player for Raspberry Pi with full parent
 Run this single command to install everything:
 
 ```bash
-curl -sSL https://github.com/socialoutcast/spotify-kids-manager/raw/main/install.sh | sudo bash
+curl -sSL https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/main/install.sh | sudo bash
 ```
 
 Or if you want to review the script first:
 
 ```bash
-wget https://github.com/socialoutcast/spotify-kids-manager/raw/main/install.sh
+wget https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/main/install.sh
 chmod +x install.sh
 sudo ./install.sh
 ```
@@ -23,7 +23,13 @@ sudo ./install.sh
 To completely reset and reinstall from scratch:
 
 ```bash
-curl -sSL https://github.com/socialoutcast/spotify-kids-manager/raw/main/install.sh | sudo bash -s -- --reset
+curl -sSL https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/main/force-reset.sh | sudo bash
+```
+
+Or for a quick reinstall (keeps existing config):
+
+```bash
+curl -sSL https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/main/install.sh | sudo bash -s -- --reset
 ```
 
 ## Features
