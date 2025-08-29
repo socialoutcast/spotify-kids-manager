@@ -1,2 +1,0 @@
-- dont take things at face value you need to validate the issue before you say YOUR RIGHT! Stop being so posative you are an engineer act like it!
-- you have full access to run any commands you need that are non destrucive to the system
