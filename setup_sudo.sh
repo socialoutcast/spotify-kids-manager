@@ -7,8 +7,10 @@ echo "Setting up sudo permissions for Spotify Kids Manager..."
 
 # Create sudoers file for spotify-admin
 cat << EOF | sudo tee /etc/sudoers.d/spotify-admin
-# Allow www-data to run apt commands without password
-www-data ALL=(ALL) NOPASSWD: /usr/bin/apt-get, /usr/bin/apt, /usr/bin/systemctl, /usr/sbin/rfkill, /usr/bin/bluetoothctl, /usr/sbin/reboot, /usr/sbin/poweroff
+# Allow www-data to run commands without password
+www-data ALL=(ALL) NOPASSWD: /usr/bin/apt-get, /usr/bin/apt, /usr/bin/systemctl, /usr/sbin/rfkill, /usr/bin/bluetoothctl, /usr/sbin/reboot, /usr/sbin/poweroff, /usr/bin/env
+# Allow www-data to set environment variables for apt commands
+www-data ALL=(ALL) NOPASSWD:SETENV: /usr/bin/apt-get, /usr/bin/apt
 EOF
 
 # Set correct permissions
