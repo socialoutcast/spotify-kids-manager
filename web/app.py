@@ -1787,23 +1787,17 @@ def update_stream():
             try:
                 # Run apt update
                 yield "data: Running apt update...\n\n"
-                proc = subprocess.Popen(['sudo', '-n', 'apt-get', 'update'],
+                proc = subprocess.Popen(['sudo', 'apt-get', 'update'],
                                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                       text=True, bufsize=1)
                 for line in proc.stdout:
                     yield f"data: {line.strip()}\n\n"
                 proc.wait()
                 
-                if proc.returncode != 0:
-                    yield "data: ERROR: sudo permissions not configured. Please run the following command on the Pi:\n\n"
-                    yield "data: echo 'www-data ALL=(ALL) NOPASSWD: /usr/bin/apt-get, /usr/bin/apt' | sudo tee /etc/sudoers.d/spotify-admin\n\n"
-                    yield "data: \n\n"
-                    return
-                
                 # Run apt upgrade with auto-yes
                 yield "data: \n\n"
                 yield "data: Running system upgrade (this may take a while)...\n\n"
-                proc = subprocess.Popen(['sudo', '-n', 'env', 'DEBIAN_FRONTEND=noninteractive', 
+                proc = subprocess.Popen(['sudo', 'DEBIAN_FRONTEND=noninteractive', 
                                        'apt-get', 'upgrade', '-y', 
                                        '-o', 'Dpkg::Options::=--force-confdef', '-o',
                                        'Dpkg::Options::=--force-confold'],
@@ -1820,9 +1814,9 @@ def update_stream():
                 # Clean up
                 yield "data: \n\n"
                 yield "data: Cleaning up...\n\n"
-                subprocess.run(['sudo', '-n', 'apt-get', 'autoremove', '-y'], 
+                subprocess.run(['sudo', 'apt-get', 'autoremove', '-y'], 
                              capture_output=True, check=False)
-                subprocess.run(['sudo', '-n', 'apt-get', 'autoclean', '-y'], 
+                subprocess.run(['sudo', 'apt-get', 'autoclean', '-y'], 
                              capture_output=True, check=False)
                 
                 yield "data: \n\n"
