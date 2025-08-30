@@ -80,6 +80,73 @@ async function controlPlayer(action) {
     }
 }
 
+// Playlist Management
+async function loadPlaylists() {
+    const container = document.getElementById('playlistContainer');
+    if (container) {
+        container.innerHTML = '<div style="text-align: center; color: #6b7280; padding: 20px;">Loading playlists...</div>';
+    }
+    
+    try {
+        const result = await apiCall('/api/spotify/playlists');
+        
+        if (result.success && result.playlists) {
+            displayPlaylists(result.playlists);
+        } else {
+            if (container) {
+                container.innerHTML = '<div style="text-align: center; color: #ef4444; padding: 20px;">Failed to load playlists: ' + (result.error || 'Unknown error') + '</div>';
+            }
+        }
+    } catch (error) {
+        if (container) {
+            container.innerHTML = '<div style="text-align: center; color: #ef4444; padding: 20px;">Error loading playlists: ' + error.message + '</div>';
+        }
+    }
+}
+
+function displayPlaylists(playlists) {
+    const container = document.getElementById('playlistContainer');
+    if (!container) return;
+    
+    if (playlists.length === 0) {
+        container.innerHTML = '<div style="text-align: center; color: #6b7280; padding: 20px;">No playlists available</div>';
+        return;
+    }
+    
+    let html = '<div style="display: grid; gap: 10px;">';
+    
+    playlists.forEach(playlist => {
+        html += `
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #f9fafb; border-radius: 5px; hover: background: #f3f4f6;">
+                <div style="flex: 1;">
+                    <div style="font-weight: 500; color: #1f2937;">${playlist.name}</div>
+                    <div style="font-size: 12px; color: #6b7280;">${playlist.tracks} tracks</div>
+                </div>
+                <button onclick="playPlaylist('${playlist.uri}')" style="padding: 5px 10px; background: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                    ▶ Play
+                </button>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+async function playPlaylist(uri) {
+    try {
+        const result = await apiCall('/api/spotify/play', 'POST', { uri: uri });
+        
+        if (result.success) {
+            showStatus('playerStatus', '✓ Playing playlist');
+        } else {
+            showStatus('playerStatus', '✗ Failed to play: ' + (result.error || 'Unknown error'), true);
+        }
+    } catch (error) {
+        showStatus('playerStatus', '✗ Error: ' + error.message, true);
+    }
+}
+
 // System Functions
 async function restartServices() {
     if (!confirm('Restart all services?')) return;
@@ -865,6 +932,11 @@ document.addEventListener('DOMContentLoaded', function() {
         loginPass.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') login();
         });
+    }
+    
+    // Load playlists if logged in
+    if (document.getElementById('playlistContainer')) {
+        loadPlaylists();
     }
     
     // Volume slider
