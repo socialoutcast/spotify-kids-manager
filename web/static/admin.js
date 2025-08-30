@@ -628,6 +628,136 @@ async function runUpdate() {
     });
 }
 
+// Package Management Functions
+async function showPackageManager() {
+    const modal = document.getElementById('packageModal');
+    if (modal) {
+        modal.style.display = 'block';
+        await loadUpgradablePackages();
+    }
+}
+
+async function closePackageModal() {
+    const modal = document.getElementById('packageModal');
+    if (modal) modal.style.display = 'none';
+}
+
+async function loadUpgradablePackages() {
+    const packageList = document.getElementById('packageList');
+    const packageStatus = document.getElementById('packageStatus');
+    
+    if (packageList) {
+        packageList.innerHTML = '<div style="padding: 20px;">Loading upgradable packages...</div>';
+    }
+    
+    try {
+        const result = await apiCall('/api/system/packages/upgradable');
+        
+        if (result.packages && result.packages.length > 0) {
+            let html = '<table style="width: 100%; border-collapse: collapse;">';
+            html += '<thead><tr>';
+            html += '<th style="text-align: left; padding: 8px; border-bottom: 2px solid #ddd;">Package</th>';
+            html += '<th style="text-align: left; padding: 8px; border-bottom: 2px solid #ddd;">Version</th>';
+            html += '<th style="text-align: left; padding: 8px; border-bottom: 2px solid #ddd;">Action</th>';
+            html += '</tr></thead><tbody>';
+            
+            result.packages.forEach(pkg => {
+                html += '<tr>';
+                html += `<td style="padding: 8px; border-bottom: 1px solid #eee;">${pkg.name}</td>`;
+                html += `<td style="padding: 8px; border-bottom: 1px solid #eee;">${pkg.current_version}</td>`;
+                html += `<td style="padding: 8px; border-bottom: 1px solid #eee;">`;
+                html += `<button onclick="updatePackage('${pkg.name}')" style="padding: 4px 8px; background: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer;">Update</button>`;
+                html += `</td>`;
+                html += '</tr>';
+            });
+            
+            html += '</tbody></table>';
+            
+            if (packageList) {
+                packageList.innerHTML = html;
+            }
+            
+            if (packageStatus) {
+                packageStatus.innerHTML = `<div style="padding: 10px; background: #f0f9ff; border-left: 4px solid #3b82f6;">Found ${result.count} upgradable packages</div>`;
+            }
+        } else {
+            if (packageList) {
+                packageList.innerHTML = '<div style="padding: 20px; text-align: center; color: #10b981;">✓ All packages are up to date!</div>';
+            }
+        }
+    } catch (error) {
+        if (packageList) {
+            packageList.innerHTML = '<div style="padding: 20px; color: #ef4444;">Error loading packages: ' + error.message + '</div>';
+        }
+    }
+}
+
+async function updatePackage(packageName) {
+    if (!confirm(`Update package ${packageName}?`)) return;
+    
+    const packageStatus = document.getElementById('packageStatus');
+    if (packageStatus) {
+        packageStatus.innerHTML = `<div style="padding: 10px; background: #fef3c7; border-left: 4px solid #f59e0b;">Updating ${packageName}...</div>`;
+    }
+    
+    try {
+        const result = await apiCall('/api/system/packages/update', 'POST', { package: packageName });
+        
+        if (result.success) {
+            if (packageStatus) {
+                packageStatus.innerHTML = `<div style="padding: 10px; background: #d1fae5; border-left: 4px solid #10b981;">✓ ${packageName} updated successfully!</div>`;
+            }
+            // Reload the package list
+            setTimeout(() => loadUpgradablePackages(), 2000);
+        } else {
+            if (packageStatus) {
+                packageStatus.innerHTML = `<div style="padding: 10px; background: #fee2e2; border-left: 4px solid #ef4444;">✗ Failed to update ${packageName}: ${result.error}</div>`;
+            }
+        }
+    } catch (error) {
+        if (packageStatus) {
+            packageStatus.innerHTML = `<div style="padding: 10px; background: #fee2e2; border-left: 4px solid #ef4444;">✗ Error: ${error.message}</div>`;
+        }
+    }
+}
+
+async function runDistUpgrade() {
+    if (!confirm('Run distribution upgrade? This will update all packages and may take a long time.')) return;
+    
+    const packageStatus = document.getElementById('packageStatus');
+    const packageList = document.getElementById('packageList');
+    
+    if (packageStatus) {
+        packageStatus.innerHTML = `<div style="padding: 10px; background: #fef3c7; border-left: 4px solid #f59e0b;">Running distribution upgrade... This may take several minutes.</div>`;
+    }
+    
+    if (packageList) {
+        packageList.innerHTML = '<div style="padding: 20px; text-align: center;"><div class="spinner"></div> Upgrading system packages...</div>';
+    }
+    
+    try {
+        const result = await apiCall('/api/system/packages/dist-upgrade', 'POST');
+        
+        if (result.success) {
+            if (packageStatus) {
+                packageStatus.innerHTML = `<div style="padding: 10px; background: #d1fae5; border-left: 4px solid #10b981;">✓ Distribution upgrade completed successfully!</div>`;
+            }
+            // Reload the package list
+            setTimeout(() => loadUpgradablePackages(), 2000);
+        } else {
+            if (packageStatus) {
+                packageStatus.innerHTML = `<div style="padding: 10px; background: #fee2e2; border-left: 4px solid #ef4444;">✗ Upgrade failed: ${result.error}</div>`;
+            }
+            loadUpgradablePackages();
+        }
+    } catch (error) {
+        if (packageStatus) {
+            packageStatus.innerHTML = `<div style="padding: 10px; background: #fee2e2; border-left: 4px solid #ef4444;">✗ Error: ${error.message}</div>`;
+        }
+        loadUpgradablePackages();
+    }
+}
+
 // Points system
 async function addBonusPoints() {
     const points = prompt('How many points to add?', '10');

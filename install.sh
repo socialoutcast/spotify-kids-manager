@@ -81,6 +81,7 @@ if [ "$RESET_MODE" = true ]; then
     
     # Remove ALL sudoers entries
     rm -f /etc/sudoers.d/spotify*
+    rm -f /etc/sudoers.d/spotify-pkgmgr
     
     # Remove ALL uninstall scripts
     rm -f /usr/local/bin/spotify*
@@ -90,7 +91,7 @@ if [ "$RESET_MODE" = true ]; then
     rm -f /etc/X11/xorg.conf.d/10-serverflags.conf
     rm -f /etc/X11/xorg.conf.d/20-display.conf
     
-    echo -e "${YELLOW}Removing ALL Spotify users...${NC}"
+    echo -e "${YELLOW}Removing ALL Spotify users and groups...${NC}"
     # Remove ANY user with spotify in the name
     for user in spotify-kids spotify-admin spotify-terminal; do
         if id "$user" &>/dev/null; then
@@ -101,6 +102,9 @@ if [ "$RESET_MODE" = true ]; then
             userdel "$user" 2>/dev/null || true
         fi
     done
+    
+    # Remove the package management group
+    groupdel spotify-pkgmgr 2>/dev/null || true
     
     # Force clean up home directories
     rm -rf /home/spotify-kids 2>/dev/null || true
@@ -195,6 +199,16 @@ fi
 mkdir -p /home/$APP_USER
 chown $APP_USER:$APP_USER /home/$APP_USER
 
+# Create package management group
+PKG_MGMT_GROUP="spotify-pkgmgr"
+echo -e "${YELLOW}Creating package management group...${NC}"
+if ! getent group "$PKG_MGMT_GROUP" >/dev/null 2>&1; then
+    groupadd "$PKG_MGMT_GROUP"
+    echo "Created group $PKG_MGMT_GROUP for package management"
+else
+    echo "Group $PKG_MGMT_GROUP already exists"
+fi
+
 # Create admin user for the web panel
 ADMIN_USER="spotify-admin"
 echo -e "${YELLOW}Creating admin user for web panel...${NC}"
@@ -208,44 +222,19 @@ if ! id "$ADMIN_USER" &>/dev/null; then
     fi
     # Now create fresh user and group
     useradd -r -M -s /bin/false "$ADMIN_USER"
+    # Add admin user to package management group ONLY
+    usermod -G "$PKG_MGMT_GROUP" "$ADMIN_USER"
 else
     echo "User $ADMIN_USER already exists"
+    # Ensure user is in package management group and ONLY that group
+    usermod -G "$PKG_MGMT_GROUP" "$ADMIN_USER"
 fi
 
-# Add sudo permissions for admin user only
-echo -e "${YELLOW}Configuring sudo permissions for admin...${NC}"
-cat > /etc/sudoers.d/spotify-admin << EOF
-# Allow spotify-admin user to run system commands without password
-$ADMIN_USER ALL=(ALL) NOPASSWD: /usr/bin/apt-get update, /usr/bin/apt-get upgrade*, /usr/bin/apt-get autoremove*, /usr/bin/apt-get autoclean*
-$ADMIN_USER ALL=(ALL) NOPASSWD: /usr/bin/apt list*
-$ADMIN_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart spotify-player
-$ADMIN_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop spotify-player
-$ADMIN_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl start spotify-player
-$ADMIN_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl status spotify-player
-$ADMIN_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl start bluetooth
-$ADMIN_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop bluetooth
-$ADMIN_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl is-active bluetooth
-$ADMIN_USER ALL=(ALL) NOPASSWD: /bin/systemctl*
-$ADMIN_USER ALL=(ALL) NOPASSWD: /usr/bin/bluetoothctl*
-$ADMIN_USER ALL=(ALL) NOPASSWD: /usr/sbin/rfkill*
-$ADMIN_USER ALL=(ALL) NOPASSWD: /usr/bin/journalctl*
-$ADMIN_USER ALL=(ALL) NOPASSWD: /bin/journalctl*
-$ADMIN_USER ALL=(ALL) NOPASSWD: /usr/bin/tail*
-$ADMIN_USER ALL=(ALL) NOPASSWD: /usr/bin/truncate*
-$ADMIN_USER ALL=(ALL) NOPASSWD: /usr/bin/cat*
-$ADMIN_USER ALL=(ALL) NOPASSWD: /bin/cat*
-$ADMIN_USER ALL=(ALL) NOPASSWD: /usr/bin/dmesg*
-$ADMIN_USER ALL=(ALL) NOPASSWD: /bin/dmesg*
-$ADMIN_USER ALL=(ALL) NOPASSWD: /usr/bin/head*
-$ADMIN_USER ALL=(ALL) NOPASSWD: /bin/head*
-$ADMIN_USER ALL=(ALL) NOPASSWD: /sbin/shutdown*
-$ADMIN_USER ALL=(ALL) NOPASSWD: /usr/sbin/shutdown*
-$ADMIN_USER ALL=(ALL) NOPASSWD: /sbin/reboot
-$ADMIN_USER ALL=(ALL) NOPASSWD: /usr/sbin/reboot
-$ADMIN_USER ALL=(ALL) NOPASSWD: /sbin/poweroff
-$ADMIN_USER ALL=(ALL) NOPASSWD: /usr/sbin/poweroff
-EOF
-chmod 0440 /etc/sudoers.d/spotify-admin
+# Add www-data to package management group
+usermod -a -G "$PKG_MGMT_GROUP" www-data
+
+# Note: Sudo permissions are now configured via the spotify-pkgmgr group
+# This ensures the admin user only has access to specific package management commands
 
 # Create application directories
 echo -e "${YELLOW}Creating application directories...${NC}"
@@ -443,13 +432,28 @@ EOF
 
 chown -R $APP_USER:$APP_USER /home/$APP_USER
 
-# Configure sudo permissions for web admin to run without password
-echo -e "${YELLOW}Configuring sudo permissions...${NC}"
-cat > /etc/sudoers.d/spotify-admin << 'EOF'
-# Allow www-data to run ALL commands without password for admin panel
-www-data ALL=(ALL) NOPASSWD: ALL
+# Configure sudo permissions for package management group
+echo -e "${YELLOW}Configuring sudo permissions for package management...${NC}"
+cat > /etc/sudoers.d/spotify-pkgmgr << 'EOF'
+# Allow package management group to run package updates without password
+%spotify-pkgmgr ALL=(ALL) NOPASSWD:SETENV: /usr/bin/apt-get update
+%spotify-pkgmgr ALL=(ALL) NOPASSWD:SETENV: /usr/bin/apt-get upgrade*
+%spotify-pkgmgr ALL=(ALL) NOPASSWD:SETENV: /usr/bin/apt-get dist-upgrade*
+%spotify-pkgmgr ALL=(ALL) NOPASSWD:SETENV: /usr/bin/apt-get autoremove*
+%spotify-pkgmgr ALL=(ALL) NOPASSWD:SETENV: /usr/bin/apt-get autoclean*
+%spotify-pkgmgr ALL=(ALL) NOPASSWD:SETENV: /usr/bin/apt-get clean
+%spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/apt list*
+%spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/dpkg -l
+%spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart spotify-player
+%spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop spotify-player
+%spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/systemctl start spotify-player
+%spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/systemctl status spotify-player
+%spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart spotify-admin
+%spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart nginx
+%spotify-pkgmgr ALL=(ALL) NOPASSWD: /sbin/reboot
+%spotify-pkgmgr ALL=(ALL) NOPASSWD: /sbin/shutdown*
 EOF
-chmod 0440 /etc/sudoers.d/spotify-admin
+chmod 0440 /etc/sudoers.d/spotify-pkgmgr
 
 # Enable services
 echo -e "${YELLOW}Enabling services...${NC}"
@@ -556,9 +560,11 @@ rm -f /etc/systemd/system/spotify-admin.service
 rm -f /etc/nginx/sites-available/spotify-admin
 rm -f /etc/nginx/sites-enabled/spotify-admin
 rm -f /etc/sudoers.d/spotify-admin
+rm -f /etc/sudoers.d/spotify-pkgmgr
 rm -rf $APP_DIR
 userdel -r $APP_USER 2>/dev/null
 userdel spotify-admin 2>/dev/null
+groupdel spotify-pkgmgr 2>/dev/null
 rm -f /usr/local/bin/spotify-kids-uninstall
 echo "Uninstall complete"
 EOF

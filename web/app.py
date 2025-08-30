@@ -875,7 +875,8 @@ ADMIN_TEMPLATE = '''
                     </div>
                 </div>
                 <button onclick="checkUpdates()">Check for Updates</button>
-                <button onclick="runUpdate()" style="margin-left: 10px;">Update System</button>
+                <button onclick="runUpdate()" style="margin-left: 10px;">Quick Update</button>
+                <button onclick="showPackageManager()" style="margin-left: 10px; background: #3b82f6;">📦 Package Manager</button>
                 <div id="updateStatus" style="margin-top: 15px; display: none;">
                     <div style="padding: 10px; background: #f3f4f6; border-radius: 5px;">
                         <div id="updateMessage" style="font-size: 12px; color: #666;"></div>
@@ -949,6 +950,27 @@ ADMIN_TEMPLATE = '''
                 <div id="updateOutput" style="background: #1e1e1e; color: #00ff00; font-family: 'Courier New', monospace; font-size: 12px; padding: 15px; border-radius: 5px; height: 300px; overflow-y: auto; white-space: pre-wrap;"></div>
                 <div style="margin-top: 20px; text-align: right;">
                     <button id="closeUpdateModal" onclick="closeUpdateModal()" style="display: none;">Close</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Package Manager Modal -->
+        <div id="packageModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border-radius: 10px; padding: 30px; width: 800px; max-height: 80vh; overflow-y: auto;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2 style="margin: 0;">📦 Package Manager</h2>
+                    <button onclick="closePackageModal()" style="background: #dc2626; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer;">✕ Close</button>
+                </div>
+                
+                <div id="packageStatus" style="margin-bottom: 20px;"></div>
+                
+                <div style="margin-bottom: 20px;">
+                    <button onclick="loadUpgradablePackages()" style="margin-right: 10px;">🔄 Refresh List</button>
+                    <button onclick="runDistUpgrade()" style="background: #f59e0b; color: white;">⬆️ Upgrade All Packages</button>
+                </div>
+                
+                <div id="packageList" style="background: #f9fafb; border-radius: 5px; padding: 20px; min-height: 200px; max-height: 400px; overflow-y: auto;">
+                    <div style="text-align: center; color: #6b7280;">Loading packages...</div>
                 </div>
             </div>
         </div>
@@ -1797,12 +1819,13 @@ def update_stream():
                 # Run apt upgrade with auto-yes
                 yield "data: \n\n"
                 yield "data: Running system upgrade (this may take a while)...\n\n"
-                proc = subprocess.Popen(['sudo', 'DEBIAN_FRONTEND=noninteractive', 
-                                       'apt-get', 'upgrade', '-y', 
-                                       '-o', 'Dpkg::Options::=--force-confdef', '-o',
-                                       'Dpkg::Options::=--force-confold'],
+                env = os.environ.copy()
+                env['DEBIAN_FRONTEND'] = 'noninteractive'
+                proc = subprocess.Popen(['sudo', '-E', 'apt-get', 'upgrade', '-y', 
+                                       '-o', 'Dpkg::Options::=--force-confdef', 
+                                       '-o', 'Dpkg::Options::=--force-confold'],
                                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                      text=True, bufsize=1)
+                                      text=True, bufsize=1, env=env)
                 
                 for line in proc.stdout:
                     cleaned_line = line.strip()
@@ -2742,6 +2765,123 @@ def restart_services():
         subprocess.run(['sudo', 'systemctl', 'restart', 'nginx'], check=False)
         
         return jsonify({'success': True, 'message': 'All services restarting...'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/system/packages/list')
+def list_packages():
+    """List all installed packages"""
+    if 'logged_in' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    try:
+        result = subprocess.run(['dpkg', '-l'], capture_output=True, text=True, timeout=10)
+        packages = []
+        for line in result.stdout.split('\n')[5:]:  # Skip header lines
+            if line.startswith('ii'):
+                parts = line.split()
+                if len(parts) >= 3:
+                    packages.append({
+                        'name': parts[1],
+                        'version': parts[2],
+                        'description': ' '.join(parts[3:]) if len(parts) > 3 else ''
+                    })
+        return jsonify({'packages': packages, 'count': len(packages)})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/system/packages/upgradable')
+def list_upgradable_packages():
+    """List packages that can be upgraded"""
+    if 'logged_in' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    try:
+        # First update the package list
+        subprocess.run(['sudo', 'apt-get', 'update'], capture_output=True, timeout=30)
+        
+        # Get upgradable packages
+        result = subprocess.run(['apt', 'list', '--upgradable'], 
+                              capture_output=True, text=True, timeout=10)
+        
+        packages = []
+        for line in result.stdout.split('\n'):
+            if '/' in line and not line.startswith('Listing'):
+                parts = line.split()
+                if len(parts) >= 2:
+                    name_arch = parts[0].split('/')
+                    version_info = parts[1] if len(parts) > 1 else ''
+                    packages.append({
+                        'name': name_arch[0],
+                        'current_version': version_info,
+                        'architecture': name_arch[1] if len(name_arch) > 1 else '',
+                        'info': ' '.join(parts[2:]) if len(parts) > 2 else ''
+                    })
+        
+        return jsonify({'packages': packages, 'count': len(packages)})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/system/packages/update', methods=['POST'])
+def update_single_package():
+    """Update a specific package"""
+    if 'logged_in' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    package_name = request.json.get('package')
+    if not package_name:
+        return jsonify({'error': 'Package name required'}), 400
+    
+    # Sanitize package name to prevent command injection
+    if not all(c.isalnum() or c in '.-+' for c in package_name):
+        return jsonify({'error': 'Invalid package name'}), 400
+    
+    try:
+        env = os.environ.copy()
+        env['DEBIAN_FRONTEND'] = 'noninteractive'
+        
+        result = subprocess.run(['sudo', '-E', 'apt-get', 'install', '--only-upgrade', 
+                               '-y', package_name],
+                              capture_output=True, text=True, timeout=60, env=env)
+        
+        if result.returncode == 0:
+            return jsonify({'success': True, 'message': f'Package {package_name} updated successfully'})
+        else:
+            return jsonify({'error': result.stderr or result.stdout}), 500
+    except subprocess.TimeoutExpired:
+        return jsonify({'error': 'Update timeout'}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/system/packages/dist-upgrade', methods=['POST'])
+def dist_upgrade():
+    """Perform a distribution upgrade"""
+    if 'logged_in' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    try:
+        env = os.environ.copy()
+        env['DEBIAN_FRONTEND'] = 'noninteractive'
+        
+        # Update package list first
+        subprocess.run(['sudo', 'apt-get', 'update'], capture_output=True, timeout=30)
+        
+        # Perform dist-upgrade
+        result = subprocess.run(['sudo', '-E', 'apt-get', 'dist-upgrade', '-y',
+                               '-o', 'Dpkg::Options::=--force-confdef',
+                               '-o', 'Dpkg::Options::=--force-confold'],
+                              capture_output=True, text=True, timeout=300, env=env)
+        
+        if result.returncode == 0:
+            # Clean up
+            subprocess.run(['sudo', 'apt-get', 'autoremove', '-y'], capture_output=True, timeout=60)
+            subprocess.run(['sudo', 'apt-get', 'autoclean'], capture_output=True, timeout=30)
+            
+            return jsonify({'success': True, 'message': 'Distribution upgrade completed successfully'})
+        else:
+            return jsonify({'error': result.stderr or result.stdout}), 500
+    except subprocess.TimeoutExpired:
+        return jsonify({'error': 'Upgrade timeout - this may take longer than expected'}), 500
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
