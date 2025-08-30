@@ -105,6 +105,8 @@ if [ "$RESET_MODE" = true ]; then
     
     # Remove the package management group
     groupdel spotify-pkgmgr 2>/dev/null || true
+    # Remove the config group
+    groupdel spotify-config 2>/dev/null || true
     
     # Force clean up home directories
     rm -rf /home/spotify-kids 2>/dev/null || true
@@ -273,23 +275,37 @@ else
     wget -q "$REPO_URL/web/static/admin.js" -O "$APP_DIR/web/static/admin.js"
 fi
 
+# Create a shared group for config access
+CONFIG_GROUP="spotify-config"
+if ! getent group "$CONFIG_GROUP" >/dev/null 2>&1; then
+    groupadd "$CONFIG_GROUP"
+fi
+
+# Add both users to the config group
+usermod -a -G "$CONFIG_GROUP" "$APP_USER"
+usermod -a -G "$CONFIG_GROUP" "$ADMIN_USER"
+
 # Set permissions
 chown -R "$APP_USER:$APP_USER" "$APP_DIR"
 chown -R "$ADMIN_USER:$ADMIN_USER" "$APP_DIR/web"
-# Make config dir accessible to both users
-chown -R "$ADMIN_USER:$ADMIN_USER" "$CONFIG_DIR"
+
+# Make config dir accessible to both users via shared group
+chown -R "$APP_USER:$CONFIG_GROUP" "$CONFIG_DIR"
 chmod 775 "$CONFIG_DIR"
+# Set group sticky bit so new files inherit the group
+chmod g+s "$CONFIG_DIR"
+
 # Create cache directory for player
 mkdir -p "$CONFIG_DIR/.cache"
-chown "$APP_USER:$APP_USER" "$CONFIG_DIR/.cache"
-chmod 755 "$CONFIG_DIR/.cache"
+chown "$APP_USER:$CONFIG_GROUP" "$CONFIG_DIR/.cache"
+chmod 775 "$CONFIG_DIR/.cache"
+
 # Both users need access to logs
 chown -R "$APP_USER:$APP_USER" "/var/log/spotify-kids"
 chmod 775 "/var/log/spotify-kids"
-# Allow player to read config files
+
+# Set default permissions for config files
 chmod 664 "$CONFIG_DIR"/*.json 2>/dev/null || true
-# Add player to admin group for config access
-usermod -a -G "$ADMIN_USER" "$APP_USER" 2>/dev/null || true
 
 # Configure auto-login
 echo -e "${YELLOW}Configuring auto-login...${NC}"
@@ -565,6 +581,7 @@ rm -rf $APP_DIR
 userdel -r $APP_USER 2>/dev/null
 userdel spotify-admin 2>/dev/null
 groupdel spotify-pkgmgr 2>/dev/null
+groupdel spotify-config 2>/dev/null
 rm -f /usr/local/bin/spotify-kids-uninstall
 echo "Uninstall complete"
 EOF
