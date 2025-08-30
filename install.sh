@@ -459,11 +459,13 @@ cat > /etc/sudoers.d/spotify-pkgmgr << 'EOF'
 %spotify-pkgmgr ALL=(ALL) NOPASSWD:SETENV: /usr/bin/apt-get autoclean*
 %spotify-pkgmgr ALL=(ALL) NOPASSWD:SETENV: /usr/bin/apt-get clean
 %spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/apt list*
+%spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/apt update
 %spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/dpkg -l
 %spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart spotify-player
 %spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop spotify-player
 %spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/systemctl start spotify-player
 %spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/systemctl status spotify-player
+%spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/systemctl is-active spotify-player
 %spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart spotify-admin
 %spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart nginx
 %spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/systemctl start bluetooth
@@ -471,8 +473,19 @@ cat > /etc/sudoers.d/spotify-pkgmgr << 'EOF'
 %spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/systemctl is-active bluetooth
 %spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/bluetoothctl*
 %spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/sbin/rfkill*
+%spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/journalctl*
+%spotify-pkgmgr ALL=(ALL) NOPASSWD: /bin/journalctl*
+%spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/tail*
+%spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/head*
+%spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/cat /var/log/*
+%spotify-pkgmgr ALL=(ALL) NOPASSWD: /bin/cat /var/log/*
+%spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/truncate*
+%spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/dmesg*
+%spotify-pkgmgr ALL=(ALL) NOPASSWD: /bin/dmesg*
+%spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/python3 /opt/spotify-kids/full_diagnostics.py
 %spotify-pkgmgr ALL=(ALL) NOPASSWD: /sbin/reboot
 %spotify-pkgmgr ALL=(ALL) NOPASSWD: /sbin/shutdown*
+%spotify-pkgmgr ALL=(ALL) NOPASSWD: /sbin/poweroff
 EOF
 chmod 0440 /etc/sudoers.d/spotify-pkgmgr
 
