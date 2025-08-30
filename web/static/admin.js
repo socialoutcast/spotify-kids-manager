@@ -581,8 +581,51 @@ function closeUpdateModal() {
 async function runUpdate() {
     if (!confirm('Run system update? This may take several minutes.')) return;
     
-    alert('Update started. Check back in a few minutes.');
-    // Note: Real update would use SSE for progress
+    // Show the update modal
+    const modal = document.getElementById('updateModal');
+    const output = document.getElementById('updateOutput');
+    const closeBtn = document.getElementById('closeUpdateModal');
+    
+    if (modal) modal.style.display = 'block';
+    if (output) output.textContent = 'Starting system update...\n';
+    if (closeBtn) closeBtn.style.display = 'none';
+    
+    // Use EventSource to stream update progress
+    const eventSource = new EventSource('/api/system/update-stream');
+    
+    eventSource.onmessage = function(event) {
+        if (output) {
+            output.textContent += event.data + '\n';
+            output.scrollTop = output.scrollHeight;
+        }
+    };
+    
+    eventSource.onerror = function(error) {
+        console.error('Update stream error:', error);
+        if (output) {
+            output.textContent += '\n=== Update process ended ===\n';
+        }
+        if (closeBtn) closeBtn.style.display = 'inline-block';
+        eventSource.close();
+        
+        // Refresh update status after completion
+        setTimeout(() => {
+            checkUpdateStatus();
+        }, 2000);
+    };
+    
+    eventSource.addEventListener('done', function(event) {
+        if (output) {
+            output.textContent += '\n=== Update completed successfully! ===\n';
+        }
+        if (closeBtn) closeBtn.style.display = 'inline-block';
+        eventSource.close();
+        
+        // Refresh update status after completion
+        setTimeout(() => {
+            checkUpdateStatus();
+        }, 2000);
+    });
 }
 
 // Points system
