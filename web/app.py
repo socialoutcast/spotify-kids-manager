@@ -863,6 +863,17 @@ ADMIN_TEMPLATE = '''
                 <p style="color: #666; font-size: 12px; margin-bottom: 15px;">
                     Keep your system up to date with security patches.
                 </p>
+                <div id="systemUpdateStatus" style="margin-bottom: 15px;">
+                    <span id="updateStatusText" class="status offline" style="font-size: 12px;">
+                        Updates: <span id="updateCount">Checking...</span>
+                    </span>
+                    <div id="updateDetails" style="display: none; margin-top: 10px; padding: 10px; background: #f3f4f6; border-radius: 5px;">
+                        <div style="font-size: 12px; color: #666;">
+                            <strong>Available Updates:</strong>
+                            <div id="updateList" style="margin-top: 5px; max-height: 150px; overflow-y: auto;"></div>
+                        </div>
+                    </div>
+                </div>
                 <button onclick="checkUpdates()">Check for Updates</button>
                 <button onclick="runUpdate()" style="margin-left: 10px;">Update System</button>
                 <div id="updateStatus" style="margin-top: 15px; display: none;">
@@ -2026,6 +2037,43 @@ def bluetooth_status():
             'service_active': is_active,
             'rfkill_unblocked': is_unblocked
         })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/system/updates-check')
+def check_system_updates():
+    """Check for available system updates"""
+    if 'logged_in' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    try:
+        # Check for available updates
+        check_result = subprocess.run(['sudo', 'apt', 'update'], 
+                                    capture_output=True, text=True, timeout=30)
+        
+        # Get list of upgradable packages
+        list_result = subprocess.run(['apt', 'list', '--upgradable'], 
+                                    capture_output=True, text=True)
+        
+        # Parse the output to count and list updates
+        lines = list_result.stdout.strip().split('\n')
+        updates = []
+        for line in lines[1:]:  # Skip the first line (header)
+            if '/' in line:
+                package_info = line.split()[0].split('/')[0]
+                if package_info:
+                    updates.append(package_info)
+        
+        update_count = len(updates)
+        
+        return jsonify({
+            'success': True,
+            'count': update_count,
+            'updates': updates[:20],  # Limit to first 20 for display
+            'has_updates': update_count > 0
+        })
+    except subprocess.TimeoutExpired:
+        return jsonify({'error': 'Update check timed out'}), 500
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
