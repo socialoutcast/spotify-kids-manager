@@ -1437,26 +1437,12 @@ def get_spotify_auth_status():
         spotify_config = load_spotify_config()
         
         if not spotify_config.get('client_id') or not spotify_config.get('client_secret'):
-            return jsonify({'authenticated': False, 'error': 'Spotify not configured'})
+            return jsonify({'success': False, 'authenticated': False, 'error': 'Spotify not configured'})
         
         # Check if token exists
         cache_file = os.path.join(CONFIG_DIR, '.cache', 'token.cache')
         
-        if os.path.exists(cache_file):
-            # Try to load the token
-            auth_manager = SpotifyOAuth(
-                client_id=spotify_config['client_id'],
-                client_secret=spotify_config['client_secret'],
-                redirect_uri='http://localhost:8888/callback',
-                scope='user-read-playback-state user-modify-playback-state user-read-currently-playing playlist-read-private playlist-read-collaborative user-library-read streaming',
-                cache_path=cache_file
-            )
-            
-            token_info = auth_manager.get_cached_token()
-            if token_info:
-                return jsonify({'success': True, 'authenticated': True, 'message': 'Player is authenticated'})
-        
-        # Not authenticated - generate auth URL
+        # Create auth manager
         auth_manager = SpotifyOAuth(
             client_id=spotify_config['client_id'],
             client_secret=spotify_config['client_secret'],
@@ -1466,6 +1452,18 @@ def get_spotify_auth_status():
             open_browser=False
         )
         
+        # Check for cached token
+        token_info = None
+        if os.path.exists(cache_file):
+            try:
+                token_info = auth_manager.get_cached_token()
+            except Exception as e:
+                app.logger.warning(f"Could not read cached token: {e}")
+        
+        if token_info:
+            return jsonify({'success': True, 'authenticated': True, 'message': 'Player is authenticated'})
+        
+        # Not authenticated - generate auth URL
         auth_url = auth_manager.get_authorize_url()
         
         return jsonify({
