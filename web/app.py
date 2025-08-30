@@ -928,12 +928,6 @@ ADMIN_TEMPLATE = '''
                     <button onclick="checkBluetoothStatus()">Refresh Status</button>
                 </div>
                 <button onclick="scanBluetooth()" id="scanBtBtn">Scan for Devices</button>
-                <div id="scanResults" style="margin-top: 15px; display: none;">
-                    <label style="font-size: 14px; margin-bottom: 10px; display: block;">Available Devices:</label>
-                    <div id="scanList" style="max-height: 150px; overflow-y: auto; border: 1px solid #ddd; border-radius: 5px; padding: 10px;">
-                        <p style="color: #999; font-size: 12px;">Scanning...</p>
-                    </div>
-                </div>
             </div>
         </div>
         
@@ -947,6 +941,43 @@ ADMIN_TEMPLATE = '''
                 </div>
             </div>
         </div>
+        
+        <!-- Bluetooth Scan Modal -->
+        <div id="bluetoothScanModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000;">
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border-radius: 10px; padding: 30px; width: 600px; max-height: 80vh; overflow-y: auto;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2 style="margin: 0;">🔍 Scanning for Bluetooth Devices</h2>
+                    <button onclick="closeScanModal()" style="background: #ef4444; color: white; border: none; padding: 5px 15px; border-radius: 5px; cursor: pointer;">✕</button>
+                </div>
+                
+                <div id="scanStatus" style="margin-bottom: 20px; padding: 10px; background: #f3f4f6; border-radius: 5px;">
+                    <div style="display: flex; align-items: center;">
+                        <div class="spinner" style="border: 3px solid #f3f3f3; border-top: 3px solid #667eea; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; margin-right: 10px;"></div>
+                        <span id="scanStatusText">Scanning for devices...</span>
+                    </div>
+                </div>
+                
+                <div style="margin-bottom: 20px;">
+                    <h3 style="margin-bottom: 10px;">Available Devices:</h3>
+                    <div id="scanDeviceList" style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; border-radius: 5px; padding: 10px; background: #f9fafb;">
+                        <p style="color: #999; text-align: center;">No devices found yet...</p>
+                    </div>
+                </div>
+                
+                <div style="display: flex; gap: 10px;">
+                    <button onclick="scanBluetooth()" style="flex: 1; background: #667eea;">Refresh Scan</button>
+                    <button onclick="stopScan()" style="flex: 1; background: #ef4444;">Stop Scanning</button>
+                    <button onclick="closeScanModal()" style="flex: 1;">Close</button>
+                </div>
+            </div>
+        </div>
+        
+        <style>
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+        </style>
         
         <!-- Log Viewer Modal -->
         <div id="logModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000;">
