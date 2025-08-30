@@ -75,6 +75,11 @@ def save_spotify_config(config):
     os.makedirs(CONFIG_DIR, exist_ok=True)
     with open(SPOTIFY_CONFIG_FILE, 'w') as f:
         json.dump(config, f, indent=2)
+    # Set proper permissions so spotify-kids user can read it
+    try:
+        os.chmod(SPOTIFY_CONFIG_FILE, 0o664)
+    except:
+        pass  # Ignore permission errors
 
 def load_parental_config():
     """Load parental control configuration"""
