@@ -1797,12 +1797,13 @@ def update_stream():
                 # Run apt upgrade with auto-yes
                 yield "data: \n\n"
                 yield "data: Running system upgrade (this may take a while)...\n\n"
-                proc = subprocess.Popen(['sudo', 'DEBIAN_FRONTEND=noninteractive', 'apt-get', 
-                                       'upgrade', '-y', '--force-yes', '-o', 
-                                       'Dpkg::Options::=--force-confdef', '-o',
+                env = os.environ.copy()
+                env['DEBIAN_FRONTEND'] = 'noninteractive'
+                proc = subprocess.Popen(['sudo', 'apt-get', 'upgrade', '-y', 
+                                       '-o', 'Dpkg::Options::=--force-confdef', '-o',
                                        'Dpkg::Options::=--force-confold'],
                                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                      text=True, bufsize=1, env={**os.environ, 'DEBIAN_FRONTEND': 'noninteractive'})
+                                      text=True, bufsize=1, env=env)
                 
                 for line in proc.stdout:
                     cleaned_line = line.strip()
