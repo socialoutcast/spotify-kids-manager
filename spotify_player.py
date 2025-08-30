@@ -23,7 +23,7 @@ CACHE_DIR = os.path.join(CONFIG_DIR, '.cache')
 LOG_DIR = '/var/log/spotify-kids'
 CLIENT_ID = None
 CLIENT_SECRET = None
-DEFAULT_REDIRECT_URI = 'http://localhost:8888/callback'
+DEFAULT_REDIRECT_URI = 'http://127.0.0.1:4202'
 DEBUG_MODE = os.environ.get('SPOTIFY_DEBUG', 'true').lower() == 'true'  # Enable debug by default
 
 # Setup logging
