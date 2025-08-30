@@ -1,0 +1,17 @@
+[Unit]
+Description=Spotify OAuth Callback Server
+After=network.target
+
+[Service]
+Type=simple
+User=spotify-kids
+Group=spotify-kids
+Environment="SPOTIFY_CONFIG_DIR=/opt/spotify-kids/config"
+ExecStart=/usr/bin/python3 /opt/spotify-kids/callback_server.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

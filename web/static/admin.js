@@ -46,7 +46,7 @@ function showStatus(elementId, message, isError = false) {
 async function saveSpotifyConfig() {
     const clientId = document.getElementById('clientId').value;
     const clientSecret = document.getElementById('clientSecret').value;
-    const redirectUri = document.getElementById('redirectUri').value || 'http://localhost:8888/callback';
+    const redirectUri = document.getElementById('redirectUri').value || 'http://127.0.0.1:4202';
     
     const result = await apiCall('/api/spotify/config', 'POST', {
         client_id: clientId,
@@ -924,6 +924,46 @@ function exportUsageStats() {
 
 function downloadLogs() {
     window.location.href = '/api/logs/download';
+}
+
+// Submit OAuth callback URL
+async function submitAuthCallback() {
+    const callbackUrl = document.getElementById('authCallbackUrl').value;
+    
+    if (!callbackUrl) {
+        alert('Please paste the callback URL');
+        return;
+    }
+    
+    // Extract the code from the URL
+    let code = null;
+    try {
+        const url = new URL(callbackUrl);
+        code = url.searchParams.get('code');
+    } catch (e) {
+        alert('Invalid URL. Please paste the complete URL from your browser.');
+        return;
+    }
+    
+    if (!code) {
+        alert('No authorization code found in the URL. Make sure you paste the complete URL after Spotify redirects you.');
+        return;
+    }
+    
+    // Submit the code to the backend
+    const result = await apiCall('/api/spotify/submit-auth-code', 'POST', { code: code });
+    
+    if (result.success) {
+        showStatus('spotifyStatus', '✓ Authentication successful! The player is now connected to Spotify.');
+        // Hide the auth section
+        document.getElementById('spotifyAuthSection').style.display = 'none';
+        // Clear the input
+        document.getElementById('authCallbackUrl').value = '';
+        // Refresh auth status
+        checkSpotifyAuthStatus();
+    } else {
+        alert('Authentication failed: ' + (result.error || 'Unknown error'));
+    }
 }
 
 // Check Spotify authentication status
