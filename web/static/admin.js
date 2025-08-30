@@ -46,12 +46,10 @@ function showStatus(elementId, message, isError = false) {
 async function saveSpotifyConfig() {
     const clientId = document.getElementById('clientId').value;
     const clientSecret = document.getElementById('clientSecret').value;
-    const redirectUri = document.getElementById('redirectUri').value || 'http://127.0.0.1:4202';
     
     const result = await apiCall('/api/spotify/config', 'POST', {
         client_id: clientId,
-        client_secret: clientSecret,
-        redirect_uri: redirectUri
+        client_secret: clientSecret
     });
     
     if (result.success) {
@@ -974,10 +972,18 @@ async function checkSpotifyAuthStatus() {
         
         const authSection = document.getElementById('spotifyAuthSection');
         const authLink = document.getElementById('spotifyAuthLink');
+        const redirectUriDisplay = document.getElementById('redirectUriDisplay');
         
         if (!authSection) {
             console.log('Auth section element not found');
             return;
+        }
+        
+        // Display the redirect URI that needs to be added to Spotify app
+        if (redirectUriDisplay) {
+            const currentUrl = window.location.href.split('#')[0].split('?')[0];
+            const baseUrl = currentUrl.endsWith('/') ? currentUrl.slice(0, -1) : currentUrl;
+            redirectUriDisplay.textContent = baseUrl + '/callback';
         }
         
         if (result.success && result.auth_url && !result.authenticated) {

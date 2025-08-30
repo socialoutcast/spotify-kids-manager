@@ -234,7 +234,7 @@ class SpotifyPlayer:
             config = {
                 'client_id': CLIENT_ID,
                 'client_secret': CLIENT_SECRET,
-                'redirect_uri': config.get('redirect_uri', DEFAULT_REDIRECT_URI)
+                'redirect_uri': DEFAULT_REDIRECT_URI  # Player uses default, web uses dynamic
             }
             
             with open(os.path.join(CONFIG_DIR, 'spotify_config.json'), 'w') as f:
@@ -269,7 +269,7 @@ class SpotifyPlayer:
             auth_manager = SpotifyOAuth(
                 client_id=CLIENT_ID,
                 client_secret=CLIENT_SECRET,
-                redirect_uri=config.get('redirect_uri', DEFAULT_REDIRECT_URI),
+                redirect_uri=DEFAULT_REDIRECT_URI,  # Player uses default, web uses dynamic
                 scope='user-read-playback-state user-modify-playback-state user-read-currently-playing playlist-read-private playlist-read-collaborative user-library-read streaming',
                 cache_path=os.path.join(CACHE_DIR, 'token.cache'),
                 open_browser=False
