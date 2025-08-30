@@ -287,28 +287,85 @@ async function clearLogs() {
 }
 
 // Bluetooth
-async function scanBluetooth() {
-    document.getElementById('scanList').innerHTML = 'Scanning...';
-    
-    const result = await apiCall('/api/bluetooth/scan');
-    
-    if (result.devices) {
-        let html = '';
-        for (const device of result.devices) {
-            html += `<div>${device.name || device.address} <button onclick="pairBluetooth('${device.address}')">Pair</button></div>`;
-        }
-        document.getElementById('scanList').innerHTML = html || 'No devices found';
-    } else {
-        document.getElementById('scanList').innerHTML = 'Scan failed: ' + (result.error || 'Unknown error');
+// Bluetooth Modal Functions
+function openBluetoothScanModal() {
+    const modal = document.getElementById('bluetoothScanModal');
+    if (modal) {
+        modal.style.display = 'flex';
+        startBluetoothScan();
     }
 }
 
-async function pairBluetooth(address) {
+function closeBluetoothScanModal() {
+    const modal = document.getElementById('bluetoothScanModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+async function startBluetoothScan() {
+    const deviceList = document.getElementById('scanDeviceList');
+    const scanStatus = document.getElementById('scanStatus');
+    const scanSpinner = document.getElementById('scanSpinner');
+    
+    // Show scanning status
+    if (scanStatus) scanStatus.textContent = 'Scanning for devices...';
+    if (scanSpinner) scanSpinner.style.display = 'block';
+    if (deviceList) deviceList.innerHTML = '<p>Searching for Bluetooth devices...</p>';
+    
+    try {
+        const result = await apiCall('/api/bluetooth/scan');
+        
+        if (scanSpinner) scanSpinner.style.display = 'none';
+        
+        if (result.devices && result.devices.length > 0) {
+            if (scanStatus) scanStatus.textContent = `Found ${result.devices.length} device(s)`;
+            
+            let html = '<div class="device-list">';
+            for (const device of result.devices) {
+                const name = device.name || 'Unknown Device';
+                const address = device.address || '';
+                const isPaired = device.paired || false;
+                
+                html += `
+                    <div class="device-item" style="padding: 10px; margin: 5px 0; background: #f5f5f5; border-radius: 5px; display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <strong>${name}</strong><br>
+                            <small style="color: #666;">${address}</small>
+                            ${isPaired ? '<span style="color: green; margin-left: 10px;">✓ Paired</span>' : ''}
+                        </div>
+                        <div>
+                            ${!isPaired ? `<button onclick="pairBluetoothDevice('${address}')" style="padding: 5px 10px; background: #4CAF50; color: white; border: none; border-radius: 3px; cursor: pointer;">Pair</button>` : 
+                              `<button onclick="connectBluetooth('${address}')" style="padding: 5px 10px; background: #2196F3; color: white; border: none; border-radius: 3px; cursor: pointer;">Connect</button>`}
+                        </div>
+                    </div>`;
+            }
+            html += '</div>';
+            
+            if (deviceList) deviceList.innerHTML = html;
+        } else {
+            if (scanStatus) scanStatus.textContent = 'No devices found';
+            if (deviceList) deviceList.innerHTML = '<p style="text-align: center; color: #666;">No Bluetooth devices found. Make sure devices are in pairing mode.</p>';
+        }
+    } catch (error) {
+        if (scanSpinner) scanSpinner.style.display = 'none';
+        if (scanStatus) scanStatus.textContent = 'Scan failed';
+        if (deviceList) deviceList.innerHTML = `<p style="color: red;">Error: ${error.message || 'Failed to scan for devices'}</p>`;
+    }
+}
+
+async function scanBluetooth() {
+    // Open the modal instead of inline display
+    openBluetoothScanModal();
+}
+
+async function pairBluetoothDevice(address) {
     const result = await apiCall('/api/bluetooth/pair', 'POST', {address: address});
     
     if (result.success) {
-        alert('Paired successfully');
-        location.reload();
+        alert('Device paired successfully!');
+        // Refresh the scan to show updated status
+        startBluetoothScan();
     } else {
         alert('Pairing failed: ' + (result.error || 'Unknown error'));
     }
