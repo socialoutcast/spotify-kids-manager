@@ -498,28 +498,23 @@ ADMIN_TEMPLATE = '''
                 <div id="spotifyAuthSection" style="display: none; margin-bottom: 15px;">
                     <div style="background: #f59e0b; color: white; padding: 10px; border-radius: 5px; margin-bottom: 10px;">
                         <strong>⚠️ Authentication Required</strong>
-                        <p style="margin: 5px 0; font-size: 12px;">The Spotify player needs to be authenticated. Follow the steps below:</p>
+                        <p style="margin: 5px 0; font-size: 12px;">The Spotify player needs to be authenticated.</p>
                     </div>
                     
                     <div style="background: #1f2937; padding: 15px; border-radius: 5px; margin-bottom: 10px;">
-                        <p style="margin: 0 0 10px 0; color: white; font-size: 13px;"><strong>Step 1:</strong> Click this link to authenticate with Spotify:</p>
-                        <a id="spotifyAuthLink" href="#" target="_blank" style="display: inline-block; background: #1db954; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; font-weight: bold;">
-                            🔐 Open Spotify Login
+                        <p style="margin: 0 0 10px 0; color: white; font-size: 13px;">Click the button below to authenticate with Spotify:</p>
+                        <a id="spotifyAuthLink" href="#" style="display: inline-block; background: #1db954; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; font-weight: bold;">
+                            🔐 Authenticate with Spotify
                         </a>
                     </div>
                     
-                    <div style="background: #1f2937; padding: 15px; border-radius: 5px;">
-                        <p style="margin: 0 0 10px 0; color: white; font-size: 13px;"><strong>Step 2:</strong> After login, you'll see an error page. Copy the ENTIRE URL from your browser's address bar and paste it here:</p>
-                        <input type="text" id="authCallbackUrl" placeholder="Paste the full URL here (http://localhost:8888/callback?code=...)" style="width: 100%; padding: 8px; margin-bottom: 10px; background: #374151; color: white; border: 1px solid #4b5563; border-radius: 3px;">
-                        <button onclick="submitAuthCallback()" style="background: #10b981; color: white; padding: 8px 20px; border-radius: 5px; border: none; cursor: pointer;">
-                            Submit Authorization
-                        </button>
-                    </div>
-                    
                     <div style="margin-top: 10px; padding: 10px; background: #374151; border-radius: 5px;">
-                        <p style="margin: 0; font-size: 11px; color: #9ca3af;">
-                            <strong>Note:</strong> The redirect will fail (that's normal). Just copy the entire URL from your browser after Spotify redirects you.
+                        <p style="margin: 0 0 5px 0; font-size: 11px; color: #9ca3af;">
+                            <strong>Important:</strong> Add this URL to your Spotify app's Redirect URIs:
                         </p>
+                        <code id="redirectUriDisplay" style="background: #1f2937; padding: 4px 8px; border-radius: 3px; color: #10b981; font-size: 11px;">
+                            Loading...
+                        </code>
                     </div>
                 </div>
                 <div class="form-group">
@@ -529,10 +524,6 @@ ADMIN_TEMPLATE = '''
                 <div class="form-group">
                     <label>Client Secret</label>
                     <input type="password" id="clientSecret" value="{{ spotify_config.get('client_secret', '') }}" placeholder="Enter Spotify Client Secret">
-                </div>
-                <div class="form-group">
-                    <label>Redirect URI (must match your Spotify app settings)</label>
-                    <input type="text" id="redirectUri" value="{{ spotify_config.get('redirect_uri', 'http://127.0.0.1:4202') }}" placeholder="http://127.0.0.1:4202">
                 </div>
                 <div style="display: flex; gap: 10px;">
                     <button onclick="saveSpotifyConfig()" style="flex: 1;">Save Configuration</button>
@@ -1301,8 +1292,7 @@ def update_spotify_config():
     
     config = {
         'client_id': data.get('client_id', ''),
-        'client_secret': data.get('client_secret', ''),
-        'redirect_uri': data.get('redirect_uri', 'http://127.0.0.1:4202')
+        'client_secret': data.get('client_secret', '')
     }
     
     try:
@@ -1465,7 +1455,12 @@ def get_spotify_auth_status():
         cache_file = os.path.join(CONFIG_DIR, '.cache', 'token.cache')
         
         # Create auth manager
-        redirect_uri = spotify_config.get('redirect_uri', 'http://127.0.0.1:4202')
+        # Use the actual URL where the admin panel is accessed
+        # Get from request headers or use configured value
+        host = request.headers.get('Host', 'localhost:8080')
+        scheme = 'https' if request.is_secure else 'http'
+        redirect_uri = f"{scheme}://{host}/callback"
+        
         auth_manager = SpotifyOAuth(
             client_id=spotify_config['client_id'],
             client_secret=spotify_config['client_secret'],
@@ -1501,6 +1496,93 @@ def get_spotify_auth_status():
         app.logger.error(f"Error checking auth status: {e}")
         return jsonify({'authenticated': False, 'error': str(e)}), 500
 
+@app.route('/callback')
+def oauth_callback():
+    """Handle OAuth callback from Spotify"""
+    code = request.args.get('code')
+    error = request.args.get('error')
+    
+    if error:
+        return f"""
+        <html>
+        <body style="font-family: Arial; text-align: center; padding: 50px;">
+            <h2 style="color: red;">❌ Authentication Failed</h2>
+            <p>Error: {error}</p>
+            <a href="/">Return to Admin Panel</a>
+        </body>
+        </html>
+        """
+    
+    if not code:
+        return f"""
+        <html>
+        <body style="font-family: Arial; text-align: center; padding: 50px;">
+            <h2 style="color: red;">❌ No Authorization Code</h2>
+            <p>No authorization code received from Spotify.</p>
+            <a href="/">Return to Admin Panel</a>
+        </body>
+        </html>
+        """
+    
+    try:
+        from spotipy.oauth2 import SpotifyOAuth
+        
+        # Load config
+        spotify_config = load_spotify_config()
+        
+        if not spotify_config.get('client_id') or not spotify_config.get('client_secret'):
+            raise Exception("Spotify not configured")
+        
+        # Create cache directory
+        os.makedirs(CACHE_DIR, exist_ok=True)
+        cache_file = os.path.join(CACHE_DIR, 'token.cache')
+        
+        # Get the actual redirect URI used (construct from request)
+        redirect_uri = request.url_root.rstrip('/') + '/callback'
+        
+        # Create auth manager with the actual redirect URI
+        auth_manager = SpotifyOAuth(
+            client_id=spotify_config['client_id'],
+            client_secret=spotify_config['client_secret'],
+            redirect_uri=redirect_uri,
+            scope='user-read-playback-state user-modify-playback-state user-read-currently-playing playlist-read-private playlist-read-collaborative user-library-read streaming',
+            cache_path=cache_file,
+            open_browser=False
+        )
+        
+        # Exchange code for token
+        token_info = auth_manager.get_access_token(code, as_dict=True)
+        
+        if token_info:
+            app.logger.info("Successfully obtained Spotify access token via callback")
+            return f"""
+            <html>
+            <head>
+                <meta http-equiv="refresh" content="3;url=/">
+            </head>
+            <body style="font-family: Arial; text-align: center; padding: 50px;">
+                <h2 style="color: green;">✅ Authentication Successful!</h2>
+                <p>Spotify has been successfully authenticated.</p>
+                <p>Redirecting to admin panel in 3 seconds...</p>
+                <a href="/">Click here if not redirected</a>
+            </body>
+            </html>
+            """
+        else:
+            raise Exception("Failed to obtain access token")
+            
+    except Exception as e:
+        app.logger.error(f"Error in OAuth callback: {e}")
+        return f"""
+        <html>
+        <body style="font-family: Arial; text-align: center; padding: 50px;">
+            <h2 style="color: red;">❌ Authentication Error</h2>
+            <p>Error: {str(e)}</p>
+            <a href="/">Return to Admin Panel</a>
+        </body>
+        </html>
+        """
+
 @app.route('/api/spotify/submit-auth-code', methods=['POST'])
 def submit_auth_code():
     """Submit authorization code from OAuth callback"""
@@ -1527,7 +1609,12 @@ def submit_auth_code():
         cache_file = os.path.join(CACHE_DIR, 'token.cache')
         
         # Create auth manager
-        redirect_uri = spotify_config.get('redirect_uri', 'http://127.0.0.1:4202')
+        # Use the actual URL where the admin panel is accessed
+        # Get from request headers or use configured value
+        host = request.headers.get('Host', 'localhost:8080')
+        scheme = 'https' if request.is_secure else 'http'
+        redirect_uri = f"{scheme}://{host}/callback"
+        
         auth_manager = SpotifyOAuth(
             client_id=spotify_config['client_id'],
             client_secret=spotify_config['client_secret'],
