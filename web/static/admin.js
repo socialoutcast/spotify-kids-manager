@@ -924,6 +924,28 @@ function downloadLogs() {
     window.location.href = '/api/logs/download';
 }
 
+// Check Spotify authentication status
+async function checkSpotifyAuthStatus() {
+    const result = await apiCall('/api/spotify/auth-status');
+    const authSection = document.getElementById('spotifyAuthSection');
+    const authLink = document.getElementById('spotifyAuthLink');
+    
+    if (result.success && result.auth_url) {
+        // Show auth section with the link
+        if (authSection) {
+            authSection.style.display = 'block';
+            if (authLink) {
+                authLink.href = result.auth_url;
+            }
+        }
+    } else {
+        // Hide auth section if authenticated
+        if (authSection) {
+            authSection.style.display = 'none';
+        }
+    }
+}
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     // Set up any event listeners
@@ -933,6 +955,11 @@ document.addEventListener('DOMContentLoaded', function() {
             if (e.key === 'Enter') login();
         });
     }
+    
+    // Check Spotify auth status
+    checkSpotifyAuthStatus();
+    // Check auth status periodically
+    setInterval(checkSpotifyAuthStatus, 30000); // Check every 30 seconds
     
     // Load playlists if logged in
     if (document.getElementById('playlistContainer')) {
