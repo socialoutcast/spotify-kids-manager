@@ -926,23 +926,35 @@ function downloadLogs() {
 
 // Check Spotify authentication status
 async function checkSpotifyAuthStatus() {
-    const result = await apiCall('/api/spotify/auth-status');
-    const authSection = document.getElementById('spotifyAuthSection');
-    const authLink = document.getElementById('spotifyAuthLink');
-    
-    if (result.success && result.auth_url) {
-        // Show auth section with the link
-        if (authSection) {
+    try {
+        const result = await apiCall('/api/spotify/auth-status');
+        console.log('Auth status result:', result);
+        
+        const authSection = document.getElementById('spotifyAuthSection');
+        const authLink = document.getElementById('spotifyAuthLink');
+        
+        if (!authSection) {
+            console.log('Auth section element not found');
+            return;
+        }
+        
+        if (result.success && result.auth_url && !result.authenticated) {
+            // Show auth section with the link
+            console.log('Showing auth link:', result.auth_url);
             authSection.style.display = 'block';
             if (authLink) {
                 authLink.href = result.auth_url;
             }
-        }
-    } else {
-        // Hide auth section if authenticated
-        if (authSection) {
+        } else if (result.authenticated) {
+            // Hide auth section if authenticated
+            console.log('Player is authenticated, hiding auth section');
+            authSection.style.display = 'none';
+        } else {
+            console.log('Unknown auth state:', result);
             authSection.style.display = 'none';
         }
+    } catch (error) {
+        console.error('Error checking auth status:', error);
     }
 }
 
