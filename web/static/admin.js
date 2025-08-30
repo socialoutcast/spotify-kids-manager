@@ -46,10 +46,12 @@ function showStatus(elementId, message, isError = false) {
 async function saveSpotifyConfig() {
     const clientId = document.getElementById('clientId').value;
     const clientSecret = document.getElementById('clientSecret').value;
+    const redirectUri = document.getElementById('redirectUri').value || 'http://localhost:8888/callback';
     
     const result = await apiCall('/api/spotify/config', 'POST', {
         client_id: clientId,
-        client_secret: clientSecret
+        client_secret: clientSecret,
+        redirect_uri: redirectUri
     });
     
     if (result.success) {

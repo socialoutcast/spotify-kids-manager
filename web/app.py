@@ -503,6 +503,12 @@ ADMIN_TEMPLATE = '''
                     <a id="spotifyAuthLink" href="#" target="_blank" style="display: inline-block; background: #1db954; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; font-weight: bold;">
                         🔐 Authenticate with Spotify
                     </a>
+                    <div style="margin-top: 10px; padding: 10px; background: #1f2937; border-radius: 5px;">
+                        <p style="margin: 0; font-size: 11px; color: #9ca3af;">
+                            <strong>Important:</strong> Add this exact URL to your Spotify app's Redirect URIs:<br>
+                            <code style="background: #374151; padding: 2px 5px; border-radius: 3px;">http://localhost:8888/callback</code>
+                        </p>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>Client ID</label>
@@ -511,6 +517,10 @@ ADMIN_TEMPLATE = '''
                 <div class="form-group">
                     <label>Client Secret</label>
                     <input type="password" id="clientSecret" value="{{ spotify_config.get('client_secret', '') }}" placeholder="Enter Spotify Client Secret">
+                </div>
+                <div class="form-group">
+                    <label>Redirect URI (optional - defaults to http://localhost:8888/callback)</label>
+                    <input type="text" id="redirectUri" value="{{ spotify_config.get('redirect_uri', 'http://localhost:8888/callback') }}" placeholder="http://localhost:8888/callback">
                 </div>
                 <div style="display: flex; gap: 10px;">
                     <button onclick="saveSpotifyConfig()" style="flex: 1;">Save Configuration</button>
@@ -1280,7 +1290,7 @@ def update_spotify_config():
     config = {
         'client_id': data.get('client_id', ''),
         'client_secret': data.get('client_secret', ''),
-        'redirect_uri': 'http://localhost:8888/callback'
+        'redirect_uri': data.get('redirect_uri', 'http://localhost:8888/callback')
     }
     
     try:
@@ -1443,10 +1453,11 @@ def get_spotify_auth_status():
         cache_file = os.path.join(CONFIG_DIR, '.cache', 'token.cache')
         
         # Create auth manager
+        redirect_uri = spotify_config.get('redirect_uri', 'http://localhost:8888/callback')
         auth_manager = SpotifyOAuth(
             client_id=spotify_config['client_id'],
             client_secret=spotify_config['client_secret'],
-            redirect_uri='http://localhost:8888/callback',
+            redirect_uri=redirect_uri,
             scope='user-read-playback-state user-modify-playback-state user-read-currently-playing playlist-read-private playlist-read-collaborative user-library-read streaming',
             cache_path=cache_file,
             open_browser=False
