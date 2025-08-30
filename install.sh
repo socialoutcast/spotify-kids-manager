@@ -466,6 +466,11 @@ cat > /etc/sudoers.d/spotify-pkgmgr << 'EOF'
 %spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/systemctl status spotify-player
 %spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart spotify-admin
 %spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart nginx
+%spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/systemctl start bluetooth
+%spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop bluetooth
+%spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/systemctl is-active bluetooth
+%spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/bluetoothctl*
+%spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/sbin/rfkill*
 %spotify-pkgmgr ALL=(ALL) NOPASSWD: /sbin/reboot
 %spotify-pkgmgr ALL=(ALL) NOPASSWD: /sbin/shutdown*
 EOF
