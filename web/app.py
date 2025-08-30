@@ -1456,9 +1456,18 @@ def get_spotify_auth_status():
         
         # Create auth manager
         # Use the actual URL where the admin panel is accessed
-        # Get from request headers or use configured value
+        # Check for forwarded proto (nginx proxy)
+        forwarded_proto = request.headers.get('X-Forwarded-Proto', '')
         host = request.headers.get('Host', 'localhost:8080')
-        scheme = 'https' if request.is_secure else 'http'
+        
+        # Determine scheme
+        if forwarded_proto:
+            scheme = forwarded_proto
+        elif request.is_secure:
+            scheme = 'https'
+        else:
+            scheme = 'http'
+            
         redirect_uri = f"{scheme}://{host}/callback"
         
         auth_manager = SpotifyOAuth(
@@ -1538,7 +1547,17 @@ def oauth_callback():
         cache_file = os.path.join(CACHE_DIR, 'token.cache')
         
         # Get the actual redirect URI used (construct from request)
-        redirect_uri = request.url_root.rstrip('/') + '/callback'
+        forwarded_proto = request.headers.get('X-Forwarded-Proto', '')
+        host = request.headers.get('Host', 'localhost:8080')
+        
+        if forwarded_proto:
+            scheme = forwarded_proto
+        elif request.is_secure:
+            scheme = 'https'
+        else:
+            scheme = 'http'
+            
+        redirect_uri = f"{scheme}://{host}/callback"
         
         # Create auth manager with the actual redirect URI
         auth_manager = SpotifyOAuth(
@@ -1610,9 +1629,18 @@ def submit_auth_code():
         
         # Create auth manager
         # Use the actual URL where the admin panel is accessed
-        # Get from request headers or use configured value
+        # Check for forwarded proto (nginx proxy)
+        forwarded_proto = request.headers.get('X-Forwarded-Proto', '')
         host = request.headers.get('Host', 'localhost:8080')
-        scheme = 'https' if request.is_secure else 'http'
+        
+        # Determine scheme
+        if forwarded_proto:
+            scheme = forwarded_proto
+        elif request.is_secure:
+            scheme = 'https'
+        else:
+            scheme = 'http'
+            
         redirect_uri = f"{scheme}://{host}/callback"
         
         auth_manager = SpotifyOAuth(
