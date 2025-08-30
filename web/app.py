@@ -2786,9 +2786,9 @@ def list_packages():
                         'version': parts[2],
                         'description': ' '.join(parts[3:]) if len(parts) > 3 else ''
                     })
-        return jsonify({'packages': packages, 'count': len(packages)})
+        return jsonify({'success': True, 'packages': packages, 'count': len(packages)}), 200
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'success': False, 'error': f'Failed to list packages: {str(e)}'}), 200
 
 @app.route('/api/system/packages/upgradable')
 def list_upgradable_packages():
@@ -2798,7 +2798,10 @@ def list_upgradable_packages():
     
     try:
         # First update the package list
-        subprocess.run(['sudo', 'apt-get', 'update'], capture_output=True, timeout=30)
+        update_result = subprocess.run(['sudo', 'apt-get', 'update'], 
+                                      capture_output=True, text=True, timeout=30)
+        if update_result.returncode != 0:
+            return jsonify({'success': False, 'error': 'Failed to update package list'}), 200
         
         # Get upgradable packages
         result = subprocess.run(['apt', 'list', '--upgradable'], 
@@ -2818,9 +2821,9 @@ def list_upgradable_packages():
                         'info': ' '.join(parts[2:]) if len(parts) > 2 else ''
                     })
         
-        return jsonify({'packages': packages, 'count': len(packages)})
+        return jsonify({'success': True, 'packages': packages, 'count': len(packages)}), 200
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'success': False, 'error': f'Failed to get upgradable packages: {str(e)}'}), 200
 
 @app.route('/api/system/packages/update', methods=['POST'])
 def update_single_package():
@@ -2830,11 +2833,11 @@ def update_single_package():
     
     package_name = request.json.get('package')
     if not package_name:
-        return jsonify({'error': 'Package name required'}), 400
+        return jsonify({'success': False, 'error': 'Package name required'}), 200
     
     # Sanitize package name to prevent command injection
-    if not all(c.isalnum() or c in '.-+' for c in package_name):
-        return jsonify({'error': 'Invalid package name'}), 400
+    if not all(c.isalnum() or c in '.-+:' for c in package_name):
+        return jsonify({'success': False, 'error': 'Invalid package name'}), 200
     
     try:
         env = os.environ.copy()
@@ -2845,13 +2848,14 @@ def update_single_package():
                               capture_output=True, text=True, timeout=60, env=env)
         
         if result.returncode == 0:
-            return jsonify({'success': True, 'message': f'Package {package_name} updated successfully'})
+            return jsonify({'success': True, 'message': f'Package {package_name} updated successfully'}), 200
         else:
-            return jsonify({'error': result.stderr or result.stdout}), 500
+            error_msg = result.stderr if result.stderr else result.stdout
+            return jsonify({'success': False, 'error': f'Update failed: {error_msg}'}), 200
     except subprocess.TimeoutExpired:
-        return jsonify({'error': 'Update timeout'}), 500
+        return jsonify({'success': False, 'error': 'Update timeout'}), 200
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'success': False, 'error': f'Server error: {str(e)}'}), 200
 
 @app.route('/api/system/packages/dist-upgrade', methods=['POST'])
 def dist_upgrade():
@@ -2864,7 +2868,10 @@ def dist_upgrade():
         env['DEBIAN_FRONTEND'] = 'noninteractive'
         
         # Update package list first
-        subprocess.run(['sudo', 'apt-get', 'update'], capture_output=True, timeout=30)
+        update_result = subprocess.run(['sudo', 'apt-get', 'update'], 
+                                      capture_output=True, text=True, timeout=30)
+        if update_result.returncode != 0:
+            return jsonify({'success': False, 'error': 'Failed to update package list: ' + (update_result.stderr or update_result.stdout)}), 200
         
         # Perform dist-upgrade
         result = subprocess.run(['sudo', '-E', 'apt-get', 'dist-upgrade', '-y',
@@ -2874,16 +2881,20 @@ def dist_upgrade():
         
         if result.returncode == 0:
             # Clean up
-            subprocess.run(['sudo', 'apt-get', 'autoremove', '-y'], capture_output=True, timeout=60)
-            subprocess.run(['sudo', 'apt-get', 'autoclean'], capture_output=True, timeout=30)
+            subprocess.run(['sudo', 'apt-get', 'autoremove', '-y'], 
+                         capture_output=True, timeout=60, env=env)
+            subprocess.run(['sudo', 'apt-get', 'autoclean'], 
+                         capture_output=True, timeout=30, env=env)
             
-            return jsonify({'success': True, 'message': 'Distribution upgrade completed successfully'})
+            return jsonify({'success': True, 'message': 'Distribution upgrade completed successfully'}), 200
         else:
-            return jsonify({'error': result.stderr or result.stdout}), 500
+            error_msg = result.stderr if result.stderr else result.stdout
+            return jsonify({'success': False, 'error': f'Upgrade failed: {error_msg}'}), 200
+            
     except subprocess.TimeoutExpired:
-        return jsonify({'error': 'Upgrade timeout - this may take longer than expected'}), 500
+        return jsonify({'success': False, 'error': 'Upgrade timeout - this may take longer than expected'}), 200
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'success': False, 'error': f'Server error: {str(e)}'}), 200
 
 if __name__ == '__main__':
     os.makedirs(CONFIG_DIR, exist_ok=True)
