@@ -373,24 +373,69 @@ ProtectHome=no
 WantedBy=multi-user.target
 EOF
 
-# Configure nginx
-echo -e "${YELLOW}Configuring nginx...${NC}"
+# Generate SSL certificate for HTTPS (required for Spotify OAuth)
+echo -e "${YELLOW}Generating SSL certificate for HTTPS...${NC}"
+SSL_DIR="$APP_DIR/ssl"
+mkdir -p $SSL_DIR
+IP_ADDRESS=$(hostname -I | awk '{print $1}')
+
+# Generate self-signed certificate
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+    -keyout $SSL_DIR/server.key \
+    -out $SSL_DIR/server.crt \
+    -subj "/C=US/ST=State/L=City/O=SpotifyKids/CN=$IP_ADDRESS" \
+    -addext "subjectAltName=IP:$IP_ADDRESS,DNS:localhost" 2>/dev/null
+
+# Set proper permissions
+chown -R $APP_USER:$APP_USER $SSL_DIR
+chmod 600 $SSL_DIR/server.key
+chmod 644 $SSL_DIR/server.crt
+
+# Configure nginx with HTTPS
+echo -e "${YELLOW}Configuring nginx with HTTPS support...${NC}"
 cat > /etc/nginx/sites-available/spotify-admin << EOF
+# HTTPS server - main configuration
 server {
-    listen 8080;
-    server_name _;
+    listen 443 ssl default_server;
+    listen [::]:443 ssl default_server;
+    server_name $IP_ADDRESS;
+
+    ssl_certificate $SSL_DIR/server.crt;
+    ssl_certificate_key $SSL_DIR/server.key;
     
+    # SSL configuration
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+
     location / {
         proxy_pass http://127.0.0.1:5001;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection 'upgrade';
         proxy_set_header Host \$host;
-        proxy_cache_bypass \$http_upgrade;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_cache_bypass \$http_upgrade;
+        proxy_read_timeout 86400;
     }
+}
+
+# HTTP server - redirect to HTTPS
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name $IP_ADDRESS;
+    return 301 https://\$server_name\$request_uri;
+}
+
+# Port 8080 - redirect to HTTPS for backward compatibility
+server {
+    listen 8080;
+    listen [::]:8080;
+    server_name $IP_ADDRESS;
+    return 301 https://$IP_ADDRESS\$request_uri;
 }
 EOF
 
@@ -593,6 +638,8 @@ rm -f /etc/systemd/system/spotify-player.service
 rm -f /etc/systemd/system/spotify-admin.service
 rm -f /etc/nginx/sites-available/spotify-admin
 rm -f /etc/nginx/sites-enabled/spotify-admin
+rm -f /etc/nginx/sites-available/spotify-admin-ssl
+rm -f /etc/nginx/sites-enabled/spotify-admin-ssl
 rm -f /etc/sudoers.d/spotify-admin
 rm -f /etc/sudoers.d/spotify-pkgmgr
 rm -rf $APP_DIR
@@ -609,8 +656,15 @@ echo -e "${GREEN}================================${NC}"
 echo -e "${GREEN}Installation Complete!${NC}"
 echo -e "${GREEN}================================${NC}"
 echo ""
-echo -e "Admin Panel: ${YELLOW}http://$(hostname -I | awk '{print $1}'):8080${NC}"
+echo -e "Admin Panel: ${GREEN}https://$(hostname -I | awk '{print $1}')${NC}"
 echo -e "Default login: ${YELLOW}admin / changeme${NC}"
+echo ""
+echo -e "${YELLOW}IMPORTANT for Spotify Authentication:${NC}"
+echo -e "1. Your browser will show a security warning (self-signed certificate)"
+echo -e "   Click 'Advanced' and 'Proceed' to continue"
+echo ""
+echo -e "2. Add this URL to your Spotify app's Redirect URIs:"
+echo -e "   ${GREEN}https://$(hostname -I | awk '{print $1}')/callback${NC}"
 echo ""
 echo -e "The system will restart in 10 seconds to apply all changes."
 echo -e "After restart, the Spotify player will start automatically."
