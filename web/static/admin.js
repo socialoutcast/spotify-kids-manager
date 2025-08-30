@@ -303,6 +303,22 @@ function closeBluetoothScanModal() {
     }
 }
 
+// Alias functions for modal buttons
+function closeScanModal() {
+    closeBluetoothScanModal();
+}
+
+function stopScan() {
+    // Stop scanning and close modal
+    const scanStatus = document.getElementById('scanStatusText');
+    if (scanStatus) {
+        scanStatus.textContent = 'Scan stopped';
+    }
+    setTimeout(() => {
+        closeBluetoothScanModal();
+    }, 500);
+}
+
 async function startBluetoothScan() {
     const deviceList = document.getElementById('scanDeviceList');
     const scanStatus = document.getElementById('scanStatus');
@@ -355,8 +371,15 @@ async function startBluetoothScan() {
 }
 
 async function scanBluetooth() {
-    // Open the modal instead of inline display
-    openBluetoothScanModal();
+    // Open the modal if not already open, or refresh scan if modal is open
+    const modal = document.getElementById('bluetoothScanModal');
+    if (modal && modal.style.display === 'flex') {
+        // Modal is already open, just refresh the scan
+        startBluetoothScan();
+    } else {
+        // Open the modal and start scanning
+        openBluetoothScanModal();
+    }
 }
 
 async function pairBluetoothDevice(address) {
