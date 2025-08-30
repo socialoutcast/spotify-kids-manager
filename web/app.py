@@ -1185,10 +1185,14 @@ def index():
     time_remaining = parental_config['listening_limits']['daily_limit_minutes'] - usage_stats.get('total_minutes_today', 0)
     time_remaining = max(0, time_remaining)
     
+    # Check if Spotify is configured
+    spotify_configured = bool(spotify_config.get('client_id') and spotify_config.get('client_secret'))
+    
     return render_template_string(ADMIN_TEMPLATE,
                                  logged_in='logged_in' in session,
                                  config=config,
                                  spotify_config=spotify_config,
+                                 spotify_configured=spotify_configured,
                                  parental_config=parental_config,
                                  usage_stats=usage_stats,
                                  schedule=schedule,
