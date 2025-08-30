@@ -495,6 +495,15 @@ ADMIN_TEMPLATE = '''
             <!-- Spotify Configuration -->
             <div class="card">
                 <h2>🎵 Spotify Configuration</h2>
+                <div id="spotifyAuthSection" style="display: none; margin-bottom: 15px;">
+                    <div style="background: #f59e0b; color: white; padding: 10px; border-radius: 5px; margin-bottom: 10px;">
+                        <strong>⚠️ Authentication Required</strong>
+                        <p style="margin: 5px 0; font-size: 12px;">The Spotify player needs to be authenticated. Click the link below to complete the OAuth flow:</p>
+                    </div>
+                    <a id="spotifyAuthLink" href="#" target="_blank" style="display: inline-block; background: #1db954; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; font-weight: bold;">
+                        🔐 Authenticate with Spotify
+                    </a>
+                </div>
                 <div class="form-group">
                     <label>Client ID</label>
                     <input type="text" id="clientId" value="{{ spotify_config.get('client_id', '') }}" placeholder="Enter Spotify Client ID">
@@ -1415,6 +1424,61 @@ def play_spotify_content():
     except Exception as e:
         app.logger.error(f"Error starting playback: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/spotify/auth-status')
+def get_spotify_auth_status():
+    """Get Spotify authentication status and URL if needed"""
+    if 'logged_in' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    try:
+        from spotipy.oauth2 import SpotifyOAuth
+        
+        spotify_config = load_spotify_config()
+        
+        if not spotify_config.get('client_id') or not spotify_config.get('client_secret'):
+            return jsonify({'authenticated': False, 'error': 'Spotify not configured'})
+        
+        # Check if token exists
+        cache_file = os.path.join(CONFIG_DIR, '.cache', 'token.cache')
+        
+        if os.path.exists(cache_file):
+            # Try to load the token
+            auth_manager = SpotifyOAuth(
+                client_id=spotify_config['client_id'],
+                client_secret=spotify_config['client_secret'],
+                redirect_uri='http://localhost:8888/callback',
+                scope='user-read-playback-state user-modify-playback-state user-read-currently-playing playlist-read-private playlist-read-collaborative user-library-read streaming',
+                cache_path=cache_file
+            )
+            
+            token_info = auth_manager.get_cached_token()
+            if token_info:
+                return jsonify({'success': True, 'authenticated': True, 'message': 'Player is authenticated'})
+        
+        # Not authenticated - generate auth URL
+        auth_manager = SpotifyOAuth(
+            client_id=spotify_config['client_id'],
+            client_secret=spotify_config['client_secret'],
+            redirect_uri='http://localhost:8888/callback',
+            scope='user-read-playback-state user-modify-playback-state user-read-currently-playing playlist-read-private playlist-read-collaborative user-library-read streaming',
+            cache_path=cache_file,
+            open_browser=False
+        )
+        
+        auth_url = auth_manager.get_authorize_url()
+        
+        return jsonify({
+            'success': True,
+            'authenticated': False,
+            'auth_url': auth_url,
+            'message': 'Player needs authentication',
+            'instructions': 'Click the link to authenticate with Spotify. After logging in, you will be redirected to a page with a code.'
+        })
+        
+    except Exception as e:
+        app.logger.error(f"Error checking auth status: {e}")
+        return jsonify({'authenticated': False, 'error': str(e)}), 500
 
 @app.route('/api/system/check-updates')
 def check_updates():
