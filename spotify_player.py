@@ -181,15 +181,27 @@ class SpotifyPlayer:
         global CLIENT_ID, CLIENT_SECRET
         
         config_file = os.path.join(CONFIG_DIR, 'spotify_config.json')
+        logger.info(f"Looking for config file at: {config_file}")
+        
         if os.path.exists(config_file):
-            with open(config_file, 'r') as f:
-                config = json.load(f)
-                CLIENT_ID = config.get('client_id')
-                CLIENT_SECRET = config.get('client_secret')
+            try:
+                with open(config_file, 'r') as f:
+                    config = json.load(f)
+                    CLIENT_ID = config.get('client_id')
+                    CLIENT_SECRET = config.get('client_secret')
+                    logger.info(f"Config loaded - Client ID: {CLIENT_ID[:8]}..." if CLIENT_ID else "No Client ID found")
+                    logger.info("Client Secret: [HIDDEN]" if CLIENT_SECRET else "No Client Secret found")
+            except Exception as e:
+                logger.error(f"Error loading config: {e}")
+        else:
+            logger.warning(f"Config file not found at {config_file}")
         
         if not CLIENT_ID or not CLIENT_SECRET:
+            logger.info("Missing credentials - showing configuration screen")
             # Show configuration screen
             self.show_config_screen()
+        else:
+            logger.info("Spotify credentials loaded successfully")
     
     def show_config_screen(self):
         """Show configuration screen for API credentials"""
@@ -244,11 +256,15 @@ class SpotifyPlayer:
     
     def authenticate(self):
         """Authenticate with Spotify using OAuth"""
+        logger.info("Starting Spotify authentication")
+        
         if not CLIENT_ID or not CLIENT_SECRET:
+            logger.warning("Cannot authenticate - missing credentials")
             return
         
         try:
             os.makedirs(CACHE_DIR, exist_ok=True)
+            logger.info(f"Cache directory: {CACHE_DIR}")
             
             auth_manager = SpotifyOAuth(
                 client_id=CLIENT_ID,
@@ -258,22 +274,28 @@ class SpotifyPlayer:
                 cache_path=os.path.join(CACHE_DIR, 'token.cache'),
                 open_browser=False
             )
+            logger.info("SpotifyOAuth manager created")
             
             # Get auth URL
             auth_url = auth_manager.get_authorize_url()
+            logger.info(f"Auth URL generated: {auth_url[:50]}...")
             
             # Check if we have cached token
             token_info = auth_manager.get_cached_token()
             
             if not token_info:
+                logger.info("No cached token found - showing auth screen")
                 # Need to authenticate
                 self.show_auth_screen(auth_url, auth_manager)
             else:
+                logger.info("Using cached token")
                 # Use cached token
                 self.sp = spotipy.Spotify(auth_manager=auth_manager)
                 self.on_authenticated()
                 
         except Exception as e:
+            logger.error(f"Authentication error: {str(e)}")
+            logger.error(traceback.format_exc())
             messagebox.showerror("Authentication Error", str(e))
     
     def show_auth_screen(self, auth_url, auth_manager):
