@@ -516,25 +516,20 @@ async function checkUpdateStatus() {
     const updateDetails = document.getElementById('updateDetails');
     const updateList = document.getElementById('updateList');
     
+    // Show checking status
+    if (updateCount) updateCount.textContent = 'Checking...';
+    
     try {
-        const result = await apiCall('/api/system/updates-check');
+        const result = await apiCall('/api/system/check-updates');
         
         if (result.success) {
-            if (result.count > 0) {
+            if (result.count && result.count > 0) {
                 updateCount.textContent = `${result.count} available`;
-                statusText.className = 'status offline';
+                if (statusText) statusText.className = 'status offline';
                 
-                // Show update list
-                if (updateList) {
-                    let listHtml = '<ul style="margin: 5px 0; padding-left: 20px;">';
-                    for (const pkg of result.updates) {
-                        listHtml += `<li style="font-size: 11px; color: #666;">${pkg}</li>`;
-                    }
-                    if (result.count > 20) {
-                        listHtml += `<li style="font-size: 11px; color: #666;">... and ${result.count - 20} more</li>`;
-                    }
-                    listHtml += '</ul>';
-                    updateList.innerHTML = listHtml;
+                // Show update list from message HTML
+                if (updateList && result.message) {
+                    updateList.innerHTML = result.message;
                 }
                 
                 if (updateDetails) {
@@ -542,18 +537,19 @@ async function checkUpdateStatus() {
                 }
             } else {
                 updateCount.textContent = 'System up to date';
-                statusText.className = 'status online';
+                if (statusText) statusText.className = 'status online';
                 if (updateDetails) {
                     updateDetails.style.display = 'none';
                 }
             }
         } else {
             updateCount.textContent = 'Check failed';
-            statusText.className = 'status offline';
+            if (statusText) statusText.className = 'status offline';
         }
     } catch (error) {
+        console.error('Update check error:', error);
         updateCount.textContent = 'Error checking';
-        statusText.className = 'status offline';
+        if (statusText) statusText.className = 'status offline';
     }
 }
 
@@ -563,18 +559,16 @@ async function checkUpdates() {
     
     // Also show in the message area if it exists
     const updateMessage = document.getElementById('updateMessage');
+    const updateStatus = document.getElementById('updateStatus');
+    
     if (updateMessage) {
-        const result = await apiCall('/api/system/updates-check');
+        const result = await apiCall('/api/system/check-updates');
         if (result.success) {
-            if (result.count > 0) {
-                updateMessage.innerHTML = `Found ${result.count} update(s) available. Click "Update System" to install.`;
-            } else {
-                updateMessage.textContent = 'Your system is up to date!';
-            }
-            const updateStatus = document.getElementById('updateStatus');
+            updateMessage.innerHTML = result.message;
             if (updateStatus) updateStatus.style.display = 'block';
         } else {
             updateMessage.textContent = 'Check failed: ' + (result.error || 'Unknown error');
+            if (updateStatus) updateStatus.style.display = 'block';
         }
     }
 }
