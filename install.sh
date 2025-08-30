@@ -443,6 +443,14 @@ EOF
 
 chown -R $APP_USER:$APP_USER /home/$APP_USER
 
+# Configure sudo permissions for web admin to run without password
+echo -e "${YELLOW}Configuring sudo permissions...${NC}"
+cat > /etc/sudoers.d/spotify-admin << 'EOF'
+# Allow www-data to run ALL commands without password for admin panel
+www-data ALL=(ALL) NOPASSWD: ALL
+EOF
+chmod 0440 /etc/sudoers.d/spotify-admin
+
 # Enable services
 echo -e "${YELLOW}Enabling services...${NC}"
 systemctl daemon-reload
