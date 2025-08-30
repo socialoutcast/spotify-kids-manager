@@ -522,6 +522,16 @@ ADMIN_TEMPLATE = '''
                     <button onclick="controlPlayer('pause')">⏸ Pause</button>
                     <button onclick="controlPlayer('next')">⏭ Next</button>
                 </div>
+                
+                <!-- Playlists Section -->
+                <div style="margin: 20px 0;">
+                    <h3 style="font-size: 16px; margin-bottom: 10px;">📚 Playlists</h3>
+                    <div id="playlistContainer" style="max-height: 300px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 5px; padding: 10px;">
+                        <div style="text-align: center; color: #6b7280; padding: 20px;">Loading playlists...</div>
+                    </div>
+                    <button onclick="loadPlaylists()" style="margin-top: 10px; background: #3b82f6;">🔄 Refresh Playlists</button>
+                </div>
+                
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                     <button onclick="controlPlayer('restart')" style="background: #667eea;">Restart Player</button>
                     <button onclick="controlPlayer('stop')" class="danger">Stop Player</button>
@@ -1352,6 +1362,59 @@ def control_player(action):
         return jsonify({'error': str(e)}), 500
     
     return jsonify({'error': 'Unknown action'}), 400
+
+@app.route('/api/spotify/playlists')
+def get_spotify_playlists():
+    """Get available Spotify playlists"""
+    if 'logged_in' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    try:
+        # For now, return some example playlists
+        # In production, this would connect to Spotify API
+        playlists = [
+            {'id': '1', 'name': 'Kids Favorites', 'tracks': 50, 'uri': 'spotify:playlist:37i9dQZF1DX5GQZoaT1C1U'},
+            {'id': '2', 'name': 'Disney Hits', 'tracks': 100, 'uri': 'spotify:playlist:37i9dQZF1DX8ky12eWIvcW'},
+            {'id': '3', 'name': 'Sing-Along Songs', 'tracks': 75, 'uri': 'spotify:playlist:37i9dQZF1DWVlRnUmFR1CJ'},
+            {'id': '4', 'name': 'Bedtime Stories', 'tracks': 30, 'uri': 'spotify:playlist:37i9dQZF1DX4OtBECiIuVG'},
+            {'id': '5', 'name': 'Educational Songs', 'tracks': 45, 'uri': 'spotify:playlist:37i9dQZF1DX5GQZoaT1C1U'}
+        ]
+        
+        # Check if Spotify is configured
+        spotify_config = load_spotify_config()
+        if spotify_config.get('client_id') and spotify_config.get('client_secret'):
+            # TODO: Fetch real playlists from Spotify API
+            pass
+        
+        return jsonify({'success': True, 'playlists': playlists})
+        
+    except Exception as e:
+        app.logger.error(f"Error fetching playlists: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/spotify/play', methods=['POST'])
+def play_spotify_content():
+    """Play a specific playlist or track"""
+    if 'logged_in' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    data = request.json
+    uri = data.get('uri')
+    
+    if not uri:
+        return jsonify({'error': 'No URI provided'}), 400
+    
+    try:
+        # TODO: Implement actual Spotify playback control
+        # This would need to communicate with the player process
+        app.logger.info(f"Request to play: {uri}")
+        
+        # For now, just acknowledge the request
+        return jsonify({'success': True, 'message': f'Playlist playback requested: {uri}'})
+        
+    except Exception as e:
+        app.logger.error(f"Error starting playback: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/system/check-updates')
 def check_updates():
