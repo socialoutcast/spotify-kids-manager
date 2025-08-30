@@ -653,6 +653,13 @@ async function loadUpgradablePackages() {
     try {
         const result = await apiCall('/api/system/packages/upgradable');
         
+        if (result.success === false) {
+            if (packageList) {
+                packageList.innerHTML = '<div style="padding: 20px; color: #ef4444;">Error: ' + (result.error || 'Failed to load packages') + '</div>';
+            }
+            return;
+        }
+        
         if (result.packages && result.packages.length > 0) {
             let html = '<table style="width: 100%; border-collapse: collapse;">';
             html += '<thead><tr>';
