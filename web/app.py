@@ -2184,12 +2184,24 @@ def bluetooth_scan():
         return jsonify({'error': 'Not authenticated'}), 401
     
     try:
+        # Make sure Bluetooth agent is set up
+        subprocess.run(['sudo', 'bluetoothctl', 'agent', 'NoInputNoOutput'], 
+                      capture_output=True, check=False)
+        subprocess.run(['sudo', 'bluetoothctl', 'default-agent'], 
+                      capture_output=True, check=False)
+        subprocess.run(['sudo', 'bluetoothctl', 'power', 'on'], 
+                      capture_output=True, check=False)
+        subprocess.run(['sudo', 'bluetoothctl', 'discoverable', 'on'], 
+                      capture_output=True, check=False)
+        subprocess.run(['sudo', 'bluetoothctl', 'pairable', 'on'], 
+                      capture_output=True, check=False)
+        
         # Start scanning in background
         scan_process = subprocess.Popen(['sudo', 'bluetoothctl', '--', 'scan', 'on'], 
                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         
         # Wait a bit for devices to be discovered
-        time.sleep(3)
+        time.sleep(5)  # Increased scan time
         
         # Get devices
         result = subprocess.run(['sudo', 'bluetoothctl', 'devices'], 
@@ -2240,21 +2252,88 @@ def bluetooth_pair():
         return jsonify({'error': 'No address provided'}), 400
     
     try:
-        # Trust the device
-        subprocess.run(['sudo', 'bluetoothctl', 'trust', address], 
-                      capture_output=True, check=False)
+        # Use expect script to handle pairing confirmations automatically
+        pair_script = f"""
+spawn bluetoothctl
+expect "#"
+send "agent on\\r"
+expect "Agent registered"
+send "default-agent\\r"
+expect "Default agent request successful"
+send "trust {address}\\r"
+expect "trust succeeded"
+send "pair {address}\\r"
+expect {{
+    "Confirm passkey" {{
+        send "yes\\r"
+        exp_continue
+    }}
+    "Accept pairing" {{
+        send "yes\\r"
+        exp_continue
+    }}
+    "Pairing successful" {{
+        send "connect {address}\\r"
+        expect "Connection successful"
+    }}
+    "Failed to pair" {{
+        send "quit\\r"
+        exit 1
+    }}
+    timeout {{
+        send "quit\\r"
+        exit 1
+    }}
+}}
+send "quit\\r"
+expect eof
+"""
         
-        # Pair with the device
-        result = subprocess.run(['sudo', 'bluetoothctl', 'pair', address],
-                              capture_output=True, text=True, timeout=30)
+        # Write expect script to temporary file
+        import tempfile
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.exp', delete=False) as f:
+            f.write(pair_script)
+            script_path = f.name
         
-        if 'successful' in result.stdout.lower():
-            # Connect to the device
-            subprocess.run(['sudo', 'bluetoothctl', 'connect', address],
-                         capture_output=True, timeout=10)
-            return jsonify({'success': True, 'message': 'Device paired and connected'})
-        else:
-            return jsonify({'success': False, 'message': 'Pairing failed: ' + result.stdout})
+        try:
+            # Set up environment for spotify-kids user's audio session
+            env = os.environ.copy()
+            env['DBUS_SESSION_BUS_ADDRESS'] = 'unix:path=/run/user/1001/bus'  # spotify-kids user ID is 1001
+            
+            # Run expect script as spotify-kids user
+            result = subprocess.run(['sudo', '-u', 'spotify-kids', 'expect', script_path],
+                                  capture_output=True, text=True, timeout=30, env=env)
+            
+            if result.returncode == 0:
+                # Set audio profile for the device
+                subprocess.run(['sudo', '-u', 'spotify-kids', 'pactl', 'set-card-profile', 
+                              f'bluez_card.{address.replace(":", "_")}', 'a2dp_sink'],
+                             capture_output=True, check=False, env=env)
+                
+                return jsonify({'success': True, 'message': 'Device paired and connected for spotify-kids user'})
+            else:
+                # Fallback to simple pairing without expect
+                subprocess.run(['sudo', 'bluetoothctl', 'agent', 'NoInputNoOutput'], 
+                              capture_output=True, check=False)
+                subprocess.run(['sudo', 'bluetoothctl', 'default-agent'], 
+                              capture_output=True, check=False)
+                subprocess.run(['sudo', 'bluetoothctl', 'trust', address], 
+                              capture_output=True, check=False)
+                
+                result = subprocess.run(['sudo', 'bluetoothctl', 'pair', address],
+                                      capture_output=True, text=True, timeout=30)
+                
+                if 'successful' in result.stdout.lower() or 'already' in result.stdout.lower():
+                    subprocess.run(['sudo', 'bluetoothctl', 'connect', address],
+                                 capture_output=True, timeout=10)
+                    return jsonify({'success': True, 'message': 'Device paired and connected'})
+                else:
+                    return jsonify({'success': False, 'message': 'Pairing failed: ' + result.stdout})
+        finally:
+            # Clean up temporary script
+            if 'script_path' in locals():
+                os.unlink(script_path)
+                
     except subprocess.TimeoutExpired:
         return jsonify({'error': 'Pairing timeout'}), 500
     except Exception as e:
@@ -2273,13 +2352,30 @@ def bluetooth_connect():
         return jsonify({'error': 'No address provided'}), 400
     
     try:
-        result = subprocess.run(['sudo', 'bluetoothctl', 'connect', address],
-                              capture_output=True, text=True, timeout=10)
+        # Set up environment for spotify-kids user
+        env = os.environ.copy()
+        env['DBUS_SESSION_BUS_ADDRESS'] = 'unix:path=/run/user/1001/bus'
+        
+        # Connect as spotify-kids user
+        result = subprocess.run(['sudo', '-u', 'spotify-kids', 'bluetoothctl', 'connect', address],
+                              capture_output=True, text=True, timeout=10, env=env)
         
         if 'successful' in result.stdout.lower():
-            return jsonify({'success': True, 'message': 'Device connected'})
+            # Set audio profile
+            subprocess.run(['sudo', '-u', 'spotify-kids', 'pactl', 'set-card-profile', 
+                          f'bluez_card.{address.replace(":", "_")}', 'a2dp_sink'],
+                         capture_output=True, check=False, env=env)
+            return jsonify({'success': True, 'message': 'Connected successfully'})
+        elif 'already' in result.stdout.lower():
+            return jsonify({'success': True, 'message': 'Already connected'})
         else:
-            return jsonify({'success': False, 'message': 'Connection failed'})
+            # Fallback to root bluetoothctl
+            result = subprocess.run(['sudo', 'bluetoothctl', 'connect', address],
+                                  capture_output=True, text=True, timeout=10)
+            if 'successful' in result.stdout.lower():
+                return jsonify({'success': True, 'message': 'Device connected'})
+            else:
+                return jsonify({'success': False, 'message': 'Connection failed'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

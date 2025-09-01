@@ -172,7 +172,9 @@ apt-get install -y \
     xterm \
     chromium \
     openbox \
-    curl
+    curl \
+    expect \
+    pulseaudio-utils
 
 # Install Node.js for the web player
 echo -e "${YELLOW}Installing Node.js...${NC}"
@@ -640,6 +642,10 @@ cat > /etc/sudoers.d/spotify-pkgmgr << 'EOF'
 %spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/systemctl is-active bluetooth
 %spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/bluetoothctl*
 %spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/sbin/rfkill*
+%spotify-pkgmgr ALL=(spotify-kids) NOPASSWD: /usr/bin/bluetoothctl*
+%spotify-pkgmgr ALL=(spotify-kids) NOPASSWD: /usr/bin/expect*
+%spotify-pkgmgr ALL=(spotify-kids) NOPASSWD: /usr/bin/pactl*
+%spotify-pkgmgr ALL=(spotify-kids) NOPASSWD: /usr/bin/pacmd*
 %spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/journalctl*
 %spotify-pkgmgr ALL=(ALL) NOPASSWD: /bin/journalctl*
 %spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/tail*
@@ -762,14 +768,68 @@ if ! grep -q "load-module module-bluetooth-discover" /etc/pulse/default.pa 2>/de
 fi
 
 # Add spotify-kids user to audio and bluetooth groups
-usermod -aG bluetooth,audio "$APP_USER"
+usermod -aG bluetooth,audio,pulse-access "$APP_USER"
+
+# Create runtime directory for spotify-kids user
+mkdir -p /run/user/1001
+chown $APP_USER:$APP_USER /run/user/1001
+chmod 700 /run/user/1001
+
+# Configure PulseAudio for spotify-kids user
+mkdir -p /home/$APP_USER/.config/pulse
+cat > /home/$APP_USER/.config/pulse/default.pa << 'EOF'
+.include /etc/pulse/default.pa
+load-module module-bluetooth-policy
+load-module module-bluetooth-discover
+load-module module-switch-on-connect
+EOF
+chown -R $APP_USER:$APP_USER /home/$APP_USER/.config
+
+# Create Bluetooth config directory
+mkdir -p /home/$APP_USER/.config/bluetooth
+chown -R $APP_USER:$APP_USER /home/$APP_USER/.config/bluetooth
 
 # Set Bluetooth to be discoverable and pairable
 bluetoothctl power on 2>/dev/null || true
-bluetoothctl agent on 2>/dev/null || true
+bluetoothctl agent NoInputNoOutput 2>/dev/null || true
 bluetoothctl default-agent 2>/dev/null || true
 bluetoothctl discoverable on 2>/dev/null || true
 bluetoothctl pairable on 2>/dev/null || true
+
+# Configure Bluetooth for audio
+cat > /etc/bluetooth/audio.conf << 'EOF'
+[General]
+Enable=Source,Sink,Media,Socket
+AutoConnect=true
+EOF
+
+# Configure Bluetooth main settings for better audio
+sed -i 's/#DiscoverableTimeout = 0/DiscoverableTimeout = 0/' /etc/bluetooth/main.conf
+sed -i 's/#PairableTimeout = 0/PairableTimeout = 0/' /etc/bluetooth/main.conf
+sed -i 's/#Class = 0x000100/Class = 0x0c0420/' /etc/bluetooth/main.conf  # Audio device class
+
+# Ensure Bluetooth service starts with proper settings
+cat > /etc/systemd/system/bluetooth-audio-setup.service << EOF
+[Unit]
+Description=Bluetooth Audio Setup
+After=bluetooth.service
+Requires=bluetooth.service
+
+[Service]
+Type=oneshot
+ExecStartPre=/bin/sleep 2
+ExecStart=/usr/bin/bluetoothctl power on
+ExecStart=/usr/bin/bluetoothctl agent NoInputNoOutput
+ExecStart=/usr/bin/bluetoothctl default-agent
+ExecStart=/usr/bin/bluetoothctl discoverable on
+ExecStart=/usr/bin/bluetoothctl pairable on
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl enable bluetooth-audio-setup.service
 
 # Disable unnecessary services
 echo -e "${YELLOW}Optimizing system...${NC}"
