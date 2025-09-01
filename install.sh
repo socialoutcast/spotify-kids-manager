@@ -320,50 +320,13 @@ chmod 775 "/var/log/spotify-kids"
 # Set default permissions for config files
 chmod 664 "$CONFIG_DIR"/*.json 2>/dev/null || true
 
-# Configure auto-login
-echo -e "${YELLOW}Configuring auto-login...${NC}"
-mkdir -p /etc/systemd/system/getty@tty1.service.d/
-cat > /etc/systemd/system/getty@tty1.service.d/autologin.conf << EOF
-[Service]
-ExecStart=
-ExecStart=-/sbin/agetty --autologin $APP_USER --noclear %I \$TERM
-EOF
+# Configure display manager for auto-login (using LightDM, not getty)
+echo -e "${YELLOW}Configuring display manager...${NC}"
 
-# Create .bash_profile for auto-starting X with terminal suppression
-cat > /home/$APP_USER/.bash_profile << 'EOF'
-#!/bin/bash
-
-# Start X server with Spotify player on tty1
-if [[ -z \$DISPLAY && \$XDG_VTNR -eq 1 ]]; then
-    # Clear the terminal and hide cursor to prevent flashing
-    clear
-    setterm -cursor off
-    # Start X and redirect all output to /dev/null
-    exec startx >/dev/null 2>&1
-fi
-EOF
-chown $APP_USER:$APP_USER /home/$APP_USER/.bash_profile
-chmod 644 /home/$APP_USER/.bash_profile
-
-# Create .xinitrc to start openbox session
-cat > /home/$APP_USER/.xinitrc << 'EOF'
-#!/bin/bash
-# Redirect all output to prevent terminal flashing
-exec >/dev/null 2>&1
-
-# Disable screen saver and power management
-xset s off
-xset -dpms
-xset s noblank
-
-# Hide mouse cursor
-unclutter -idle 0.1 &
-
-# Start openbox window manager
-exec openbox-session
-EOF
-chown $APP_USER:$APP_USER /home/$APP_USER/.xinitrc
-chmod 755 /home/$APP_USER/.xinitrc
+# Disable getty on tty1 to prevent conflicts
+systemctl disable getty@tty1 2>/dev/null || true
+systemctl stop getty@tty1 2>/dev/null || true
+rm -rf /etc/systemd/system/getty@tty1.service.d 2>/dev/null || true
 
 # Create openbox autostart file
 mkdir -p /home/$APP_USER/.config/openbox
@@ -381,6 +344,22 @@ unclutter -idle 0.1 &
 EOF
 chown -R $APP_USER:$APP_USER /home/$APP_USER/.config
 chmod 755 /home/$APP_USER/.config/openbox/autostart
+
+# Configure LightDM for auto-login with openbox
+echo -e "${YELLOW}Configuring LightDM...${NC}"
+cat > /etc/lightdm/lightdm.conf << EOF
+[Seat:*]
+autologin-user=$APP_USER
+autologin-user-timeout=0
+user-session=openbox
+greeter-hide-users=true
+greeter-show-manual-login=false
+allow-guest=false
+xserver-command=X -nocursor
+EOF
+
+# Set openbox as default X session manager
+update-alternatives --set x-session-manager /usr/bin/openbox-session 2>/dev/null || true
 
 # Install Node.js dependencies for player
 echo -e "${YELLOW}Installing player dependencies...${NC}"
@@ -677,9 +656,34 @@ cat > /etc/sudoers.d/spotify-pkgmgr << 'EOF'
 EOF
 chmod 0440 /etc/sudoers.d/spotify-pkgmgr
 
+# Disable Plymouth splash screen to prevent flashing
+echo -e "${YELLOW}Disabling splash screens...${NC}"
+systemctl disable plymouth-quit-wait 2>/dev/null || true
+systemctl disable plymouth-start 2>/dev/null || true
+
+# Update boot parameters to hide boot messages
+echo -e "${YELLOW}Updating boot parameters...${NC}"
+if [ -f /boot/cmdline.txt ]; then
+    # Raspberry Pi boot config
+    cp /boot/cmdline.txt /boot/cmdline.txt.backup
+    # Remove any existing splash/quiet parameters and add our own
+    sed -i 's/ splash//g; s/ quiet//g; s/ plymouth.ignore-serial-consoles//g; s/ logo.nologo//g; s/ vt.global_cursor_default=0//g; s/ consoleblank=0//g; s/ loglevel=[0-9]//g' /boot/cmdline.txt
+    # Add parameters to hide boot messages
+    sed -i 's/$/ quiet loglevel=0 logo.nologo vt.global_cursor_default=0 consoleblank=0/' /boot/cmdline.txt
+elif [ -f /etc/default/grub ]; then
+    # GRUB systems
+    cp /etc/default/grub /etc/default/grub.backup
+    sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="quiet loglevel=0 logo.nologo vt.global_cursor_default=0 consoleblank=0"/' /etc/default/grub
+    update-grub 2>/dev/null || true
+fi
+
+# Set graphical target as default
+systemctl set-default graphical.target
+
 # Enable services
 echo -e "${YELLOW}Enabling services...${NC}"
 systemctl daemon-reload
+systemctl enable lightdm
 systemctl enable spotify-player.service
 systemctl enable spotify-admin.service
 systemctl enable spotify-kiosk.service
