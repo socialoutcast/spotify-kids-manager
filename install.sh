@@ -171,7 +171,7 @@ apt-get install -y \
     scrot \
     xterm \
     chromium \
-    lightdm \
+    openbox \
     curl
 
 # Install Node.js for the web player
@@ -329,6 +329,59 @@ ExecStart=
 ExecStart=-/sbin/agetty --autologin $APP_USER --noclear %I \$TERM
 EOF
 
+# Create .bash_profile for auto-starting X with terminal suppression
+cat > /home/$APP_USER/.bash_profile << 'EOF'
+#!/bin/bash
+
+# Start X server with Spotify player on tty1
+if [[ -z \$DISPLAY && \$XDG_VTNR -eq 1 ]]; then
+    # Clear the terminal and hide cursor to prevent flashing
+    clear
+    setterm -cursor off
+    # Start X and redirect all output to /dev/null
+    exec startx >/dev/null 2>&1
+fi
+EOF
+chown $APP_USER:$APP_USER /home/$APP_USER/.bash_profile
+chmod 644 /home/$APP_USER/.bash_profile
+
+# Create .xinitrc to start openbox session
+cat > /home/$APP_USER/.xinitrc << 'EOF'
+#!/bin/bash
+# Redirect all output to prevent terminal flashing
+exec >/dev/null 2>&1
+
+# Disable screen saver and power management
+xset s off
+xset -dpms
+xset s noblank
+
+# Hide mouse cursor
+unclutter -idle 0.1 &
+
+# Start openbox window manager
+exec openbox-session
+EOF
+chown $APP_USER:$APP_USER /home/$APP_USER/.xinitrc
+chmod 755 /home/$APP_USER/.xinitrc
+
+# Create openbox autostart file
+mkdir -p /home/$APP_USER/.config/openbox
+cat > /home/$APP_USER/.config/openbox/autostart << 'EOF'
+# Disable screen saver and power management
+xset s off
+xset -dpms
+xset s noblank
+
+# Hide mouse cursor
+unclutter -idle 0.1 &
+
+# Start the kiosk launcher
+/opt/spotify-kids/kiosk_launcher.sh &
+EOF
+chown -R $APP_USER:$APP_USER /home/$APP_USER/.config
+chmod 755 /home/$APP_USER/.config/openbox/autostart
+
 # Install Node.js dependencies for player
 echo -e "${YELLOW}Installing player dependencies...${NC}"
 cd "$APP_DIR/player"
@@ -473,22 +526,56 @@ echo -e "${YELLOW}Creating kiosk launcher...${NC}"
 cat > "$APP_DIR/kiosk_launcher.sh" << 'EOF'
 #!/bin/bash
 
-# Wait for network
-while ! ping -c 1 google.com &> /dev/null; do
-    sleep 1
+# Spotify Kids Player Kiosk Mode Launcher
+# This script launches Chromium in kiosk mode displaying the web player
+
+# Redirect all output to /dev/null to prevent terminal flashing
+exec > /dev/null 2>&1
+
+# Change to a directory the spotify-kids user has access to
+cd /opt/spotify-kids || cd /tmp
+
+# Wait for network to be ready
+sleep 10
+
+# Auto-detect the display
+if [ -z "$DISPLAY" ]; then
+    # Find the active X display
+    for display in 0 1 2; do
+        if [ -S /tmp/.X11-unix/X${display} ]; then
+            export DISPLAY=:${display}
+            break
+        fi
+    done
+fi
+
+# Try to get X authorization if needed
+if [ -f /home/spotify-kids/.Xauthority ]; then
+    export XAUTHORITY=/home/spotify-kids/.Xauthority
+fi
+
+# Disable screen blanking and power management
+xset s off 2>/dev/null || true
+xset -dpms 2>/dev/null || true
+xset s noblank 2>/dev/null || true
+
+# Hide mouse cursor immediately for touchscreen
+unclutter -idle 0 -root &
+
+# Remove any existing chromium preferences that might interfere
+rm -rf /home/spotify-kids/.config/chromium/Singleton*
+
+# Wait for the web player to be ready
+until curl -s http://localhost:5000 > /dev/null 2>&1; do
+    sleep 2
 done
 
-# Wait for the player service to be ready
-while ! curl -s http://localhost:5000 > /dev/null 2>&1; do
-    sleep 1
-done
+# Kill any existing chromium instances first
+pkill -f "chromium.*kiosk" 2>/dev/null || true
+sleep 2
 
-# Kill any existing Chromium instances
-pkill chromium || true
-sleep 1
-
-# Launch Chromium in kiosk mode
-chromium \
+# Launch chromium - systemd will restart if it crashes
+exec chromium-browser \
     --kiosk \
     --noerrdialogs \
     --disable-infobars \
@@ -504,29 +591,47 @@ chromium \
     --disable-component-update \
     --autoplay-policy=no-user-gesture-required \
     --window-position=0,0 \
-    --user-data-dir=/home/$APP_USER/.config/chromium-kiosk \
-    http://localhost:5000
+    --user-data-dir=/home/spotify-kids/.config/chromium-kiosk \
+    "http://localhost:5000"
 EOF
 
 chmod +x "$APP_DIR/kiosk_launcher.sh"
 chown $APP_USER:$APP_USER "$APP_DIR/kiosk_launcher.sh"
 
-# Configure LightDM for auto-login and kiosk mode
-echo -e "${YELLOW}Configuring display manager for kiosk mode...${NC}"
-cat > /etc/lightdm/lightdm.conf.d/50-spotify-kiosk.conf << EOF
-[SeatDefaults]
-autologin-user=$APP_USER
-autologin-user-timeout=0
-user-session=spotify-kiosk
-EOF
+# Create systemd service for kiosk mode
+echo -e "${YELLOW}Creating kiosk service...${NC}"
+cat > /etc/systemd/system/spotify-kiosk.service << EOF
+[Unit]
+Description=Spotify Kids Player Kiosk Mode
+After=graphical.target spotify-player.service
+Wants=graphical.target
+Requires=spotify-player.service
 
-# Create custom X session for kiosk
-cat > /usr/share/xsessions/spotify-kiosk.desktop << EOF
-[Desktop Entry]
-Name=Spotify Kiosk
-Comment=Spotify Kids Player Kiosk Mode
-Exec=$APP_DIR/kiosk_launcher.sh
-Type=Application
+[Service]
+Type=simple
+User=$APP_USER
+Group=$APP_USER
+Environment="DISPLAY=:0"
+Environment="XAUTHORITY=/home/$APP_USER/.Xauthority"
+Environment="HOME=/home/$APP_USER"
+
+# Wait for X11 to be ready
+ExecStartPre=/bin/bash -c 'until [ -S /tmp/.X11-unix/X0 ]; do sleep 2; done'
+ExecStartPre=/bin/sleep 5
+
+# Start kiosk
+ExecStart=$APP_DIR/kiosk_launcher.sh
+
+# Restart if crashes
+Restart=always
+RestartSec=10
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=graphical.target
 EOF
 
 chown -R $APP_USER:$APP_USER /home/$APP_USER
@@ -577,8 +682,8 @@ echo -e "${YELLOW}Enabling services...${NC}"
 systemctl daemon-reload
 systemctl enable spotify-player.service
 systemctl enable spotify-admin.service
+systemctl enable spotify-kiosk.service
 systemctl enable nginx
-systemctl enable lightdm
 systemctl start spotify-player.service
 systemctl start spotify-admin.service
 systemctl restart nginx

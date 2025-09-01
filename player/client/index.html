@@ -9,6 +9,9 @@
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+            cursor: none !important;
+            -webkit-user-select: none;
+            user-select: none;
         }
 
         @font-face {
@@ -28,7 +31,6 @@
                 "sidebar main"
                 "nowplaying nowplaying";
             height: 100vh;
-            cursor: none;
         }
 
         /* Sidebar */
@@ -75,45 +77,6 @@
             width: 24px;
             height: 24px;
             margin-right: 16px;
-        }
-
-        /* Search Bar */
-        .search-bar {
-            position: absolute;
-            top: 16px;
-            left: 300px;
-            right: 20px;
-            max-width: 364px;
-            z-index: 100;
-        }
-
-        .search-bar input {
-            width: 100%;
-            padding: 12px 48px 12px 48px;
-            background: rgba(255,255,255,0.1);
-            border: none;
-            border-radius: 500px;
-            color: #fff;
-            font-size: 14px;
-            outline: none;
-        }
-
-        .search-bar input::placeholder {
-            color: rgba(255,255,255,0.5);
-        }
-
-        .search-bar input:focus {
-            background: rgba(255,255,255,0.2);
-        }
-
-        .search-icon {
-            position: absolute;
-            left: 16px;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 20px;
-            height: 20px;
-            fill: rgba(255,255,255,0.7);
         }
 
         /* Main Content */
@@ -248,34 +211,6 @@
             font-size: 14px;
         }
 
-        .playlist-controls {
-            display: flex;
-            align-items: center;
-            gap: 24px;
-            margin-bottom: 32px;
-        }
-
-        .btn-play-large {
-            width: 56px;
-            height: 56px;
-            background: #1db954;
-            border: none;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: transform 0.1s;
-        }
-
-        .btn-play-large:hover {
-            transform: scale(1.04);
-        }
-
-        .btn-play-large:active {
-            transform: scale(0.96);
-        }
-
         /* Track List */
         .track-list {
             margin-top: 24px;
@@ -290,6 +225,7 @@
             align-items: center;
             color: #b3b3b3;
             transition: background 0.2s;
+            cursor: pointer;
         }
 
         .track-row:hover {
@@ -344,17 +280,6 @@
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
-        }
-
-        .track-album {
-            font-size: 14px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
-        .track-duration {
-            font-size: 14px;
         }
 
         /* Now Playing Bar */
@@ -491,41 +416,11 @@
             border-radius: 2px;
             position: relative;
             pointer-events: none;
+            width: 0%;
         }
 
         .progress-bar:hover .progress-bar-fill {
             background: #1db954;
-        }
-
-        /* Volume Controls */
-        .now-playing-right {
-            display: flex;
-            justify-content: flex-end;
-            align-items: center;
-            gap: 16px;
-        }
-
-        .volume-bar {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            width: 125px;
-        }
-
-        .volume-slider {
-            flex: 1;
-            height: 4px;
-            background: rgba(255,255,255,0.3);
-            border-radius: 2px;
-            position: relative;
-            cursor: pointer;
-        }
-
-        .volume-fill {
-            height: 100%;
-            background: #fff;
-            border-radius: 2px;
-            pointer-events: none;
         }
 
         /* Playlists Section */
@@ -567,6 +462,30 @@
             background: rgba(255,255,255,0.2);
         }
 
+        .status-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            padding: 4px 8px;
+            background: rgba(29, 185, 84, 0.2);
+            color: #1db954;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            z-index: 100;
+        }
+
+        .loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #fff;
+            font-size: 18px;
+        }
+
         /* Hidden */
         .hidden {
             display: none !important;
@@ -574,6 +493,9 @@
     </style>
 </head>
 <body>
+    <div class="status-badge hidden" id="statusBadge">SDK Ready</div>
+    <div class="loading" id="loading">Initializing Spotify Player...</div>
+
     <!-- Sidebar -->
     <aside class="sidebar">
         <!-- Logo -->
@@ -606,16 +528,13 @@
         </div>
     </aside>
     
-    <!-- Search Bar -->
-    <div class="search-bar hidden" id="searchBar">
-        <svg class="search-icon" viewBox="0 0 24 24">
-            <path fill="currentColor" d="M10.533 1.279c-5.18 0-9.407 4.14-9.407 9.279s4.226 9.279 9.407 9.279c2.234 0 4.29-.77 5.907-2.058l4.353 4.353a1 1 0 101.414-1.414l-4.344-4.344a9.157 9.157 0 002.077-5.816c0-5.14-4.226-9.28-9.407-9.28zm-7.407 9.279c0-4.006 3.302-7.28 7.407-7.28s7.407 3.274 7.407 7.28-3.302 7.279-7.407 7.279-7.407-3.273-7.407-7.28z"/>
-        </svg>
-        <input type="text" placeholder="What do you want to listen to?" id="searchInput">
-    </div>
-    
     <!-- Main Content Area -->
-    <main class="main-content" id="mainContent"></main>
+    <main class="main-content" id="mainContent">
+        <div class="content-section">
+            <h2 class="section-title" id="greeting">Good evening</h2>
+            <div class="cards-grid" id="homeCards"></div>
+        </div>
+    </main>
     
     <!-- Now Playing Bar -->
     <div class="now-playing-bar">
@@ -659,300 +578,190 @@
             <div class="playback-bar">
                 <div class="progress-time" id="progressTime">0:00</div>
                 <div class="progress-bar" id="progressBar">
-                    <div class="progress-bar-fill" id="progressBarFill" style="width: 0%"></div>
+                    <div class="progress-bar-fill" id="progressBarFill"></div>
                 </div>
                 <div class="progress-time" id="durationTime">0:00</div>
             </div>
         </div>
         
-        <div class="now-playing-right">
-            <div class="volume-bar">
-                <button class="control-button">
-                    <svg viewBox="0 0 16 16">
-                        <path fill="currentColor" d="M9.741.85a.75.75 0 01.375.65v13a.75.75 0 01-1.125.65l-6.925-4a3.642 3.642 0 01-1.33-4.967 3.639 3.639 0 011.33-1.332l6.925-4a.75.75 0 01.75 0zm-6.924 5.3a2.139 2.139 0 000 3.7l5.8 3.35V2.8l-5.8 3.35zm8.683 4.29V5.56a2.75 2.75 0 010 4.88z"/>
-                    </svg>
-                </button>
-                <div class="volume-slider" id="volumeSlider">
-                    <div class="volume-fill" id="volumeFill" style="width: 50%"></div>
-                </div>
-            </div>
-        </div>
+        <div class="now-playing-right"></div>
     </div>
-    
+
+    <!-- Spotify Web Playback SDK -->
+    <script src="https://sdk.scdn.co/spotify-player.js"></script>
     <script>
-        // Application State - Single source of truth
+        let player;
+        let deviceId;
+        let accessToken;
+        let currentPlaylistId;
+        let currentTrackUri;
+
+        // State
         const AppState = {
-            currentView: null,
-            currentPlaylistId: null,
             playlists: [],
-            currentTrack: null,
+            currentView: 'home',
             isPlaying: false,
-            progress: 0,
-            duration: 0,
-            volume: 50,
             shuffleState: false,
-            repeatState: 'off',
-            searchQuery: '',
-            lastUpdateTime: 0,
-            viewCache: {},
-            renderCache: {}
+            repeatState: 'off'
         };
 
-        // DOM Elements - Cache once
-        const DOM = {};
-        
-        function initDOM() {
-            DOM.sidebar = document.querySelector('.sidebar');
-            DOM.playlists = document.getElementById('playlists');
-            DOM.mainContent = document.getElementById('mainContent');
-            DOM.searchBar = document.getElementById('searchBar');
-            DOM.searchInput = document.getElementById('searchInput');
-            DOM.nowPlayingCover = document.getElementById('nowPlayingCover');
-            DOM.nowPlayingName = document.getElementById('nowPlayingName');
-            DOM.nowPlayingArtist = document.getElementById('nowPlayingArtist');
-            DOM.playPauseBtn = document.getElementById('playPauseBtn');
-            DOM.prevBtn = document.getElementById('prevBtn');
-            DOM.nextBtn = document.getElementById('nextBtn');
-            DOM.shuffleBtn = document.getElementById('shuffleBtn');
-            DOM.repeatBtn = document.getElementById('repeatBtn');
-            DOM.progressBar = document.getElementById('progressBar');
-            DOM.progressBarFill = document.getElementById('progressBarFill');
-            DOM.progressTime = document.getElementById('progressTime');
-            DOM.durationTime = document.getElementById('durationTime');
-            DOM.volumeSlider = document.getElementById('volumeSlider');
-            DOM.volumeFill = document.getElementById('volumeFill');
-            DOM.navItems = document.querySelectorAll('.nav-item');
+        // Initialize SDK
+        window.onSpotifyWebPlaybackSDKReady = () => {
+            console.log('Spotify SDK Ready');
+            initializePlayer();
+        };
+
+        async function getToken() {
+            try {
+                const res = await fetch('/api/token');
+                const data = await res.json();
+                accessToken = data.access_token;
+                return accessToken;
+            } catch (error) {
+                console.error('Failed to get token:', error);
+                return null;
+            }
         }
 
-        // API Handler
-        const API = {
-            async request(endpoint, options = {}) {
-                try {
-                    const res = await fetch(`/api${endpoint}`, options);
-                    return res.ok ? await res.json() : null;
-                } catch (e) {
-                    console.error('API Error:', e);
-                    return null;
-                }
-            },
-            
-            getPlaylists: () => API.request('/playlists'),
-            getPlayback: () => API.request('/playback'),
-            getPlaylistTracks: (id) => API.request(`/playlist/${id}`),
-            search: (q) => API.request(`/search?q=${encodeURIComponent(q)}`),
-            play: () => API.request('/play', { method: 'POST' }),
-            pause: () => API.request('/pause', { method: 'POST' }),
-            next: () => API.request('/next', { method: 'POST' }),
-            previous: () => API.request('/previous', { method: 'POST' }),
-            seek: (position) => API.request('/seek', { 
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ position })
-            }),
-            setVolume: (volume) => API.request('/volume', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ volume })
-            }),
-            shuffle: (state) => API.request('/shuffle', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ state })
-            }),
-            repeat: (state) => API.request('/repeat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ state })
-            }),
-            playUri: (uri) => API.request('/play-uri', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ uri })
-            }),
-            playPlaylist: (uri) => API.request('/play-playlist', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ uri })
-            })
-        };
-
-        // Renderer - Efficient DOM updates
-        const Renderer = {
-            updateElement(element, content) {
-                if (!element) return;
-                if (element.textContent !== content) {
-                    element.textContent = content;
-                }
-            },
-            
-            updateAttribute(element, attr, value) {
-                if (!element) return;
-                if (element.getAttribute(attr) !== value) {
-                    element.setAttribute(attr, value);
-                }
-            },
-            
-            updateStyle(element, prop, value) {
-                if (!element) return;
-                if (element.style[prop] !== value) {
-                    element.style[prop] = value;
-                }
-            },
-            
-            toggleClass(element, className, condition) {
-                if (!element) return;
-                const hasClass = element.classList.contains(className);
-                if (condition && !hasClass) {
-                    element.classList.add(className);
-                } else if (!condition && hasClass) {
-                    element.classList.remove(className);
-                }
-            },
-            
-            renderPlaylists() {
-                if (!DOM.playlists || !AppState.playlists) return;
-                
-                const currentHTML = DOM.playlists.innerHTML;
-                const newHTML = AppState.playlists.map(p => 
-                    `<div class="playlist-item" data-id="${p.id}">${p.name}</div>`
-                ).join('');
-                
-                if (currentHTML !== newHTML) {
-                    DOM.playlists.innerHTML = newHTML;
-                }
-            },
-            
-            updateNowPlaying() {
-                const track = AppState.currentTrack;
-                if (!track) return;
-                
-                // Update text content
-                Renderer.updateElement(DOM.nowPlayingName, track.name || '-');
-                Renderer.updateElement(DOM.nowPlayingArtist, track.artists?.join(', ') || '-');
-                
-                // Update cover if changed
-                const coverUrl = track.album?.images?.[0]?.url;
-                if (coverUrl && !DOM.nowPlayingCover.querySelector(`img[src="${coverUrl}"]`)) {
-                    DOM.nowPlayingCover.innerHTML = `<img src="${coverUrl}" alt="">`;
-                }
-                
-                // Update play/pause button
-                const isPlaying = AppState.isPlaying;
-                const pauseSvg = '<svg viewBox="0 0 16 16"><path fill="currentColor" d="M2.7 1a.7.7 0 00-.7.7v12.6a.7.7 0 00.7.7h2.6a.7.7 0 00.7-.7V1.7a.7.7 0 00-.7-.7H2.7zm8 0a.7.7 0 00-.7.7v12.6a.7.7 0 00.7.7h2.6a.7.7 0 00.7-.7V1.7a.7.7 0 00-.7-.7h-2.6z"/></svg>';
-                const playSvg = '<svg viewBox="0 0 16 16"><path fill="currentColor" d="M3 1.713a.7.7 0 011.05-.607l10.89 6.288a.7.7 0 010 1.212L4.05 14.894A.7.7 0 013 14.288V1.713z"/></svg>';
-                
-                if (DOM.playPauseBtn.innerHTML !== (isPlaying ? pauseSvg : playSvg)) {
-                    DOM.playPauseBtn.innerHTML = isPlaying ? pauseSvg : playSvg;
-                }
-                
-                // Update control states
-                Renderer.toggleClass(DOM.shuffleBtn, 'active', AppState.shuffleState);
-                Renderer.toggleClass(DOM.repeatBtn, 'active', AppState.repeatState !== 'off');
-            },
-            
-            updateProgress() {
-                const progress = AppState.progress || 0;
-                const duration = AppState.duration || 0;
-                const percentage = duration > 0 ? (progress / duration) * 100 : 0;
-                
-                Renderer.updateStyle(DOM.progressBarFill, 'width', `${percentage}%`);
-                Renderer.updateElement(DOM.progressTime, this.formatTime(progress));
-                Renderer.updateElement(DOM.durationTime, this.formatTime(duration));
-            },
-            
-            formatTime(ms) {
-                const seconds = Math.floor(ms / 1000);
-                const mins = Math.floor(seconds / 60);
-                const secs = seconds % 60;
-                return `${mins}:${secs.toString().padStart(2, '0')}`;
+        async function initializePlayer() {
+            const token = await getToken();
+            if (!token) {
+                document.getElementById('loading').textContent = 'Failed to get token';
+                return;
             }
-        };
 
-        // View Manager - Cached view rendering
-        const Views = {
-            home() {
-                if (AppState.currentView === 'home' && AppState.viewCache.home) {
-                    DOM.mainContent.innerHTML = AppState.viewCache.home;
-                    return;
-                }
+            player = new Spotify.Player({
+                name: 'Spotify Kids Player',
+                getOAuthToken: async cb => {
+                    const newToken = await getToken();
+                    cb(newToken);
+                },
+                volume: 0.5
+            });
+
+            // Ready
+            player.addListener('ready', ({ device_id }) => {
+                console.log('Ready with Device ID', device_id);
+                deviceId = device_id;
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('statusBadge').classList.remove('hidden');
                 
-                AppState.currentView = 'home';
-                const greeting = this.getGreeting();
+                // Transfer playback
+                transferPlayback(device_id);
                 
-                const html = `
-                    <div class="content-section">
-                        <h2 class="section-title">Good ${greeting}</h2>
-                        <div class="cards-grid" id="homeCards">
-                            ${AppState.playlists.slice(0, 6).map(p => `
-                                <div class="card" data-id="${p.id}" data-uri="${p.uri}">
-                                    <div class="card-image">
-                                        ${p.images?.[0]?.url ? 
-                                            `<img src="${p.images[0].url}" alt="">` : 
-                                            '<div style="background: #282828; width: 100%; height: 100%;"></div>'
-                                        }
-                                        <button class="play-button" data-uri="${p.uri}">
-                                            <svg viewBox="0 0 24 24" width="24" height="24">
-                                                <path fill="currentColor" d="M7.05 3.606l13.49 7.788a.7.7 0 010 1.212L7.05 20.394A.7.7 0 016 19.788V4.212a.7.7 0 011.05-.606z"/>
-                                            </svg>
-                                        </button>
-                                    </div>
-                                    <div class="card-title">${p.name}</div>
-                                    <div class="card-subtitle">Playlist</div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                `;
-                
-                AppState.viewCache.home = html;
-                DOM.mainContent.innerHTML = html;
-                this.updateNavigation('home');
-            },
-            
-            async loadPlaylist(playlistId) {
-                if (AppState.currentView === 'playlist' && 
-                    AppState.currentPlaylistId === playlistId && 
-                    AppState.viewCache[`playlist-${playlistId}`]) {
-                    DOM.mainContent.innerHTML = AppState.viewCache[`playlist-${playlistId}`];
-                    return;
-                }
-                
-                AppState.currentView = 'playlist';
-                AppState.currentPlaylistId = playlistId;
-                
-                DOM.mainContent.innerHTML = '<div style="padding: 40px; text-align: center;">Loading...</div>';
-                
-                const data = await API.getPlaylistTracks(playlistId);
-                if (!data) {
-                    DOM.mainContent.innerHTML = '<div style="padding: 40px; text-align: center;">Failed to load playlist</div>';
-                    return;
-                }
-                
-                const playlist = data.playlist;
-                const html = `
-                    <div class="playlist-header">
-                        <div class="playlist-cover">
-                            ${playlist.images?.[0]?.url ? 
-                                `<img src="${playlist.images[0].url}" alt="">` : 
-                                '<div style="background: #282828; width: 100%; height: 100%;"></div>'
-                            }
-                        </div>
-                        <div class="playlist-info">
-                            <div style="font-size: 12px; font-weight: 700; text-transform: uppercase;">Playlist</div>
-                            <h1>${playlist.name}</h1>
-                            <div class="playlist-meta">${playlist.tracks?.length || 0} songs</div>
-                        </div>
-                    </div>
-                    <div class="playlist-controls">
-                        <button class="btn-play-large" data-uri="${playlist.uri}">
+                // Load initial data
+                loadPlaylists();
+                updateGreeting();
+            });
+
+            // Not Ready
+            player.addListener('not_ready', ({ device_id }) => {
+                console.log('Device offline', device_id);
+            });
+
+            // Player state changed
+            player.addListener('player_state_changed', state => {
+                if (!state) return;
+                updateNowPlaying(state);
+                updatePlayButton(!state.paused);
+                updateProgress(state.position, state.duration);
+            });
+
+            // Errors
+            player.addListener('initialization_error', ({ message }) => {
+                console.error('Init Error:', message);
+                document.getElementById('loading').textContent = 'Initialization failed';
+            });
+
+            player.addListener('authentication_error', ({ message }) => {
+                console.error('Auth Error:', message);
+                document.getElementById('loading').textContent = 'Authentication failed';
+            });
+
+            // Connect
+            player.connect();
+        }
+
+        async function transferPlayback(device_id) {
+            try {
+                await fetch('https://api.spotify.com/v1/me/player', {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        device_ids: [device_id],
+                        play: false
+                    })
+                });
+            } catch (error) {
+                console.error('Transfer failed:', error);
+            }
+        }
+
+        async function loadPlaylists() {
+            try {
+                const res = await fetch('/api/playlists');
+                const data = await res.json();
+                AppState.playlists = data.playlists;
+                renderPlaylists();
+                renderHomeCards();
+            } catch (error) {
+                console.error('Failed to load playlists:', error);
+            }
+        }
+
+        function renderPlaylists() {
+            const container = document.getElementById('playlists');
+            container.innerHTML = AppState.playlists.map(p => `
+                <div class="playlist-item" data-id="${p.id}">${p.name}</div>
+            `).join('');
+        }
+
+        function renderHomeCards() {
+            const container = document.getElementById('homeCards');
+            container.innerHTML = AppState.playlists.slice(0, 6).map(p => `
+                <div class="card" data-id="${p.id}">
+                    <div class="card-image">
+                        ${p.images?.[0]?.url ? 
+                            `<img src="${p.images[0].url}" alt="">` : 
+                            '<div style="background: #282828; width: 100%; height: 100%;"></div>'
+                        }
+                        <button class="play-button" data-uri="${p.uri}">
                             <svg viewBox="0 0 24 24" width="24" height="24">
                                 <path fill="currentColor" d="M7.05 3.606l13.49 7.788a.7.7 0 010 1.212L7.05 20.394A.7.7 0 016 19.788V4.212a.7.7 0 011.05-.606z"/>
                             </svg>
                         </button>
                     </div>
+                    <div class="card-title">${p.name}</div>
+                    <div class="card-subtitle">Playlist</div>
+                </div>
+            `).join('');
+        }
+
+        async function loadPlaylistView(playlistId) {
+            try {
+                const res = await fetch(`/api/playlist/${playlistId}`);
+                const data = await res.json();
+                
+                document.getElementById('mainContent').innerHTML = `
+                    <div class="playlist-header">
+                        <div class="playlist-cover">
+                            ${data.playlist.images?.[0]?.url ? 
+                                `<img src="${data.playlist.images[0].url}" alt="">` : 
+                                ''
+                            }
+                        </div>
+                        <div class="playlist-info">
+                            <div style="font-size: 12px; font-weight: 700; text-transform: uppercase;">Playlist</div>
+                            <h1>${data.playlist.name}</h1>
+                            <div class="playlist-meta">${data.playlist.tracks?.length || 0} songs</div>
+                        </div>
+                    </div>
                     <div class="track-list">
-                        ${playlist.tracks?.map((track, i) => `
-                            <div class="track-row" data-uri="${track.uri}">
+                        ${data.playlist.tracks?.map((track, i) => `
+                            <div class="track-row" data-uri="${track.uri}" data-playlist="${playlistId}" data-offset="${i}">
                                 <div class="track-number">${i + 1}</div>
                                 <div class="track-info">
                                     <div class="track-cover">
@@ -967,279 +776,186 @@
                                     </div>
                                 </div>
                                 <div class="track-album">${track.album?.name || ''}</div>
-                                <div class="track-duration">${this.formatDuration(track.duration_ms)}</div>
+                                <div class="track-duration">${formatDuration(track.duration_ms)}</div>
                             </div>
-                        `).join('') || '<div style="padding: 20px;">No tracks in playlist</div>'}
+                        `).join('') || '<div style="padding: 20px;">No tracks</div>'}
                     </div>
                 `;
                 
-                AppState.viewCache[`playlist-${playlistId}`] = html;
-                DOM.mainContent.innerHTML = html;
-            },
-            
-            async search() {
-                if (AppState.currentView === 'search' && !AppState.searchQuery) {
-                    return;
-                }
-                
-                AppState.currentView = 'search';
-                DOM.searchBar.classList.remove('hidden');
-                this.updateNavigation('search');
-            },
-            
-            updateNavigation(view) {
-                DOM.navItems.forEach(item => {
-                    if (item.dataset.view === view) {
-                        item.classList.add('active');
-                    } else {
-                        item.classList.remove('active');
-                    }
+                // Update active playlist
+                document.querySelectorAll('.playlist-item').forEach(item => {
+                    item.classList.toggle('active', item.dataset.id === playlistId);
                 });
-            },
-            
-            getGreeting() {
-                const hour = new Date().getHours();
-                if (hour < 12) return 'morning';
-                if (hour < 18) return 'afternoon';
-                return 'evening';
-            },
-            
-            formatDuration(ms) {
-                const seconds = Math.floor(ms / 1000);
-                const mins = Math.floor(seconds / 60);
-                const secs = seconds % 60;
-                return `${mins}:${secs.toString().padStart(2, '0')}`;
+            } catch (error) {
+                console.error('Failed to load playlist:', error);
             }
+        }
+
+        async function playPlaylist(uri) {
+            if (!deviceId) return;
+            
+            try {
+                await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${deviceId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        context_uri: uri
+                    })
+                });
+            } catch (error) {
+                console.error('Failed to play:', error);
+            }
+        }
+
+        async function playTrack(uri, playlistId, offset) {
+            if (!deviceId) return;
+            
+            try {
+                // Get playlist tracks
+                const res = await fetch(`/api/playlist/${playlistId}`);
+                const data = await res.json();
+                const uris = data.playlist.tracks.map(t => t.uri);
+                
+                await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${deviceId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        uris: uris,
+                        offset: { position: parseInt(offset) }
+                    })
+                });
+            } catch (error) {
+                console.error('Failed to play track:', error);
+            }
+        }
+
+        function updateNowPlaying(state) {
+            const track = state.track_window.current_track;
+            if (!track) return;
+            
+            document.getElementById('nowPlayingName').textContent = track.name;
+            document.getElementById('nowPlayingArtist').textContent = track.artists.map(a => a.name).join(', ');
+            
+            const cover = document.getElementById('nowPlayingCover');
+            if (track.album.images[0]) {
+                cover.innerHTML = `<img src="${track.album.images[0].url}" alt="">`;
+            }
+            
+            // Update playing track highlight
+            document.querySelectorAll('.track-row').forEach(row => {
+                row.classList.toggle('playing', row.dataset.uri === track.uri);
+            });
+        }
+
+        function updatePlayButton(isPaused) {
+            const btn = document.getElementById('playPauseBtn');
+            if (isPaused) {
+                btn.innerHTML = '<svg viewBox="0 0 16 16"><path fill="currentColor" d="M3 1.713a.7.7 0 011.05-.607l10.89 6.288a.7.7 0 010 1.212L4.05 14.894A.7.7 0 013 14.288V1.713z"/></svg>';
+            } else {
+                btn.innerHTML = '<svg viewBox="0 0 16 16"><path fill="currentColor" d="M2.7 1a.7.7 0 00-.7.7v12.6a.7.7 0 00.7.7h2.6a.7.7 0 00.7-.7V1.7a.7.7 0 00-.7-.7H2.7zm8 0a.7.7 0 00-.7.7v12.6a.7.7 0 00.7.7h2.6a.7.7 0 00.7-.7V1.7a.7.7 0 00-.7-.7h-2.6z"/></svg>';
+            }
+        }
+
+        function updateProgress(position, duration) {
+            const percent = duration > 0 ? (position / duration) * 100 : 0;
+            document.getElementById('progressBarFill').style.width = percent + '%';
+            document.getElementById('progressTime').textContent = formatTime(position);
+            document.getElementById('durationTime').textContent = formatTime(duration);
+        }
+
+        function formatTime(ms) {
+            const seconds = Math.floor(ms / 1000);
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function formatDuration(ms) {
+            return formatTime(ms);
+        }
+
+        function updateGreeting() {
+            const hour = new Date().getHours();
+            let greeting = 'Good evening';
+            if (hour < 12) greeting = 'Good morning';
+            else if (hour < 18) greeting = 'Good afternoon';
+            document.getElementById('greeting').textContent = greeting;
+        }
+
+        // Event handlers
+        document.addEventListener('click', (e) => {
+            // Playlist selection
+            if (e.target.classList.contains('playlist-item')) {
+                loadPlaylistView(e.target.dataset.id);
+            }
+            
+            // Play button on card
+            if (e.target.closest('.play-button')) {
+                const uri = e.target.closest('.play-button').dataset.uri;
+                playPlaylist(uri);
+            }
+            
+            // Track row click
+            if (e.target.closest('.track-row')) {
+                const row = e.target.closest('.track-row');
+                playTrack(row.dataset.uri, row.dataset.playlist, row.dataset.offset);
+            }
+            
+            // Card click (not play button)
+            if (e.target.closest('.card') && !e.target.closest('.play-button')) {
+                const card = e.target.closest('.card');
+                loadPlaylistView(card.dataset.id);
+            }
+            
+            // Nav items
+            if (e.target.closest('.nav-item')) {
+                const view = e.target.closest('.nav-item').dataset.view;
+                if (view === 'home') {
+                    location.reload();
+                }
+            }
+        });
+
+        // Control buttons
+        document.getElementById('playPauseBtn').onclick = () => {
+            if (player) player.togglePlay();
         };
 
-        // WebSocket for real-time updates
-        class RealtimeUpdates {
-            constructor() {
-                this.ws = null;
-                this.reconnectTimer = null;
-            }
-            
-            connect() {
-                if (this.ws?.readyState === WebSocket.OPEN) return;
-                
-                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-                this.ws = new WebSocket(`${protocol}//${window.location.host}`);
-                
-                this.ws.onmessage = (event) => {
-                    try {
-                        const data = JSON.parse(event.data);
-                        if (data.type === 'playback') {
-                            this.updatePlayback(data.data);
-                        }
-                    } catch (e) {
-                        console.error('WebSocket message error:', e);
-                    }
-                };
-                
-                this.ws.onerror = () => this.scheduleReconnect();
-                this.ws.onclose = () => this.scheduleReconnect();
-            }
-            
-            scheduleReconnect() {
-                if (this.reconnectTimer) return;
-                this.reconnectTimer = setTimeout(() => {
-                    this.reconnectTimer = null;
-                    this.connect();
-                }, 5000);
-            }
-            
-            updatePlayback(data) {
-                if (!data) return;
-                
-                // Only update if data actually changed
-                const hasTrackChanged = JSON.stringify(AppState.currentTrack) !== JSON.stringify(data.item);
-                const hasStateChanged = AppState.isPlaying !== data.is_playing ||
-                                       AppState.shuffleState !== data.shuffle_state ||
-                                       AppState.repeatState !== data.repeat_state;
-                
-                if (hasTrackChanged) {
-                    AppState.currentTrack = data.item;
-                }
-                
-                if (hasStateChanged) {
-                    AppState.isPlaying = data.is_playing;
-                    AppState.shuffleState = data.shuffle_state;
-                    AppState.repeatState = data.repeat_state;
-                }
-                
-                AppState.progress = data.progress_ms || 0;
-                AppState.duration = data.item?.duration_ms || 0;
-                
-                // Only render if something changed
-                if (hasTrackChanged || hasStateChanged) {
-                    Renderer.updateNowPlaying();
-                }
-                Renderer.updateProgress();
-            }
-        }
+        document.getElementById('prevBtn').onclick = () => {
+            if (player) player.previousTrack();
+        };
 
-        // Event handling
-        function attachEventHandlers() {
-            // Navigation
-            DOM.navItems.forEach(item => {
-                item.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    const view = item.dataset.view;
-                    if (view === 'home') Views.home();
-                    else if (view === 'search') Views.search();
+        document.getElementById('nextBtn').onclick = () => {
+            if (player) player.nextTrack();
+        };
+
+        document.getElementById('progressBar').onclick = (e) => {
+            if (!player) return;
+            const rect = e.currentTarget.getBoundingClientRect();
+            const percent = (e.clientX - rect.left) / rect.width;
+            player.getCurrentState().then(state => {
+                if (state) {
+                    player.seek(percent * state.duration);
+                }
+            });
+        };
+
+        // Update progress periodically
+        setInterval(() => {
+            if (player) {
+                player.getCurrentState().then(state => {
+                    if (state && !state.paused) {
+                        updateProgress(state.position, state.duration);
+                    }
                 });
-            });
-            
-            // Playlist selection
-            DOM.playlists.addEventListener('click', (e) => {
-                const item = e.target.closest('.playlist-item');
-                if (item) {
-                    Views.loadPlaylist(item.dataset.id);
-                }
-            });
-            
-            // Play buttons (delegated)
-            DOM.mainContent.addEventListener('click', (e) => {
-                const playBtn = e.target.closest('.play-button, .btn-play-large');
-                if (playBtn && playBtn.dataset.uri) {
-                    API.playPlaylist(playBtn.dataset.uri);
-                }
-                
-                const trackRow = e.target.closest('.track-row');
-                if (trackRow && trackRow.dataset.uri) {
-                    API.playUri(trackRow.dataset.uri);
-                }
-                
-                const card = e.target.closest('.card');
-                if (card && !e.target.closest('.play-button')) {
-                    Views.loadPlaylist(card.dataset.id);
-                }
-            });
-            
-            // Search
-            let searchTimer;
-            DOM.searchInput.addEventListener('input', (e) => {
-                clearTimeout(searchTimer);
-                const query = e.target.value.trim();
-                AppState.searchQuery = query;
-                
-                if (!query) {
-                    Views.home();
-                    return;
-                }
-                
-                searchTimer = setTimeout(async () => {
-                    const results = await API.search(query);
-                    if (results) {
-                        renderSearchResults(results);
-                    }
-                }, 300);
-            });
-            
-            // Playback controls
-            DOM.playPauseBtn.onclick = () => AppState.isPlaying ? API.pause() : API.play();
-            DOM.prevBtn.onclick = () => API.previous();
-            DOM.nextBtn.onclick = () => API.next();
-            DOM.shuffleBtn.onclick = () => API.shuffle(!AppState.shuffleState);
-            DOM.repeatBtn.onclick = () => {
-                const states = ['off', 'context', 'track'];
-                const current = states.indexOf(AppState.repeatState);
-                API.repeat(states[(current + 1) % states.length]);
-            };
-            
-            // Progress bar
-            DOM.progressBar.addEventListener('click', (e) => {
-                const rect = DOM.progressBar.getBoundingClientRect();
-                const percent = (e.clientX - rect.left) / rect.width;
-                const position = Math.floor(percent * AppState.duration);
-                API.seek(position);
-            });
-            
-            // Volume
-            DOM.volumeSlider.addEventListener('click', (e) => {
-                const rect = DOM.volumeSlider.getBoundingClientRect();
-                const percent = (e.clientX - rect.left) / rect.width;
-                const volume = Math.floor(percent * 100);
-                AppState.volume = volume;
-                Renderer.updateStyle(DOM.volumeFill, 'width', `${volume}%`);
-                API.setVolume(volume);
-            });
-        }
-
-        function renderSearchResults(results) {
-            const html = `
-                <div class="content-section">
-                    <h2 class="section-title">Search Results</h2>
-                    <div class="cards-grid">
-                        ${results.items?.map(item => `
-                            <div class="card" data-id="${item.id}" data-uri="${item.uri}">
-                                <div class="card-image">
-                                    ${item.images?.[0]?.url ? 
-                                        `<img src="${item.images[0].url}" alt="">` : 
-                                        '<div style="background: #282828; width: 100%; height: 100%;"></div>'
-                                    }
-                                    <button class="play-button" data-uri="${item.uri}">
-                                        <svg viewBox="0 0 24 24" width="24" height="24">
-                                            <path fill="currentColor" d="M7.05 3.606l13.49 7.788a.7.7 0 010 1.212L7.05 20.394A.7.7 0 016 19.788V4.212a.7.7 0 011.05-.606z"/>
-                                        </svg>
-                                    </button>
-                                </div>
-                                <div class="card-title">${item.name}</div>
-                                <div class="card-subtitle">${item.type === 'track' ? item.artists?.map(a => a.name).join(', ') : 'Playlist'}</div>
-                            </div>
-                        `).join('') || '<div>No results found</div>'}
-                    </div>
-                </div>
-            `;
-            DOM.mainContent.innerHTML = html;
-        }
-
-        // Animation loop for smooth progress
-        function animateProgress() {
-            if (AppState.isPlaying && AppState.progress < AppState.duration) {
-                AppState.progress += 100;
-                Renderer.updateProgress();
             }
-            requestAnimationFrame(() => setTimeout(animateProgress, 100));
-        }
-
-        // Initialize Application
-        async function init() {
-            // Initialize DOM references
-            initDOM();
-            
-            // Attach event handlers
-            attachEventHandlers();
-            
-            // Load initial data
-            const playlistData = await API.getPlaylists();
-            if (playlistData) {
-                AppState.playlists = playlistData.playlists;
-                Renderer.renderPlaylists();
-            }
-            
-            // Load home view
-            Views.home();
-            
-            // Start real-time updates
-            const realtime = new RealtimeUpdates();
-            realtime.connect();
-            
-            // Start progress animation
-            animateProgress();
-            
-            // Backup polling - minimal and conditional
-            setInterval(async () => {
-                // Only poll when playing to reduce unnecessary updates
-                if (AppState.isPlaying) {
-                    const data = await API.getPlayback();
-                    if (data) realtime.updatePlayback(data);
-                }
-            }, 5000);
-        }
-
-        // Start the app
-        init();
+        }, 1000);
     </script>
 </body>
 </html>

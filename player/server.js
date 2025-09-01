@@ -199,6 +199,26 @@ async function updatePlaybackState() {
 
 // API Routes
 
+app.get('/api/token', async (req, res) => {
+    if (!spotifyApi) {
+        return res.status(503).json({ error: 'Spotify not connected' });
+    }
+    
+    try {
+        // Get the current access token
+        let accessToken = spotifyApi.getAccessToken();
+        if (!accessToken) {
+            // Try to refresh if no token
+            await refreshAccessToken();
+            accessToken = spotifyApi.getAccessToken();
+        }
+        res.json({ access_token: accessToken });
+    } catch (error) {
+        console.error('Error getting token:', error);
+        res.status(500).json({ error: 'Failed to get token' });
+    }
+});
+
 app.get('/api/config', (req, res) => {
     res.json({
         parental: parentalConfig,
@@ -350,6 +370,21 @@ app.get('/api/playback', async (req, res) => {
     res.json(playbackState);
 });
 
+// Get available devices
+app.get('/api/devices', async (req, res) => {
+    if (!spotifyApi) {
+        return res.status(503).json({ error: 'Spotify not connected' });
+    }
+    
+    try {
+        const devices = await spotifyApi.getMyDevices();
+        res.json({ devices: devices.body.devices });
+    } catch (error) {
+        console.error('Error getting devices:', error);
+        res.json({ devices: [] });
+    }
+});
+
 app.post('/api/play', async (req, res) => {
     if (!spotifyApi) {
         return res.status(503).json({ error: 'Spotify not connected' });
@@ -358,6 +393,23 @@ app.post('/api/play', async (req, res) => {
     try {
         const { context_uri, uris, offset } = req.body;
         const options = {};
+        
+        // Get available devices
+        const devices = await spotifyApi.getMyDevices();
+        if (devices.body.devices.length === 0) {
+            return res.status(404).json({ error: 'No Spotify devices available. Please open Spotify on a device.' });
+        }
+        
+        // Find active device or use first available
+        let device = devices.body.devices.find(d => d.is_active);
+        if (!device) {
+            device = devices.body.devices[0];
+            // Transfer playback to this device
+            await spotifyApi.transferMyPlayback([device.id]);
+            await new Promise(resolve => setTimeout(resolve, 500)); // Small delay for transfer
+        }
+        
+        options.device_id = device.id;
         
         // Handle Liked Songs special case
         if (context_uri === 'spotify:collection:tracks') {
@@ -504,6 +556,88 @@ app.post('/api/like', async (req, res) => {
         res.json({ success: true });
     } catch (error) {
         console.error('Error toggling like:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Play a specific track URI
+app.post('/api/play-uri', async (req, res) => {
+    if (!spotifyApi) {
+        return res.status(503).json({ error: 'Spotify not connected' });
+    }
+    
+    try {
+        const { uri } = req.body;
+        
+        // Get available devices
+        const devices = await spotifyApi.getMyDevices();
+        if (devices.body.devices.length === 0) {
+            return res.status(404).json({ error: 'No Spotify devices available. Please open Spotify on a device.' });
+        }
+        
+        // Find active device or use first available
+        let device = devices.body.devices.find(d => d.is_active);
+        if (!device) {
+            device = devices.body.devices[0];
+            await spotifyApi.transferMyPlayback([device.id]);
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        
+        await spotifyApi.play({
+            device_id: device.id,
+            uris: [uri]
+        });
+        
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error playing URI:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Play a playlist
+app.post('/api/play-playlist', async (req, res) => {
+    if (!spotifyApi) {
+        return res.status(503).json({ error: 'Spotify not connected' });
+    }
+    
+    try {
+        const { uri } = req.body;
+        
+        // Get available devices
+        const devices = await spotifyApi.getMyDevices();
+        if (devices.body.devices.length === 0) {
+            return res.status(404).json({ error: 'No Spotify devices available. Please open Spotify on a device.' });
+        }
+        
+        // Find active device or use first available
+        let device = devices.body.devices.find(d => d.is_active);
+        if (!device) {
+            device = devices.body.devices[0];
+            await spotifyApi.transferMyPlayback([device.id]);
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        
+        // Handle special playlists
+        if (uri === 'spotify:collection:tracks') {
+            // Liked Songs
+            const tracks = await spotifyApi.getMySavedTracks({ limit: 50 });
+            if (tracks.body.items.length > 0) {
+                await spotifyApi.play({
+                    device_id: device.id,
+                    uris: tracks.body.items.map(item => item.track.uri)
+                });
+            }
+        } else {
+            await spotifyApi.play({
+                device_id: device.id,
+                context_uri: uri
+            });
+        }
+        
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error playing playlist:', error);
         res.status(500).json({ error: error.message });
     }
 });

@@ -3,6 +3,9 @@
 # Spotify Kids Player Kiosk Mode Launcher
 # This script launches Chromium in kiosk mode displaying the web player
 
+# Redirect all output to /dev/null to prevent terminal flashing
+exec > /dev/null 2>&1
+
 # Change to a directory the spotify-kids user has access to
 cd /opt/spotify-kids || cd /tmp
 
@@ -15,7 +18,6 @@ if [ -z "$DISPLAY" ]; then
     for display in 0 1 2; do
         if [ -S /tmp/.X11-unix/X${display} ]; then
             export DISPLAY=:${display}
-            echo "Using display $DISPLAY"
             break
         fi
     done
@@ -32,36 +34,15 @@ xset -dpms 2>/dev/null || true
 xset s noblank 2>/dev/null || true
 
 # Hide mouse cursor immediately for touchscreen
-unclutter -idle 0 -root 2>/dev/null &
+unclutter -idle 0 -root &
 
 # Remove any existing chromium preferences that might interfere
 rm -rf /home/spotify-kids/.config/chromium/Singleton*
 
-# Launch Chromium in kiosk mode
-# --kiosk: Full screen mode, no browser UI
-# --noerrdialogs: No error dialogs
-# --disable-infobars: No info bars
-# --disable-session-crashed-bubble: No crash restore bubble
-# --disable-translate: No translation bar
-# --no-first-run: Skip first run setup
-# --fast: Fast startup
-# --fast-start: Fast tab/window startup
-# --disable-features=TranslateUI: Disable translate feature
-# --app: Run as an app (removes navigation)
-# --window-position=0,0: Position at top-left
-# --window-size: Set to screen size (will be overridden by kiosk mode)
-# --disable-pinch: Disable pinch zoom
-# --overscroll-history-navigation=0: Disable swipe navigation
-
-echo "Starting Chromium in kiosk mode on display $DISPLAY"
-
 # Wait for the web player to be ready
 until curl -s http://localhost:5000 > /dev/null 2>&1; do
-    echo "Waiting for web player to be ready..."
     sleep 2
 done
-
-echo "Web player is ready, launching browser"
 
 # Kill any existing chromium instances first
 pkill -f "chromium.*kiosk" 2>/dev/null || true
