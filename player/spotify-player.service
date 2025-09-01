@@ -1,0 +1,40 @@
+[Unit]
+Description=Spotify Kids Web Player
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=spotify-kids
+Group=spotify-kids
+WorkingDirectory=/opt/spotify-kids/player
+Environment="NODE_ENV=production"
+Environment="PORT=5000"
+Environment="SPOTIFY_CONFIG_DIR=/opt/spotify-kids/config"
+
+# Install dependencies if needed
+ExecStartPre=/bin/bash -c 'if [ ! -d "node_modules" ]; then npm install --production; fi'
+
+# Start the server
+ExecStart=/usr/bin/node server.js
+
+# Restart policy
+Restart=always
+RestartSec=10
+StartLimitInterval=60
+StartLimitBurst=3
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=spotify-player
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/opt/spotify-kids/config
+
+[Install]
+WantedBy=multi-user.target

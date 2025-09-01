@@ -1,0 +1,84 @@
+{
+  "player_config": {
+    "theme": "spotify-dark",
+    "themes_available": [
+      "spotify-dark",
+      "spotify-light", 
+      "kids-colorful",
+      "minimal",
+      "high-contrast"
+    ],
+    "ui": {
+      "show_visualizer": false,
+      "show_lyrics": false,
+      "show_queue": true,
+      "show_recently_played": true,
+      "show_recommendations": true,
+      "sidebar_width": 280,
+      "album_art_size": 400,
+      "mini_player_height": 90
+    },
+    "playback": {
+      "auto_play_on_start": false,
+      "crossfade_seconds": 0,
+      "normalize_volume": true,
+      "gapless_playback": true,
+      "auto_queue_recommendations": false
+    },
+    "accessibility": {
+      "hide_cursor_timeout": 0,
+      "enable_touch_gestures": true,
+      "large_touch_targets": true,
+      "swipe_to_skip": true,
+      "double_tap_to_like": true,
+      "long_press_for_menu": false,
+      "haptic_feedback": false
+    },
+    "display": {
+      "clock_format": "12h",
+      "show_clock": true,
+      "show_date": false,
+      "screensaver_timeout": 0,
+      "brightness_control": false,
+      "fullscreen": true
+    }
+  },
+  "parental_controls": {
+    "enabled": true,
+    "volume_limit": 85,
+    "explicit_filter": true,
+    "max_play_time_minutes": 120,
+    "time_restrictions": {
+      "enabled": false,
+      "allowed_hours": {
+        "weekday": { "start": "07:00", "end": "20:00" },
+        "weekend": { "start": "07:00", "end": "21:00" }
+      }
+    },
+    "content_filters": {
+      "allowed_playlists": [],
+      "blocked_artists": [],
+      "blocked_songs": [],
+      "blocked_genres": [],
+      "max_song_duration_minutes": 10,
+      "allow_podcasts": false,
+      "allow_audiobooks": false
+    },
+    "usage_tracking": {
+      "enabled": true,
+      "track_play_history": true,
+      "track_skip_patterns": true,
+      "daily_summary": true
+    }
+  },
+  "advanced": {
+    "cache_size_mb": 500,
+    "offline_mode": false,
+    "prefetch_next_track": true,
+    "network_timeout_seconds": 30,
+    "retry_failed_requests": true,
+    "max_retries": 3,
+    "log_level": "info",
+    "debug_mode": false
+  }
+}
