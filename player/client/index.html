@@ -891,8 +891,9 @@
         // Event handlers
         document.addEventListener('click', (e) => {
             // Playlist selection
-            if (e.target.classList.contains('playlist-item')) {
-                loadPlaylistView(e.target.dataset.id);
+            if (e.target.closest('.playlist-item')) {
+                const playlistItem = e.target.closest('.playlist-item');
+                loadPlaylistView(playlistItem.dataset.id);
             }
             
             // Play button on card

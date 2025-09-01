@@ -2311,7 +2311,23 @@ def bluetooth_pair():
                                          capture_output=True, text=True, timeout=10)
             
             if 'successful' in connect_result.stdout.lower():
-                return jsonify({'success': True, 'message': 'Device paired and connected successfully'})
+                # Set as default audio output for spotify-kids user
+                # Wait a moment for the device to be ready
+                import time
+                time.sleep(2)
+                
+                # Get the Bluetooth device name for PulseAudio
+                # The device should now be available as a sink
+                subprocess.run(['sudo', '-u', 'spotify-kids', 'pactl', 'set-default-sink', 
+                              f'bluez_sink.{address.replace(":", "_")}.a2dp_sink'],
+                              capture_output=True, check=False)
+                
+                # Also try to move any existing streams to the new device
+                subprocess.run(['sudo', '-u', 'spotify-kids', 'bash', '-c',
+                              f'pactl list short sink-inputs | cut -f1 | xargs -I{{}} pactl move-sink-input {{}} bluez_sink.{address.replace(":", "_")}.a2dp_sink'],
+                              capture_output=True, check=False)
+                
+                return jsonify({'success': True, 'message': 'Device paired, connected and set as audio output'})
             else:
                 return jsonify({'success': True, 'message': 'Device paired. You may need to connect manually.'})
         elif 'already' in result.stderr.lower():
@@ -2319,7 +2335,19 @@ def bluetooth_pair():
             connect_result = subprocess.run(['sudo', 'bluetoothctl', 'connect', address],
                                          capture_output=True, text=True, timeout=10)
             if 'successful' in connect_result.stdout.lower():
-                return jsonify({'success': True, 'message': 'Device was already paired. Now connected.'})
+                # Set as default audio output for spotify-kids user
+                import time
+                time.sleep(2)
+                
+                subprocess.run(['sudo', '-u', 'spotify-kids', 'pactl', 'set-default-sink', 
+                              f'bluez_sink.{address.replace(":", "_")}.a2dp_sink'],
+                              capture_output=True, check=False)
+                
+                subprocess.run(['sudo', '-u', 'spotify-kids', 'bash', '-c',
+                              f'pactl list short sink-inputs | cut -f1 | xargs -I{{}} pactl move-sink-input {{}} bluez_sink.{address.replace(":", "_")}.a2dp_sink'],
+                              capture_output=True, check=False)
+                
+                return jsonify({'success': True, 'message': 'Device was already paired. Now connected and set as audio output.'})
             else:
                 return jsonify({'success': True, 'message': 'Device already paired. You may need to connect manually.'})
         else:
