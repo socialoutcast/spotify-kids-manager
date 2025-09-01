@@ -1156,10 +1156,28 @@ def get_bluetooth_status():
                     address = parts[1]
                     name = parts[2] if len(parts) > 2 else 'Unknown'
                     
-                    # Check if connected
+                    # Get more detailed info including proper name
                     info_result = subprocess.run(['sudo', 'bluetoothctl', 'info', address],
                                                capture_output=True, text=True, timeout=5)
+                    
+                    # Check if connected
                     connected = 'Connected: yes' in info_result.stdout
+                    
+                    # Try to get better name from info
+                    for info_line in info_result.stdout.split('\n'):
+                        if 'Name:' in info_line:
+                            name_parts = info_line.split('Name:', 1)
+                            if len(name_parts) > 1:
+                                better_name = name_parts[1].strip()
+                                if better_name:
+                                    name = better_name
+                                    break
+                        elif 'Alias:' in info_line and name == address:
+                            alias_parts = info_line.split('Alias:', 1)
+                            if len(alias_parts) > 1:
+                                alias = alias_parts[1].strip()
+                                if alias and alias != address:
+                                    name = alias
                     
                     paired_devices.append({
                         'address': address,
@@ -2200,8 +2218,8 @@ def bluetooth_scan():
         scan_process = subprocess.Popen(['sudo', 'bluetoothctl', '--', 'scan', 'on'], 
                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         
-        # Wait a bit for devices to be discovered
-        time.sleep(5)  # Increased scan time
+        # Wait longer for devices to be discovered and names to resolve
+        time.sleep(8)  # Increased scan time for better name resolution
         
         # Get devices
         result = subprocess.run(['sudo', 'bluetoothctl', 'devices'], 
@@ -2225,14 +2243,34 @@ def bluetooth_scan():
                 if len(parts) >= 2:
                     paired_addresses.add(parts[1])
         
-        # Parse discovered devices
+        # Parse discovered devices and get their info
         for line in result.stdout.split('\n'):
             if 'Device' in line:
                 parts = line.split(' ', 2)
                 if len(parts) >= 3:
                     address = parts[1]
                     if address not in paired_addresses:
-                        name = parts[2] if len(parts) > 2 else 'Unknown'
+                        # Initial name from scan results
+                        name = parts[2] if len(parts) > 2 else address
+                        
+                        # Try to get more info about the device
+                        info_result = subprocess.run(['sudo', 'bluetoothctl', 'info', address],
+                                                    capture_output=True, text=True, timeout=2)
+                        
+                        # Parse info output for better name
+                        for info_line in info_result.stdout.split('\n'):
+                            if 'Name:' in info_line:
+                                name_parts = info_line.split('Name:', 1)
+                                if len(name_parts) > 1:
+                                    name = name_parts[1].strip()
+                                    break
+                            elif 'Alias:' in info_line:
+                                alias_parts = info_line.split('Alias:', 1)
+                                if len(alias_parts) > 1:
+                                    alias = alias_parts[1].strip()
+                                    if alias and alias != address:
+                                        name = alias
+                        
                         devices.append({'address': address, 'name': name})
         
         return jsonify({'success': True, 'devices': devices})
