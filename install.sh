@@ -165,13 +165,20 @@ apt-get install -y \
     git \
     unclutter \
     bluez \
+    bluez-firmware \
     bluez-tools \
+    bluez-alsa-utils \
+    pulseaudio \
     pulseaudio-module-bluetooth \
+    libasound2-plugins \
+    libspa-0.2-bluetooth \
+    pi-bluetooth \
     rfkill \
     scrot \
     xterm \
     chromium \
     openbox \
+    lightdm \
     curl \
     expect \
     pulseaudio-utils
