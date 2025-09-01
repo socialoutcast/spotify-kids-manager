@@ -1042,7 +1042,7 @@
                 const coverImage = playlist.images?.[0]?.url;
                 
                 return `
-                    <div class="playlist-item" onclick="event.stopPropagation(); playPlaylist('${playlist.uri}')">
+                    <div class="playlist-item" data-uri="${playlist.uri}">
                         <div class="playlist-cover">
                             ${coverImage ? 
                                 `<img src="${coverImage}" alt="${playlist.name}">` : 
@@ -1060,10 +1060,24 @@
             // Only update DOM if content has changed
             if (elements.playlists.innerHTML !== playlistsHTML) {
                 elements.playlists.innerHTML = playlistsHTML;
+                
+                // Add click handlers to playlist items
+                document.querySelectorAll('.playlist-item').forEach(item => {
+                    item.onclick = (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const uri = item.dataset.uri;
+                        if (uri) {
+                            window.playPlaylist(uri);
+                        }
+                    };
+                });
             }
         }
 
-        async function playPlaylist(uri) {
+        // Make playPlaylist globally accessible
+        window.playPlaylist = async function(uri) {
+            console.log('Playing playlist:', uri);
             await api('/play', 'POST', { context_uri: uri });
         }
 
@@ -1110,12 +1124,13 @@
         }
 
         function displaySearchResults(results) {
+            elements.mainContent.dataset.page = 'search';
             elements.mainContent.innerHTML = `
                 <div class="content-section">
                     <h2 class="section-title">Search Results</h2>
                     <div class="cards-grid">
                         ${results.map(item => `
-                            <div class="card" onclick="playItem('${item.uri}', '${item.type}')">
+                            <div class="card" data-uri="${item.uri}" data-type="${item.type}">
                                 <div class="card-image">
                                     ${item.image ? 
                                         `<img src="${item.image}" alt="">` : 
@@ -1134,9 +1149,23 @@
                     </div>
                 </div>
             `;
+            
+            // Add click handlers to search result cards
+            document.querySelectorAll('.card').forEach(card => {
+                card.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const uri = card.dataset.uri;
+                    const type = card.dataset.type;
+                    if (uri) {
+                        window.playItem(uri, type);
+                    }
+                };
+            });
         }
 
-        async function playItem(uri, type) {
+        // Make playItem globally accessible
+        window.playItem = async function(uri, type) {
             if (type === 'track') {
                 await api('/play', 'POST', { uris: [uri] });
             } else {
@@ -1145,12 +1174,16 @@
         }
 
         function loadHomePage() {
+            // Don't reload if already on home page
+            if (elements.mainContent.dataset.page === 'home') return;
+            
+            elements.mainContent.dataset.page = 'home';
             elements.mainContent.innerHTML = `
                 <div class="content-section">
                     <h2 class="section-title">Good ${getGreeting()}</h2>
                     <div class="cards-grid">
                         ${state.playlists.slice(0, 6).map(playlist => `
-                            <div class="card" onclick="playPlaylist('${playlist.uri}')">
+                            <div class="card" data-uri="${playlist.uri}">
                                 <div class="card-image">
                                     ${playlist.images?.[0]?.url ? 
                                         `<img src="${playlist.images[0].url}" alt="">` : 
@@ -1169,6 +1202,18 @@
                     </div>
                 </div>
             `;
+            
+            // Add click handlers to cards
+            document.querySelectorAll('.card').forEach(card => {
+                card.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const uri = card.dataset.uri;
+                    if (uri) {
+                        window.playPlaylist(uri);
+                    }
+                };
+            });
         }
 
         function getGreeting() {
@@ -1187,10 +1232,16 @@
                 if (state.currentTime <= state.duration) {
                     updateProgress();
                 }
+                // Only continue animation if still playing
+                if (state.isPlaying) {
+                    progressAnimationFrame = requestAnimationFrame(() => {
+                        setTimeout(animateProgress, 100);
+                    });
+                }
+            } else {
+                // Schedule next check if not playing
+                setTimeout(animateProgress, 1000);
             }
-            progressAnimationFrame = requestAnimationFrame(() => {
-                setTimeout(animateProgress, 100);
-            });
         }
         
         // Initialization
@@ -1202,13 +1253,16 @@
             // Start progress animation
             animateProgress();
             
-            // Poll for updates less frequently
+            // Poll for updates only when playing
             setInterval(async () => {
-                const data = await api('/playback');
-                if (data) {
-                    updatePlaybackState(data);
+                // Only poll if we're playing or if we don't have WebSocket
+                if (state.isPlaying || !ws || ws.readyState !== WebSocket.OPEN) {
+                    const data = await api('/playback');
+                    if (data) {
+                        updatePlaybackState(data);
+                    }
                 }
-            }, 2000); // Reduced to every 2 seconds
+            }, 3000); // Every 3 seconds, only when needed
         }
 
         // Start the app
