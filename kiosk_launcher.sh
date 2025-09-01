@@ -31,8 +31,8 @@ xset s off 2>/dev/null || true
 xset -dpms 2>/dev/null || true
 xset s noblank 2>/dev/null || true
 
-# Hide mouse cursor after 0.1 seconds of inactivity
-unclutter -idle 0.1 2>/dev/null &
+# Hide mouse cursor immediately for touchscreen
+unclutter -idle 0 -root 2>/dev/null &
 
 # Remove any existing chromium preferences that might interfere
 rm -rf /home/spotify-kids/.config/chromium/Singleton*
