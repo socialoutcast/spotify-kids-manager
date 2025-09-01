@@ -63,36 +63,26 @@ done
 
 echo "Web player is ready, launching browser"
 
-while true; do
-    # Launch chromium - try with different options if it fails
-    chromium-browser \
-        --kiosk \
-        --noerrdialogs \
-        --disable-infobars \
-        --disable-session-crashed-bubble \
-        --disable-translate \
-        --no-first-run \
-        --fast \
-        --fast-start \
-        --disable-features=TranslateUI \
-        --check-for-update-interval=31536000 \
-        --disable-pinch \
-        --overscroll-history-navigation=0 \
-        --disable-component-update \
-        --autoplay-policy=no-user-gesture-required \
-        --window-position=0,0 \
-        --user-data-dir=/home/spotify-kids/.config/chromium-kiosk \
-        "http://localhost:5000" 2>/dev/null || \
-    chromium-browser \
-        --kiosk \
-        --no-sandbox \
-        --disable-dev-shm-usage \
-        --disable-gpu \
-        --disable-software-rasterizer \
-        --user-data-dir=/home/spotify-kids/.config/chromium-kiosk \
-        "http://localhost:5000" 2>/dev/null
-    
-    # If browser crashes or is somehow closed, wait and restart
-    echo "Browser closed or crashed, restarting in 5 seconds..."
-    sleep 5
-done
+# Kill any existing chromium instances first
+pkill -f "chromium.*kiosk" 2>/dev/null || true
+sleep 2
+
+# Launch chromium - systemd will restart if it crashes
+exec chromium-browser \
+    --kiosk \
+    --noerrdialogs \
+    --disable-infobars \
+    --disable-session-crashed-bubble \
+    --disable-translate \
+    --no-first-run \
+    --fast \
+    --fast-start \
+    --disable-features=TranslateUI \
+    --check-for-update-interval=31536000 \
+    --disable-pinch \
+    --overscroll-history-navigation=0 \
+    --disable-component-update \
+    --autoplay-policy=no-user-gesture-required \
+    --window-position=0,0 \
+    --user-data-dir=/home/spotify-kids/.config/chromium-kiosk \
+    "http://localhost:5000"

@@ -612,7 +612,7 @@ app.get('/api/recommendations', async (req, res) => {
 
 // Serve Spotify clone interface
 app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'client', 'spotify-player.html'));
+    res.sendFile(path.join(__dirname, 'client', 'index.html'));
 });
 
 // HTTP server
