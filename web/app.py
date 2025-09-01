@@ -3219,4 +3219,28 @@ def dist_upgrade():
 
 if __name__ == '__main__':
     os.makedirs(CONFIG_DIR, exist_ok=True)
-    app.run(host='0.0.0.0', port=5001, debug=False)
+    
+    # Check for SSL certificates to enable HTTPS
+    ssl_context = None
+    cert_file = '/opt/spotify-kids/ssl/server.crt'
+    key_file = '/opt/spotify-kids/ssl/server.key'
+    
+    # First check the nginx SSL location
+    if os.path.exists(cert_file) and os.path.exists(key_file):
+        ssl_context = (cert_file, key_file)
+        print(f"Running with HTTPS using certificates from {cert_file}")
+        print(f"Access the admin panel at: https://192.168.1.164:5001")
+    else:
+        # Check alternative location
+        cert_file = '/opt/spotify-kids/certs/server.crt'
+        key_file = '/opt/spotify-kids/certs/server.key'
+        if os.path.exists(cert_file) and os.path.exists(key_file):
+            ssl_context = (cert_file, key_file)
+            print(f"Running with HTTPS using certificates from {cert_file}")
+            print(f"Access the admin panel at: https://192.168.1.164:5001")
+        else:
+            print("No SSL certificates found, running on HTTP")
+            print("Run setup_https.sh to enable HTTPS support for Spotify OAuth")
+            print(f"Access the admin panel at: http://192.168.1.164:5001")
+    
+    app.run(host='0.0.0.0', port=5001, debug=False, ssl_context=ssl_context)
