@@ -1042,7 +1042,7 @@
                 const coverImage = playlist.images?.[0]?.url;
                 
                 return `
-                    <div class="playlist-item" data-uri="${playlist.uri}">
+                    <div class="playlist-item" data-uri="${playlist.uri}" data-id="${playlist.id}" data-name="${playlist.name.replace(/'/g, '&#39;')}">
                         <div class="playlist-cover">
                             ${coverImage ? 
                                 `<img src="${coverImage}" alt="${playlist.name}">` : 
@@ -1066,9 +1066,11 @@
                     item.onclick = (e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        const uri = item.dataset.uri;
-                        if (uri) {
-                            window.playPlaylist(uri);
+                        const playlistId = item.dataset.id;
+                        const playlistName = item.dataset.name;
+                        const playlistUri = item.dataset.uri;
+                        if (playlistId) {
+                            loadPlaylistView(playlistId, playlistName, playlistUri);
                         }
                     };
                 });
@@ -1078,6 +1080,152 @@
         // Make playPlaylist globally accessible
         window.playPlaylist = async function(uri) {
             console.log('Playing playlist:', uri);
+            await api('/play', 'POST', { context_uri: uri });
+        }
+        
+        // Load playlist view with tracks
+        async function loadPlaylistView(playlistId, playlistName, playlistUri) {
+            // Show loading state
+            elements.mainContent.dataset.page = 'playlist';
+            elements.mainContent.innerHTML = `
+                <div class="playlist-header" style="padding: 24px 32px; display: flex; align-items: end; gap: 24px; background: linear-gradient(transparent, rgba(0,0,0,0.5));">
+                    <div style="width: 232px; height: 232px; background: #282828; flex-shrink: 0;">
+                        <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: #b3b3b3;">
+                            Loading...
+                        </div>
+                    </div>
+                    <div style="flex: 1;">
+                        <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; margin-bottom: 8px;">PLAYLIST</div>
+                        <h1 style="font-size: 72px; font-weight: 900; margin: 0; line-height: 1;">${playlistName}</h1>
+                    </div>
+                </div>
+                <div style="padding: 24px 32px;">
+                    <div style="display: flex; align-items: center; justify-content: center; padding: 40px; color: #b3b3b3;">
+                        Loading tracks...
+                    </div>
+                </div>
+            `;
+            
+            try {
+                // Fetch playlist tracks
+                const data = await api(`/playlist/${playlistId}`);
+                
+                if (data && data.tracks) {
+                    displayPlaylistTracks(data, playlistUri);
+                }
+            } catch (error) {
+                console.error('Error loading playlist:', error);
+                elements.mainContent.innerHTML = `
+                    <div style="padding: 40px; text-align: center; color: #b3b3b3;">
+                        Error loading playlist
+                    </div>
+                `;
+            }
+        }
+        
+        // Display playlist tracks
+        function displayPlaylistTracks(playlist, playlistUri) {
+            const formatDuration = (ms) => {
+                const minutes = Math.floor(ms / 60000);
+                const seconds = Math.floor((ms % 60000) / 1000);
+                return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            };
+            
+            elements.mainContent.dataset.page = 'playlist';
+            elements.mainContent.innerHTML = `
+                <div class="playlist-header" style="padding: 24px 32px 24px; display: flex; align-items: end; gap: 24px; background: linear-gradient(transparent, rgba(0,0,0,0.5));">
+                    ${playlist.image ? 
+                        `<img src="${playlist.image}" style="width: 232px; height: 232px; object-fit: cover;">` :
+                        `<div style="width: 232px; height: 232px; background: linear-gradient(135deg, #450af5, #c4eeff); flex-shrink: 0;"></div>`
+                    }
+                    <div style="flex: 1;">
+                        <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; margin-bottom: 8px;">PLAYLIST</div>
+                        <h1 style="font-size: 48px; font-weight: 900; margin: 0 0 8px 0; line-height: 1.1;">${playlist.name}</h1>
+                        ${playlist.description ? `<p style="color: #b3b3b3; margin: 8px 0;">${playlist.description}</p>` : ''}
+                        <div style="margin-top: 16px;">
+                            <span style="color: #b3b3b3;">${playlist.total || playlist.tracks.length} songs</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="padding: 24px 32px;">
+                    <div style="margin-bottom: 24px;">
+                        <button onclick="window.playPlaylist('${playlistUri}')" style="
+                            background: #1db954;
+                            color: #000;
+                            border: none;
+                            border-radius: 500px;
+                            padding: 12px 32px;
+                            font-size: 16px;
+                            font-weight: 700;
+                            cursor: pointer;
+                            margin-right: 24px;
+                        ">Play</button>
+                        <button onclick="window.shufflePlaylist('${playlistUri}')" style="
+                            background: transparent;
+                            color: #fff;
+                            border: 1px solid #b3b3b3;
+                            border-radius: 500px;
+                            padding: 12px 32px;
+                            font-size: 16px;
+                            font-weight: 700;
+                            cursor: pointer;
+                        ">Shuffle</button>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 16px 4fr 2fr 1fr; gap: 16px; padding: 8px 16px; border-bottom: 1px solid rgba(255,255,255,0.1); color: #b3b3b3; font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em;">
+                        <div>#</div>
+                        <div>Title</div>
+                        <div>Album</div>
+                        <div style="text-align: right;">Duration</div>
+                    </div>
+                    
+                    <div class="track-list">
+                        ${playlist.tracks.map((track, index) => `
+                            <div class="track-row" data-uri="${track.uri}" style="
+                                display: grid;
+                                grid-template-columns: 16px 4fr 2fr 1fr;
+                                gap: 16px;
+                                padding: 8px 16px;
+                                border-radius: 4px;
+                                cursor: pointer;
+                                transition: background 0.2s;
+                            " onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">
+                                <div style="color: #b3b3b3; display: flex; align-items: center;">${index + 1}</div>
+                                <div style="display: flex; align-items: center; gap: 16px;">
+                                    ${track.image ? 
+                                        `<img src="${track.image}" style="width: 40px; height: 40px;">` : 
+                                        '<div style="width: 40px; height: 40px; background: #282828;"></div>'
+                                    }
+                                    <div>
+                                        <div style="color: #fff;">${track.name}</div>
+                                        <div style="color: #b3b3b3; font-size: 14px;">${track.artists}</div>
+                                    </div>
+                                </div>
+                                <div style="color: #b3b3b3; display: flex; align-items: center;">${track.album}</div>
+                                <div style="color: #b3b3b3; text-align: right; display: flex; align-items: center; justify-content: flex-end;">${formatDuration(track.duration_ms)}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+            
+            // Add click handlers to tracks
+            document.querySelectorAll('.track-row').forEach((row, index) => {
+                row.onclick = async (e) => {
+                    e.preventDefault();
+                    // Play the playlist starting from this track
+                    await api('/play', 'POST', { 
+                        context_uri: playlistUri,
+                        offset: { position: index }
+                    });
+                };
+            });
+        }
+        
+        // Shuffle playlist
+        window.shufflePlaylist = async function(uri) {
+            await api('/shuffle', 'POST', { state: 'on' });
             await api('/play', 'POST', { context_uri: uri });
         }
 
@@ -1183,13 +1331,13 @@
                     <h2 class="section-title">Good ${getGreeting()}</h2>
                     <div class="cards-grid">
                         ${state.playlists.slice(0, 6).map(playlist => `
-                            <div class="card" data-uri="${playlist.uri}">
+                            <div class="card" data-uri="${playlist.uri}" data-id="${playlist.id}" data-name="${playlist.name.replace(/'/g, '&#39;')}">
                                 <div class="card-image">
                                     ${playlist.images?.[0]?.url ? 
                                         `<img src="${playlist.images[0].url}" alt="">` : 
                                         '<div style="background: #282828; width: 100%; height: 100%;"></div>'
                                     }
-                                    <button class="play-button">
+                                    <button class="play-button" onclick="event.stopPropagation(); window.playPlaylist('${playlist.uri}')">
                                         <svg viewBox="0 0 24 24" width="24" height="24">
                                             <path fill="currentColor" d="M7.05 3.606l13.49 7.788a.7.7 0 010 1.212L7.05 20.394A.7.7 0 016 19.788V4.212a.7.7 0 011.05-.606z"/>
                                         </svg>
@@ -1203,14 +1351,20 @@
                 </div>
             `;
             
-            // Add click handlers to cards
+            // Add click handlers to cards (click on card loads playlist, play button plays it)
             document.querySelectorAll('.card').forEach(card => {
                 card.onclick = (e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    const uri = card.dataset.uri;
-                    if (uri) {
-                        window.playPlaylist(uri);
+                    
+                    // Don't trigger if clicking the play button
+                    if (e.target.closest('.play-button')) return;
+                    
+                    const playlistId = card.dataset.id;
+                    const playlistName = card.dataset.name;
+                    const playlistUri = card.dataset.uri;
+                    if (playlistId) {
+                        loadPlaylistView(playlistId, playlistName, playlistUri);
                     }
                 };
             });

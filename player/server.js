@@ -286,6 +286,66 @@ app.get('/api/playlists', async (req, res) => {
     }
 });
 
+app.get('/api/playlist/:id', async (req, res) => {
+    if (!spotifyApi) {
+        return res.status(503).json({ error: 'Spotify not connected' });
+    }
+    
+    try {
+        const playlistId = req.params.id;
+        
+        // Handle special playlists
+        if (playlistId === 'liked-songs') {
+            // Get liked songs
+            const tracks = await spotifyApi.getMySavedTracks({ limit: 50 });
+            const formattedTracks = tracks.body.items.map(item => ({
+                id: item.track.id,
+                uri: item.track.uri,
+                name: item.track.name,
+                artists: item.track.artists.map(a => a.name).join(', '),
+                album: item.track.album.name,
+                duration_ms: item.track.duration_ms,
+                explicit: item.track.explicit,
+                image: item.track.album.images?.[0]?.url
+            }));
+            
+            res.json({
+                id: 'liked-songs',
+                name: 'Liked Songs',
+                tracks: formattedTracks,
+                total: tracks.body.total
+            });
+        } else {
+            // Get regular playlist tracks
+            const playlist = await spotifyApi.getPlaylist(playlistId);
+            const formattedTracks = playlist.body.tracks.items
+                .filter(item => item.track) // Filter out null tracks
+                .map(item => ({
+                    id: item.track.id,
+                    uri: item.track.uri,
+                    name: item.track.name,
+                    artists: item.track.artists.map(a => a.name).join(', '),
+                    album: item.track.album.name,
+                    duration_ms: item.track.duration_ms,
+                    explicit: item.track.explicit,
+                    image: item.track.album.images?.[0]?.url
+                }));
+            
+            res.json({
+                id: playlist.body.id,
+                name: playlist.body.name,
+                description: playlist.body.description,
+                image: playlist.body.images?.[0]?.url,
+                tracks: formattedTracks,
+                total: playlist.body.tracks.total
+            });
+        }
+    } catch (error) {
+        console.error('Error getting playlist tracks:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 app.get('/api/playback', async (req, res) => {
     res.json(playbackState);
 });
