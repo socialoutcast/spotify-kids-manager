@@ -236,13 +236,46 @@ app.get('/api/playlists', async (req, res) => {
     }
     
     try {
+        // Get user playlists
         const data = await spotifyApi.getUserPlaylists({ limit: 50 });
+        let playlists = data.body.items || [];
         
-        // Filter by parental controls
-        let playlists = data.body.items;
+        // Add special Spotify playlists
+        const specialPlaylists = [
+            {
+                id: 'liked-songs',
+                name: 'Liked Songs',
+                uri: 'spotify:collection:tracks',
+                type: 'collection',
+                owner: { display_name: 'You' },
+                images: [{ url: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNDgiIHZpZXdCb3g9IjAgMCA0OCA0OCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjQ4IiBoZWlnaHQ9IjQ4IiBmaWxsPSJsaW5lYXItZ3JhZGllbnQoMTM1ZGVnLCAjNDUwYWY1LCAjYzRlZWZmKSIvPgo8cGF0aCBkPSJNMjQgMzZDMjQgMzYgMzcgMjcuNSAzNyAxOC41QzM3IDEzLjUgMzMgMTAgMjguNSAxMEMyNi41IDEwIDI0LjUgMTEgMjQgMTJDMjMuNSAxMSAyMS41IDEwIDE5LjUgMTBDMTUgMTAgMTEgMTMuNSAxMSAxOC41QzExIDI3LjUgMjQgMzYgMjQgMzZaIiBmaWxsPSJ3aGl0ZSIvPgo8L3N2Zz4=' }]
+            }
+        ];
+        
+        // Try to get DJ (if available)
+        try {
+            // DJ is usually a made-for-you playlist
+            const madeForYou = await spotifyApi.getPlaylistsForCategory('made_for_you', { limit: 10 });
+            const djPlaylist = madeForYou.body.playlists?.items?.find(p => 
+                p.name.toLowerCase().includes('dj') || 
+                p.name.toLowerCase().includes('daily mix')
+            );
+            if (djPlaylist) {
+                specialPlaylists.push(djPlaylist);
+            }
+        } catch (e) {
+            // DJ might not be available in all regions
+            console.log('DJ playlist not available');
+        }
+        
+        // Add special playlists at the beginning
+        playlists = [...specialPlaylists, ...playlists];
+        
+        // Filter by parental controls if configured
         if (parentalConfig.allowed_playlists && parentalConfig.allowed_playlists.length > 0) {
             playlists = playlists.filter(p => 
-                parentalConfig.allowed_playlists.includes(p.uri)
+                parentalConfig.allowed_playlists.includes(p.uri) ||
+                p.type === 'collection' // Always allow Liked Songs
             );
         }
         
@@ -266,7 +299,17 @@ app.post('/api/play', async (req, res) => {
         const { context_uri, uris, offset } = req.body;
         const options = {};
         
-        if (context_uri) options.context_uri = context_uri;
+        // Handle Liked Songs special case
+        if (context_uri === 'spotify:collection:tracks') {
+            // Get liked songs and play them
+            const tracks = await spotifyApi.getMySavedTracks({ limit: 50 });
+            if (tracks.body.items.length > 0) {
+                options.uris = tracks.body.items.map(item => item.track.uri);
+            }
+        } else if (context_uri) {
+            options.context_uri = context_uri;
+        }
+        
         if (uris) options.uris = uris;
         if (offset !== undefined) options.offset = { position: offset };
         

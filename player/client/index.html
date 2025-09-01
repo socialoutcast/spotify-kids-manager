@@ -806,24 +806,39 @@
         let ws = null;
         
         function connectWebSocket() {
+            // Don't reconnect if already connected
+            if (ws && ws.readyState === WebSocket.OPEN) return;
+            
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             ws = new WebSocket(`${protocol}//${window.location.host}`);
             
+            ws.onopen = () => {
+                console.log('WebSocket connected');
+            };
+            
             ws.onmessage = (event) => {
-                const message = JSON.parse(event.data);
-                
-                if (message.type === 'playback') {
-                    updatePlaybackState(message.data);
-                } else if (message.type === 'config') {
-                    // Handle config updates
+                try {
+                    const message = JSON.parse(event.data);
+                    
+                    if (message.type === 'playback') {
+                        updatePlaybackState(message.data);
+                    } else if (message.type === 'config') {
+                        // Handle config updates without reload
+                    }
+                } catch (e) {
+                    console.error('WebSocket message error:', e);
                 }
             };
             
-            ws.onerror = () => {
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                ws = null;
                 setTimeout(connectWebSocket, 5000);
             };
             
             ws.onclose = () => {
+                console.log('WebSocket closed');
+                ws = null;
                 setTimeout(connectWebSocket, 5000);
             };
         }
@@ -845,51 +860,70 @@
             }
         }
 
-        // Update functions
+        // Update functions with proper change detection
         function updatePlaybackState(data) {
             if (!data) return;
             
-            // Only update if data has changed
-            if (JSON.stringify(data) === JSON.stringify(state.lastData)) return;
-            state.lastData = data;
+            // Deep comparison to prevent unnecessary updates
+            const hasChanged = (key, value) => {
+                return JSON.stringify(state[key]) !== JSON.stringify(value);
+            };
             
-            state.isPlaying = data.is_playing || false;
-            
-            // Update play/pause button
-            if (state.isPlaying) {
-                elements.playIcon.style.display = 'none';
-                elements.pauseIcon.style.display = 'block';
-            } else {
-                elements.playIcon.style.display = 'block';
-                elements.pauseIcon.style.display = 'none';
+            // Only update play state if changed
+            if (hasChanged('isPlaying', data.is_playing)) {
+                state.isPlaying = data.is_playing || false;
+                
+                // Update play/pause button
+                if (state.isPlaying) {
+                    elements.playIcon.style.display = 'none';
+                    elements.pauseIcon.style.display = 'block';
+                } else {
+                    elements.playIcon.style.display = 'block';
+                    elements.pauseIcon.style.display = 'none';
+                }
             }
             
-            // Update track info if changed
+            // Update track info only if changed
             if (data.item && (!state.currentTrack || state.currentTrack.id !== data.item.id)) {
                 state.currentTrack = data.item;
                 updateNowPlayingDisplay(data.item);
             }
             
-            // Update progress
-            if (data.item) {
-                state.currentTime = data.progress_ms || 0;
-                state.duration = data.item.duration_ms || 0;
-                updateProgress();
+            // Update progress smoothly
+            if (data.item && data.progress_ms !== undefined) {
+                const newTime = data.progress_ms || 0;
+                const newDuration = data.item.duration_ms || 0;
+                
+                // Only update if significant change (more than 1 second)
+                if (Math.abs(state.currentTime - newTime) > 1000 || state.duration !== newDuration) {
+                    state.currentTime = newTime;
+                    state.duration = newDuration;
+                    updateProgress();
+                }
             }
             
-            // Update control states
-            state.shuffleState = data.shuffle_state || false;
-            state.repeatState = data.repeat_state || 'off';
-            state.isLiked = data.is_liked || false;
+            // Update control states only if changed
+            if (hasChanged('shuffleState', data.shuffle_state)) {
+                state.shuffleState = data.shuffle_state || false;
+                elements.shuffleBtn.classList.toggle('active', state.shuffleState);
+            }
             
-            elements.shuffleBtn.classList.toggle('active', state.shuffleState);
-            elements.repeatBtn.classList.toggle('active', state.repeatState !== 'off');
-            elements.likeBtn.classList.toggle('active', state.isLiked);
+            if (hasChanged('repeatState', data.repeat_state)) {
+                state.repeatState = data.repeat_state || 'off';
+                elements.repeatBtn.classList.toggle('active', state.repeatState !== 'off');
+            }
             
-            // Update volume
+            if (hasChanged('isLiked', data.is_liked)) {
+                state.isLiked = data.is_liked || false;
+                elements.likeBtn.classList.toggle('active', state.isLiked);
+            }
+            
+            // Update volume only if changed
             if (data.device && data.device.volume_percent !== undefined) {
-                state.volume = data.device.volume_percent;
-                elements.volumeFill.style.width = state.volume + '%';
+                if (hasChanged('volume', data.device.volume_percent)) {
+                    state.volume = data.device.volume_percent;
+                    elements.volumeFill.style.width = state.volume + '%';
+                }
             }
         }
 
@@ -926,31 +960,43 @@
             return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
         }
 
-        // Control handlers
-        elements.playPauseBtn.onclick = async () => {
+        // Control handlers with event prevention
+        elements.playPauseBtn.onclick = async (e) => {
+            e?.preventDefault();
+            e?.stopPropagation();
             await api(state.isPlaying ? '/pause' : '/play', 'POST');
         };
 
-        elements.nextBtn.onclick = async () => {
+        elements.nextBtn.onclick = async (e) => {
+            e?.preventDefault();
+            e?.stopPropagation();
             await api('/next', 'POST');
         };
 
-        elements.prevBtn.onclick = async () => {
+        elements.prevBtn.onclick = async (e) => {
+            e?.preventDefault();
+            e?.stopPropagation();
             await api('/previous', 'POST');
         };
 
-        elements.shuffleBtn.onclick = async () => {
+        elements.shuffleBtn.onclick = async (e) => {
+            e?.preventDefault();
+            e?.stopPropagation();
             await api('/shuffle', 'POST', { state: state.shuffleState ? 'off' : 'on' });
         };
 
-        elements.repeatBtn.onclick = async () => {
+        elements.repeatBtn.onclick = async (e) => {
+            e?.preventDefault();
+            e?.stopPropagation();
             const states = ['off', 'context', 'track'];
             const currentIndex = states.indexOf(state.repeatState);
             const newState = states[(currentIndex + 1) % states.length];
             await api('/repeat', 'POST', { state: newState });
         };
 
-        elements.likeBtn.onclick = async () => {
+        elements.likeBtn.onclick = async (e) => {
+            e?.preventDefault();
+            e?.stopPropagation();
             if (state.currentTrack) {
                 await api('/like', 'POST', { 
                     track_id: state.currentTrack.id, 
@@ -961,6 +1007,8 @@
 
         // Progress bar seeking
         elements.progressBar.onclick = async (e) => {
+            e?.preventDefault();
+            e?.stopPropagation();
             const rect = elements.progressBar.getBoundingClientRect();
             const percent = (e.clientX - rect.left) / rect.width;
             const position = Math.round(percent * state.duration);
@@ -969,6 +1017,8 @@
 
         // Volume control
         elements.volumeSlider.onclick = async (e) => {
+            e?.preventDefault();
+            e?.stopPropagation();
             const rect = elements.volumeSlider.getBoundingClientRect();
             const percent = (e.clientX - rect.left) / rect.width;
             const volume = Math.round(percent * 100);
@@ -985,30 +1035,47 @@
         }
 
         function displayPlaylists() {
-            elements.playlists.innerHTML = state.playlists.map(playlist => `
-                <div class="playlist-item" onclick="playPlaylist('${playlist.uri}')">
-                    <div class="playlist-cover">
-                        ${playlist.images?.[0]?.url ? 
-                            `<img src="${playlist.images[0].url}" alt="">` : 
-                            '<svg viewBox="0 0 48 48"><rect fill="#282828" width="48" height="48"/></svg>'
-                        }
+            // Prevent re-rendering if playlists haven't changed
+            const playlistsHTML = state.playlists.map(playlist => {
+                // Special handling for Liked Songs
+                const isLikedSongs = playlist.type === 'collection';
+                const coverImage = playlist.images?.[0]?.url;
+                
+                return `
+                    <div class="playlist-item" onclick="event.stopPropagation(); playPlaylist('${playlist.uri}')">
+                        <div class="playlist-cover">
+                            ${coverImage ? 
+                                `<img src="${coverImage}" alt="${playlist.name}">` : 
+                                '<svg viewBox="0 0 48 48"><rect fill="#282828" width="48" height="48"/></svg>'
+                            }
+                        </div>
+                        <div class="playlist-info">
+                            <div class="playlist-name">${playlist.name}</div>
+                            <div class="playlist-type">${isLikedSongs ? 'Liked Songs' : 'Playlist'} • ${playlist.owner?.display_name || 'Spotify'}</div>
+                        </div>
                     </div>
-                    <div class="playlist-info">
-                        <div class="playlist-name">${playlist.name}</div>
-                        <div class="playlist-type">Playlist • ${playlist.owner.display_name}</div>
-                    </div>
-                </div>
-            `).join('');
+                `;
+            }).join('');
+            
+            // Only update DOM if content has changed
+            if (elements.playlists.innerHTML !== playlistsHTML) {
+                elements.playlists.innerHTML = playlistsHTML;
+            }
         }
 
         async function playPlaylist(uri) {
             await api('/play', 'POST', { context_uri: uri });
         }
 
-        // Page navigation
+        // Page navigation without refresh
         document.querySelectorAll('.nav-item').forEach(item => {
             item.onclick = (e) => {
                 e.preventDefault();
+                e.stopPropagation();
+                
+                // Prevent if already active
+                if (item.classList.contains('active')) return;
+                
                 document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
                 item.classList.add('active');
                 
@@ -1020,6 +1087,7 @@
                     document.querySelector('.search-bar').style.display = 'none';
                     loadHomePage();
                 }
+                return false;
             };
         });
 
@@ -1110,19 +1178,37 @@
             return 'evening';
         }
 
+        // Progress animation frame
+        let progressAnimationFrame = null;
+        
+        function animateProgress() {
+            if (state.isPlaying && state.duration > 0) {
+                state.currentTime += 100;
+                if (state.currentTime <= state.duration) {
+                    updateProgress();
+                }
+            }
+            progressAnimationFrame = requestAnimationFrame(() => {
+                setTimeout(animateProgress, 100);
+            });
+        }
+        
         // Initialization
         async function init() {
             connectWebSocket();
             await loadPlaylists();
             loadHomePage();
             
-            // Poll for updates as backup to WebSocket
+            // Start progress animation
+            animateProgress();
+            
+            // Poll for updates less frequently
             setInterval(async () => {
                 const data = await api('/playback');
                 if (data) {
                     updatePlaybackState(data);
                 }
-            }, 1000);
+            }, 2000); // Reduced to every 2 seconds
         }
 
         // Start the app
