@@ -3340,4 +3340,4 @@ if __name__ == '__main__':
             print("Run setup_https.sh to enable HTTPS support for Spotify OAuth")
             print(f"Access the admin panel at: http://192.168.1.164:5001")
     
-    app.run(host='0.0.0.0', port=5001, debug=False, ssl_context=ssl_context)
+    app.run(host="0.0.0.0", port=5001, debug=False)
