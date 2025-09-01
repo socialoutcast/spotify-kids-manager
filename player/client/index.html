@@ -815,11 +815,13 @@
         async function playTrack(uri, playlistId, offset) {
             if (!deviceId) return;
             
+            console.log('Playing track:', uri, 'from playlist:', playlistId, 'at offset:', offset);
+            
             try {
                 // Get playlist tracks
                 const res = await fetch(`/api/playlist/${playlistId}`);
                 const data = await res.json();
-                const uris = data.playlist.tracks.map(t => t.uri);
+                const uris = data.tracks.map(t => t.uri);
                 
                 await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${deviceId}`, {
                     method: 'PUT',
