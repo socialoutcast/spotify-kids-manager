@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Spotify Player</title>
+    <link rel="stylesheet" href="/css/themes.css">
+    <link rel="stylesheet" href="/css/player.css">
+</head>
+<body data-theme="spotify-dark">
+    <div id="app">
+        <div class="loading-screen">
+            <div class="spinner"></div>
+            <p>Loading Spotify Player...</p>
+        </div>
+    </div>
+    
+    <!-- Player Configuration -->
+    <script>
+        window.PLAYER_CONFIG = {
+            websocket_url: window.location.protocol === 'https:' 
+                ? `wss://${window.location.host}` 
+                : `ws://${window.location.host}`,
+            api_base: '/api',
+            update_interval: 1000,
+            debug: false
+        };
+    </script>
+    
+    <!-- Core Scripts -->
+    <script src="/js/config.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/websocket.js"></script>
+    <script src="/js/player.js"></script>
+    <script src="/js/ui.js"></script>
+    <script src="/js/gestures.js"></script>
+    <script src="/js/app.js"></script>
+</body>
+</html>

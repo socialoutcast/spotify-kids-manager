@@ -19,7 +19,7 @@ const TOKEN_CACHE_FILE = path.join(CONFIG_DIR, 'cache', 'token.cache');
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'client/build')));
+app.use(express.static(path.join(__dirname, 'client')));
 app.use(session({
     secret: process.env.SESSION_SECRET || 'spotify-kids-player-secret',
     resave: false,
@@ -507,9 +507,9 @@ app.get('/api/recommendations', async (req, res) => {
     }
 });
 
-// Serve React app
+// Serve Spotify clone interface
 app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'client/build', 'index.html'));
+    res.sendFile(path.join(__dirname, 'client', 'spotify-player.html'));
 });
 
 // HTTP server

@@ -169,7 +169,18 @@ apt-get install -y \
     pulseaudio-module-bluetooth \
     rfkill \
     scrot \
-    xterm
+    xterm \
+    chromium \
+    lightdm \
+    curl
+
+# Install Node.js for the web player
+echo -e "${YELLOW}Installing Node.js...${NC}"
+if ! command -v node &> /dev/null; then
+    curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+    apt-get install -y nodejs
+fi
+echo -e "${GREEN}Node.js version: $(node --version)${NC}"
 
 # Install Python packages
 echo -e "${YELLOW}Installing Python packages...${NC}"
@@ -249,30 +260,32 @@ mkdir -p "/var/log/nginx"
 echo -e "${YELLOW}Installing application files...${NC}"
 
 # Check if running from local directory or curl
-if [ -f "$SCRIPT_DIR/spotify_player.py" ]; then
+if [ -f "$SCRIPT_DIR/web/app.py" ]; then
     echo "Installing from local files..."
-    cp "$SCRIPT_DIR/spotify_player.py" "$APP_DIR/"
-    cp "$SCRIPT_DIR/parental_controls.py" "$APP_DIR/" 2>/dev/null || true
-    cp "$SCRIPT_DIR/full_diagnostics.py" "$APP_DIR/" 2>/dev/null || true
-    cp "$SCRIPT_DIR/remote_fix.py" "$APP_DIR/" 2>/dev/null || true
-    cp "$SCRIPT_DIR/debug_web.py" "$APP_DIR/" 2>/dev/null || true
+    # Web admin panel
     cp -r "$SCRIPT_DIR/web" "$APP_DIR/"
+    # Player application
+    cp -r "$SCRIPT_DIR/player" "$APP_DIR/"
+    # Kiosk launcher
+    cp "$SCRIPT_DIR/kiosk_launcher.sh" "$APP_DIR/" 2>/dev/null || true
 else
     echo "Downloading files from GitHub..."
-    # Main application files
-    wget -q "$REPO_URL/spotify_player.py" -O "$APP_DIR/spotify_player.py"
-    wget -q "$REPO_URL/parental_controls.py" -O "$APP_DIR/parental_controls.py" || echo "parental_controls.py not found"
-    
-    # Diagnostic and fix tools
-    wget -q "$REPO_URL/full_diagnostics.py" -O "$APP_DIR/full_diagnostics.py" || echo "full_diagnostics.py not found"
-    wget -q "$REPO_URL/remote_fix.py" -O "$APP_DIR/remote_fix.py" || echo "remote_fix.py not found"
-    wget -q "$REPO_URL/debug_web.py" -O "$APP_DIR/debug_web.py" || echo "debug_web.py not found"
-    
     # Web admin panel
     mkdir -p "$APP_DIR/web"
     mkdir -p "$APP_DIR/web/static"
     wget -q "$REPO_URL/web/app.py" -O "$APP_DIR/web/app.py"
     wget -q "$REPO_URL/web/static/admin.js" -O "$APP_DIR/web/static/admin.js"
+    
+    # Player application
+    mkdir -p "$APP_DIR/player"
+    mkdir -p "$APP_DIR/player/client"
+    wget -q "$REPO_URL/player/package.json" -O "$APP_DIR/player/package.json"
+    wget -q "$REPO_URL/player/server.js" -O "$APP_DIR/player/server.js"
+    wget -q "$REPO_URL/player/spotify-player.service" -O "$APP_DIR/player/spotify-player.service"
+    wget -q "$REPO_URL/player/client/index.html" -O "$APP_DIR/player/client/index.html"
+    
+    # Kiosk launcher
+    wget -q "$REPO_URL/kiosk_launcher.sh" -O "$APP_DIR/kiosk_launcher.sh" || echo "kiosk_launcher.sh not found"
 fi
 
 # Create a shared group for config access
@@ -316,36 +329,49 @@ ExecStart=
 ExecStart=-/sbin/agetty --autologin $APP_USER --noclear %I \$TERM
 EOF
 
+# Install Node.js dependencies for player
+echo -e "${YELLOW}Installing player dependencies...${NC}"
+cd "$APP_DIR/player"
+sudo -u $APP_USER npm install --production
+
+# Create cache directory
+mkdir -p "$CONFIG_DIR/cache"
+chown $APP_USER:$CONFIG_GROUP "$CONFIG_DIR/cache"
+chmod 775 "$CONFIG_DIR/cache"
+
 # Create systemd service for the player
 echo -e "${YELLOW}Creating systemd service for player...${NC}"
 cat > /etc/systemd/system/spotify-player.service << EOF
 [Unit]
-Description=Spotify Kids Player
-After=multi-user.target graphical.target
-Wants=graphical.target
+Description=Spotify Kids Web Player
+After=network.target
+Wants=network-online.target
 
 [Service]
 Type=simple
 User=$APP_USER
 Group=$APP_USER
-Environment="DISPLAY=:0"
-Environment="XAUTHORITY=/home/$APP_USER/.Xauthority"
-Environment="HOME=/home/$APP_USER"
+WorkingDirectory=$APP_DIR/player
+Environment="NODE_ENV=production"
+Environment="PORT=5000"
 Environment="SPOTIFY_CONFIG_DIR=$CONFIG_DIR"
-Environment="SPOTIFY_DEBUG=true"
-Environment="PYTHONUNBUFFERED=1"
-WorkingDirectory=$APP_DIR
-ExecStartPre=/bin/bash -c 'until [ -S /tmp/.X11-unix/X0 ]; do sleep 1; done'
-ExecStart=/usr/bin/python3 -u $APP_DIR/spotify_player.py
+ExecStartPre=/bin/bash -c 'if [ ! -d "node_modules" ]; then npm install --production; fi'
+ExecStart=/usr/bin/node server.js
 Restart=always
 RestartSec=10
 StartLimitInterval=60
 StartLimitBurst=3
 StandardOutput=journal
 StandardError=journal
+SyslogIdentifier=spotify-player
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=$CONFIG_DIR
 
 [Install]
-WantedBy=graphical.target
+WantedBy=multi-user.target
 EOF
 
 # Create systemd service for admin panel
@@ -442,53 +468,65 @@ EOF
 ln -sf /etc/nginx/sites-available/spotify-admin /etc/nginx/sites-enabled/
 rm -f /etc/nginx/sites-enabled/default
 
-# Create .xinitrc for the user
-echo -e "${YELLOW}Creating X session configuration...${NC}"
-mkdir -p /home/$APP_USER
-cat > /home/$APP_USER/.xinitrc << EOF
-#!/bin/sh
-
-# Log X session startup
-echo "Starting X session at \$(date)" >> /var/log/spotify-kids/xsession.log
-
-# Set display environment
-export DISPLAY=:0
-export XAUTHORITY=/home/$APP_USER/.Xauthority
-
-# Wait for X server to be ready
-sleep 2
-
-# Disable screen blanking and power management
-xset s off 2>/dev/null || true
-xset -dpms 2>/dev/null || true
-xset s noblank 2>/dev/null || true
-
-# Hide cursor after 3 seconds of inactivity
-unclutter -idle 3 -root &
-
-# Set background color to black
-xsetroot -solid '#000000' 2>/dev/null || true
-
-# Log before starting player
-echo "Starting Spotify player at \$(date)" >> /var/log/spotify-kids/xsession.log
-
-# Start the Spotify player with error logging
-exec python3 $APP_DIR/spotify_player.py 2>&1 | tee -a /var/log/spotify-kids/player.log
-EOF
-
-chmod +x /home/$APP_USER/.xinitrc
-chown $APP_USER:$APP_USER /home/$APP_USER/.xinitrc
-
-# Create .bash_profile for auto-start
-echo -e "${YELLOW}Configuring auto-start...${NC}"
-mkdir -p /home/$APP_USER
-cat > /home/$APP_USER/.bash_profile << EOF
+# Create kiosk launcher script
+echo -e "${YELLOW}Creating kiosk launcher...${NC}"
+cat > "$APP_DIR/kiosk_launcher.sh" << 'EOF'
 #!/bin/bash
 
-# Start X server with Spotify player on tty1
-if [[ -z \$DISPLAY && \$XDG_VTNR -eq 1 ]]; then
-    exec startx
-fi
+# Wait for network
+while ! ping -c 1 google.com &> /dev/null; do
+    sleep 1
+done
+
+# Wait for the player service to be ready
+while ! curl -s http://localhost:5000 > /dev/null 2>&1; do
+    sleep 1
+done
+
+# Kill any existing Chromium instances
+pkill chromium || true
+sleep 1
+
+# Launch Chromium in kiosk mode
+chromium \
+    --kiosk \
+    --noerrdialogs \
+    --disable-infobars \
+    --disable-session-crashed-bubble \
+    --disable-translate \
+    --no-first-run \
+    --fast \
+    --fast-start \
+    --disable-features=TranslateUI \
+    --check-for-update-interval=31536000 \
+    --disable-pinch \
+    --overscroll-history-navigation=0 \
+    --disable-component-update \
+    --autoplay-policy=no-user-gesture-required \
+    --window-position=0,0 \
+    --user-data-dir=/home/$APP_USER/.config/chromium-kiosk \
+    http://localhost:5000
+EOF
+
+chmod +x "$APP_DIR/kiosk_launcher.sh"
+chown $APP_USER:$APP_USER "$APP_DIR/kiosk_launcher.sh"
+
+# Configure LightDM for auto-login and kiosk mode
+echo -e "${YELLOW}Configuring display manager for kiosk mode...${NC}"
+cat > /etc/lightdm/lightdm.conf.d/50-spotify-kiosk.conf << EOF
+[SeatDefaults]
+autologin-user=$APP_USER
+autologin-user-timeout=0
+user-session=spotify-kiosk
+EOF
+
+# Create custom X session for kiosk
+cat > /usr/share/xsessions/spotify-kiosk.desktop << EOF
+[Desktop Entry]
+Name=Spotify Kiosk
+Comment=Spotify Kids Player Kiosk Mode
+Exec=$APP_DIR/kiosk_launcher.sh
+Type=Application
 EOF
 
 chown -R $APP_USER:$APP_USER /home/$APP_USER
@@ -537,8 +575,11 @@ chmod 0440 /etc/sudoers.d/spotify-pkgmgr
 # Enable services
 echo -e "${YELLOW}Enabling services...${NC}"
 systemctl daemon-reload
+systemctl enable spotify-player.service
 systemctl enable spotify-admin.service
 systemctl enable nginx
+systemctl enable lightdm
+systemctl start spotify-player.service
 systemctl start spotify-admin.service
 systemctl restart nginx
 

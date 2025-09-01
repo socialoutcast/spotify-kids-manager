@@ -1,6 +1,6 @@
 # Spotify Kids Manager
 
-A secure, touchscreen-optimized Spotify player for Raspberry Pi with full parental controls via web admin panel.
+A professional web-based Spotify player that's an exact clone of the Spotify Web Player interface, optimized for touchscreen kiosks with comprehensive parental controls via a secure admin panel.
 
 ## Quick Install
 
@@ -34,25 +34,43 @@ curl -sSL https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/m
 
 ## Features
 
-### For Kids (Display/Touchscreen)
-- 🎵 Native fullscreen Spotify player
-- 👆 Touch-optimized interface with on-screen keyboard
-- 🔒 Kiosk mode - cannot be closed or exited
-- 🎨 Spotify-like interface with playlists, search, and album art
+### Web Player (Display/Touchscreen)
+- 🎵 **Exact Spotify Web Player Clone** - Pixel-perfect interface
+- 🎨 Three-panel layout: Sidebar, Main View, Now Playing Bar
+- 👆 Touch-optimized with large hit targets
+- 🔒 Kiosk mode - runs fullscreen, cannot be closed
+- 🎵 Full playback controls (play, pause, next, previous, seek)
+- 🔀 Smart shuffle and regular shuffle modes
+- ❤️ Like/unlike tracks functionality
+- 🔁 Repeat modes (off, context, track)
+- 🔍 Spotify search for tracks, albums, artists, playlists
+- 📚 All playlists including Liked Songs and DJ
+- 🖼️ Full album artwork display
 - 🚫 No video content - audio only
-- ⏰ Time restrictions (configurable)
+- 🌐 WebSocket real-time updates
+- 🖱️ Hidden cursor for touchscreen
+- ⏰ Parental time restrictions
 - 🔊 Volume limiting
 
 ### For Parents (Web Admin Panel)
-- 🌐 Access from any device at `http://pi-ip-address:8080`
+- 🌐 Secure HTTPS access at `https://pi-ip-address`
 - 🔐 Password protected admin interface
 - 🎮 Remote control of playback
 - 📊 System monitoring (CPU, memory, disk)
 - 🔄 One-click system updates with live progress
 - ⚙️ Configure Spotify API credentials
-- 🕒 Set time restrictions
-- 🔊 Set maximum volume limits
-- 🔒 Device lock to disable local controls
+- 🎛️ **Parental Controls**:
+  - Set allowed playlists
+  - Block explicit content
+  - Block specific artists/songs
+  - Set time restrictions
+  - Configure maximum volume
+  - Set play time limits
+- 🎨 **Player Configuration**:
+  - Theme selection (Spotify Dark/Light, Kids Colorful, Minimal)
+  - Toggle visualizer
+  - Enable/disable gestures
+  - Configure touch targets
 - 🎧 **Bluetooth Management**:
   - Scan for Bluetooth speakers/headphones
   - Pair and connect devices
@@ -81,14 +99,15 @@ curl -sSL https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/m
 4. Fill in:
    - App name: `Spotify Kids Player`
    - App description: `Personal kids player`
-   - Redirect URI: `http://localhost:8888/callback`
+   - Redirect URI: `https://<your-pi-ip>/callback`
 5. Save your Client ID and Client Secret
 6. Enter these in the admin panel after installation
 
 ## Default Credentials
 
 - **Admin Panel**: `admin` / `changeme`
-- **URL**: `http://<your-pi-ip>:8080`
+- **URL**: `https://<your-pi-ip>`
+- **Player**: `http://localhost:5000` (local display only)
 
 ⚠️ **Important**: Change the default password immediately after installation!
 
@@ -96,18 +115,26 @@ curl -sSL https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/m
 
 ```
 spotify-kids-manager/
-├── install.sh           # Installer with reset option
-├── spotify_player.py    # Native Python/Tkinter player (NO BROWSER)
+├── install.sh           # Complete installer with reset option
+├── player/              # Node.js web player application
+│   ├── server.js        # Express server with Spotify API
+│   ├── package.json     # Node dependencies
+│   └── client/          # Frontend files
+│       └── index.html   # Spotify Web Player clone UI
 ├── web/                 # Admin web interface
-│   └── app.py          # Flask admin panel with Bluetooth control
+│   ├── app.py          # Flask admin panel
+│   └── static/         # Admin UI assets
+│       └── admin.js    # Admin panel JavaScript
+├── kiosk_launcher.sh   # Chromium kiosk mode launcher
 └── README.md           # This file
 ```
 
 ### Services
 
-- **spotify-player.service** - Native Python player (auto-starts on boot, fullscreen)
-- **spotify-admin.service** - Web admin panel (port 5001, proxied through nginx on 8080)
-- **nginx** - Reverse proxy for admin panel
+- **spotify-player.service** - Node.js web server serving Spotify clone (port 5000)
+- **spotify-admin.service** - Flask admin panel (port 5001)
+- **nginx** - HTTPS reverse proxy (port 443) with SSL termination
+- **lightdm** - Display manager for auto-login and kiosk mode
 - **bluetooth.service** - Bluetooth audio support
 
 ### User Accounts
@@ -115,17 +142,23 @@ spotify-kids-manager/
 The installer creates two separate users for security:
 
 **spotify-kids** (Player user)
-- Auto-logs in on boot
-- Starts X server with the player
+- Auto-logs in via LightDM
+- Runs Chromium in kiosk mode
+- Owns the player service and files
 - NO sudo privileges at all
-- Can only run the player application
+- Member of audio, video, input groups
 - Cannot access system settings
 
 **spotify-admin** (Admin service user)
-- Runs the web admin panel
-- Has sudo rights for system updates and player control only
+- Runs the web admin panel service
+- Member of spotify-pkgmgr group for limited sudo
+- Has sudo rights for system updates and service control only
 - Cannot log in interactively
 - Service account only
+
+**spotify-config** (Shared group)
+- Allows both users to access configuration files
+- Ensures proper permission management
 
 ## Troubleshooting
 
@@ -190,10 +223,12 @@ The admin panel includes a System Updates section where you can:
 
 - **Complete user separation**: Player user has NO sudo privileges
 - **Admin panel** runs as separate service account with limited sudo
-- **Network isolation**: Admin panel only accessible via network (port 8080)
-- **Player lockdown**: Cannot be closed, no system access
+- **HTTPS encryption**: Self-signed SSL certificate for OAuth requirements
+- **Network isolation**: Admin panel only accessible via HTTPS (port 443)
+- **Player lockdown**: Chromium kiosk mode, cannot be closed
 - **Credentials**: Stored locally in `/opt/spotify-kids/config/`
-- **No remote access** to player interface (display only)
+- **Token management**: Automatic refresh of Spotify access tokens
+- **No remote access** to player interface (localhost only)
 
 ## License
 
