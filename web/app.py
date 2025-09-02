@@ -2395,82 +2395,75 @@ def update_stream():
         return Response("Error: Not authenticated", status=401)
     
     def generate():
-        # Create a queue for output
-        output_queue = queue.Queue()
-        
-        def run_update():
-            try:
-                # Run apt update
-                yield "data: Running apt update...\n\n"
-                proc = subprocess.Popen(['sudo', 'apt-get', 'update'],
-                                      stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                      text=True, bufsize=1)
-                for line in proc.stdout:
-                    yield f"data: {line.strip()}\n\n"
-                proc.wait()
-                
-                # Run apt upgrade with auto-yes and handle held-back packages
-                yield "data: \n\n"
-                yield "data: Running system upgrade (this may take a while)...\n\n"
-                env = os.environ.copy()
-                env['DEBIAN_FRONTEND'] = 'noninteractive'
-                
-                # First try regular upgrade
-                proc = subprocess.Popen(['sudo', '-E', 'apt-get', 'upgrade', '-y', 
-                                       '-o', 'Dpkg::Options::=--force-confdef', 
-                                       '-o', 'Dpkg::Options::=--force-confold'],
-                                      stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                      text=True, bufsize=1, env=env)
-                
-                for line in proc.stdout:
-                    cleaned_line = line.strip()
-                    if cleaned_line:
-                        yield f"data: {cleaned_line}\n\n"
-                
-                proc.wait()
-                
-                # Handle held-back packages with dist-upgrade
-                yield "data: \n\n"
-                yield "data: Checking for held-back packages...\n\n"
-                proc = subprocess.Popen(['sudo', '-E', 'apt-get', 'dist-upgrade', '-y', 
-                                       '-o', 'Dpkg::Options::=--force-confdef', 
-                                       '-o', 'Dpkg::Options::=--force-confold'],
-                                      stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                      text=True, bufsize=1, env=env)
-                
-                for line in proc.stdout:
-                    cleaned_line = line.strip()
-                    if cleaned_line:
-                        yield f"data: {cleaned_line}\n\n"
-                
-                proc.wait()
-                
-                # Clean up - show output for autoremove
-                yield "data: \n\n"
-                yield "data: Removing unnecessary packages...\n\n"
-                proc = subprocess.Popen(['sudo', 'apt-get', 'autoremove', '-y'],
-                                      stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                      text=True, bufsize=1)
-                for line in proc.stdout:
-                    cleaned_line = line.strip()
-                    if cleaned_line:
-                        yield f"data: {cleaned_line}\n\n"
-                proc.wait()
-                
-                # Run autoclean
-                yield "data: \n\n"
-                yield "data: Cleaning package cache...\n\n"
-                subprocess.run(['sudo', 'apt-get', 'autoclean', '-y'], 
-                             capture_output=True, check=False)
-                
-                yield "data: \n\n"
-                yield "data: ✓ Update completed successfully!\n\n"
-                
-            except Exception as e:
-                yield f"data: Error: {str(e)}\n\n"
-        
-        # Return the generator
-        return run_update()
+        try:
+            # Run apt update
+            yield "data: Running apt update...\n\n"
+            proc = subprocess.Popen(['sudo', 'apt-get', 'update'],
+                                  stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                  text=True, bufsize=1)
+            for line in proc.stdout:
+                yield f"data: {line.strip()}\n\n"
+            proc.wait()
+            
+            # Run apt upgrade with auto-yes and handle held-back packages
+            yield "data: \n\n"
+            yield "data: Running system upgrade (this may take a while)...\n\n"
+            env = os.environ.copy()
+            env['DEBIAN_FRONTEND'] = 'noninteractive'
+            
+            # First try regular upgrade
+            proc = subprocess.Popen(['sudo', '-E', 'apt-get', 'upgrade', '-y', 
+                                   '-o', 'Dpkg::Options::=--force-confdef', 
+                                   '-o', 'Dpkg::Options::=--force-confold'],
+                                  stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                  text=True, bufsize=1, env=env)
+            
+            for line in proc.stdout:
+                cleaned_line = line.strip()
+                if cleaned_line:
+                    yield f"data: {cleaned_line}\n\n"
+            
+            proc.wait()
+            
+            # Handle held-back packages with dist-upgrade
+            yield "data: \n\n"
+            yield "data: Checking for held-back packages...\n\n"
+            proc = subprocess.Popen(['sudo', '-E', 'apt-get', 'dist-upgrade', '-y', 
+                                   '-o', 'Dpkg::Options::=--force-confdef', 
+                                   '-o', 'Dpkg::Options::=--force-confold'],
+                                  stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                  text=True, bufsize=1, env=env)
+            
+            for line in proc.stdout:
+                cleaned_line = line.strip()
+                if cleaned_line:
+                    yield f"data: {cleaned_line}\n\n"
+            
+            proc.wait()
+            
+            # Clean up - show output for autoremove
+            yield "data: \n\n"
+            yield "data: Removing unnecessary packages...\n\n"
+            proc = subprocess.Popen(['sudo', 'apt-get', 'autoremove', '-y'],
+                                  stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                  text=True, bufsize=1)
+            for line in proc.stdout:
+                cleaned_line = line.strip()
+                if cleaned_line:
+                    yield f"data: {cleaned_line}\n\n"
+            proc.wait()
+            
+            # Run autoclean
+            yield "data: \n\n"
+            yield "data: Cleaning package cache...\n\n"
+            subprocess.run(['sudo', 'apt-get', 'autoclean', '-y'], 
+                         capture_output=True, check=False)
+            
+            yield "data: \n\n"
+            yield "data: ✓ Update completed successfully!\n\n"
+            
+        except Exception as e:
+            yield f"data: Error: {str(e)}\n\n"
     
     return Response(generate(), mimetype='text/event-stream',
                    headers={'Cache-Control': 'no-cache',
