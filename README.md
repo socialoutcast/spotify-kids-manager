@@ -1,16 +1,64 @@
-# Spotify Kids Manager
+# Spotify Kids Manager 🎵
 
-A professional web-based Spotify player that's an exact clone of the Spotify Web Player interface, optimized for touchscreen kiosks with comprehensive parental controls via a secure admin panel.
+A comprehensive parental control system for Spotify that provides a safe, managed music experience for children. Features a kid-friendly web player, parental controls, time limits, content filtering, and full kiosk mode support for Raspberry Pi deployment.
 
-## Quick Install
+![Spotify Kids Manager](https://img.shields.io/badge/Spotify-Kids%20Manager-1DB954?style=for-the-badge&logo=spotify&logoColor=white)
+![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![Raspberry Pi](https://img.shields.io/badge/Raspberry%20Pi-A22846?style=for-the-badge&logo=raspberry-pi&logoColor=white)
 
-Run this single command to install everything:
+## 🌟 Features
+
+### Kid-Friendly Web Player
+- 🎵 **Exact Spotify Web Player Clone** - Familiar interface optimized for kids
+- 👆 Touch-optimized with large, friendly controls
+- 🎨 Visual playlist covers with easy navigation
+- 🎵 Full playback controls (play, pause, next, previous, seek)
+- 🔊 Volume control with visual feedback
+- 🔀 Shuffle and repeat modes
+- ❤️ Like/unlike tracks functionality
+- 📱 Responsive design for tablets and touchscreens
+- 🖼️ Full album artwork display
+- 🌐 Real-time WebSocket updates
+
+### Parental Controls & Admin Dashboard
+- ⏰ **Time Limits**: Set daily listening limits and schedules
+- 🚫 **Content Filtering**: Block explicit content automatically
+- ⏭️ **Skip Limits**: Prevent excessive song skipping
+- 📋 **Approved Playlists**: Curate which playlists kids can access
+- 📊 **Usage Statistics**: Track listening time and habits
+- 🎨 **Modern Spotify-themed dark interface**
+- 📈 Real-time system monitoring
+- 🔵 Bluetooth device management
+- 📝 System logs viewer
+- 🔄 One-click service restarts
+
+### Kiosk Mode
+- 🖥️ Full-screen browser mode for dedicated devices
+- 🚀 Auto-start on boot
+- 🔒 No system access for kids
+- 🍓 Perfect for Raspberry Pi deployment
+- 👆 Touch-optimized interface
+
+## 📋 Prerequisites
+
+Before you begin, ensure you have:
+
+- ✅ **Spotify Premium Account** (required for web playback)
+- ✅ **Spotify Developer Account** (free - we'll show you how to set this up)
+- ✅ **Node.js 16+** and **Python 3.8+**
+- ✅ **Raspberry Pi** (recommended) or any Linux system
+- ✅ **Chromium Browser** (for kiosk mode)
+
+## 🚀 Quick Installation
+
+### Option 1: One-Line Install (Recommended)
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/main/install.sh | sudo bash
 ```
 
-Or if you want to review the script first:
+### Option 2: Download and Review First
 
 ```bash
 wget https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/main/install.sh
@@ -18,222 +66,375 @@ chmod +x install.sh
 sudo ./install.sh
 ```
 
-## Reset/Reinstall
+The installer will automatically:
+- Install all dependencies
+- Create system users and groups
+- Set up systemd services
+- Configure Nginx with SSL
+- Initialize configuration files
+- Start all services
 
-To completely reset and reinstall from scratch:
+## 🎯 Spotify Developer Setup (IMPORTANT!)
 
-```bash
-curl -sSL https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/main/force-reset.sh | sudo bash
-```
+### Step 1: Create Your Spotify App
 
-Or for a quick reinstall (keeps existing config):
+1. **Go to Spotify Developer Dashboard**
+   ```
+   https://developer.spotify.com/dashboard
+   ```
+   - Log in with your Spotify account
+   - Click the green **"Create app"** button
 
-```bash
-curl -sSL https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/main/install.sh | sudo bash -s -- --reset
-```
+2. **Fill in the App Details**
+   ```
+   App name: Spotify Kids Manager
+   App description: Parental control system for Spotify
+   Website: (leave blank or add your website)
+   Redirect URI: (we'll add this in Step 3)
+   ```
 
-## Features
+3. **Select APIs**
+   - Check: ✅ **Web API**
+   - Check: ✅ **Web Playback SDK**
+   
+4. **Accept Terms and Create**
+   - Check the terms of service box
+   - Click **"Save"**
 
-### Web Player (Display/Touchscreen)
-- 🎵 **Exact Spotify Web Player Clone** - Pixel-perfect interface
-- 🎨 Three-panel layout: Sidebar, Main View, Now Playing Bar
-- 👆 Touch-optimized with large hit targets
-- 🔒 Kiosk mode - runs fullscreen, cannot be closed
-- 🎵 Full playback controls (play, pause, next, previous, seek)
-- 🔀 Smart shuffle and regular shuffle modes
-- ❤️ Like/unlike tracks functionality
-- 🔁 Repeat modes (off, context, track)
-- 🔍 Spotify search for tracks, albums, artists, playlists
-- 📚 All playlists including Liked Songs and DJ
-- 🖼️ Full album artwork display
-- 🚫 No video content - audio only
-- 🌐 WebSocket real-time updates
-- 🖱️ Hidden cursor for touchscreen
-- ⏰ Parental time restrictions
-- 🔊 Volume limiting
+### Step 2: Get Your Credentials
 
-### For Parents (Web Admin Panel)
-- 🌐 Secure HTTPS access at `https://pi-ip-address`
-- 🔐 Password protected admin interface
-- 🎮 Remote control of playback
-- 📊 System monitoring (CPU, memory, disk)
-- 🔄 One-click system updates with live progress
-- ⚙️ Configure Spotify API credentials
-- 🎛️ **Parental Controls**:
-  - Set allowed playlists
-  - Block explicit content
-  - Block specific artists/songs
-  - Set time restrictions
-  - Configure maximum volume
-  - Set play time limits
-- 🎨 **Player Configuration**:
-  - Theme selection (Spotify Dark/Light, Kids Colorful, Minimal)
-  - Toggle visualizer
-  - Enable/disable gestures
-  - Configure touch targets
-- 🎧 **Bluetooth Management**:
-  - Scan for Bluetooth speakers/headphones
-  - Pair and connect devices
-  - Manage paired devices
-  - Enable/disable Bluetooth
+1. **In your new app's dashboard:**
+   - You'll see your **Client ID** displayed (copy this)
+   - Click **"Settings"** button
+   - Click **"View client secret"** (copy this too)
+   - Keep these safe - you'll need them soon!
 
-## Requirements
+### Step 3: Configure Redirect URI (CRITICAL!)
 
-### Hardware
-- Raspberry Pi (3B+ or newer recommended)
-- LCD touchscreen display (optional but recommended)
-- Optional: Bluetooth speakers/headphones
-- SD card (8GB minimum, 16GB recommended)
-- Internet connection (WiFi or Ethernet)
+1. **Access Your Admin Panel**
+   ```
+   https://YOUR_RASPBERRY_PI_IP
+   
+   Default login:
+   Username: admin
+   Password: changeme
+   ```
 
-### Software
-- Raspberry Pi OS (32-bit or 64-bit)
-- Spotify Premium account (required for API)
-- Spotify App registration (free developer account)
+2. **Get Your Callback URL**
+   - When you first access the admin panel
+   - Look at the top of the Spotify Setup section
+   - You'll see a message showing your callback URL:
+   ```
+   Your Redirect URI: http://YOUR_IP:5001/callback
+   ```
+   - **COPY THIS EXACT URL**
 
-## Setting up Spotify API
+3. **Add to Spotify App**
+   - Go back to your Spotify app in the Developer Dashboard
+   - Click **"Settings"**
+   - Find **"Redirect URIs"** section
+   - Click **"Add"**
+   - Paste your callback URL EXACTLY as shown
+   - Click **"Save"**
 
-1. Go to https://developer.spotify.com/dashboard
-2. Log in with your Spotify account
-3. Click "Create App"
-4. Fill in:
-   - App name: `Spotify Kids Player`
-   - App description: `Personal kids player`
-   - Redirect URI: `https://<your-pi-ip>/callback`
-5. Save your Client ID and Client Secret
-6. Enter these in the admin panel after installation
+### Step 4: Configure in Admin Panel
 
-## Default Credentials
+1. **Navigate to Spotify Setup**
+   - Click "Spotify Setup" in the sidebar
 
-- **Admin Panel**: `admin` / `changeme`
-- **URL**: `https://<your-pi-ip>`
-- **Player**: `http://localhost:5000` (local display only)
+2. **Enter Your Credentials**
+   - Paste your **Client ID**
+   - Paste your **Client Secret**
+   - Click **"Save Configuration"**
 
-⚠️ **Important**: Change the default password immediately after installation!
+3. **Test Connection**
+   - Click **"Test Connection"**
+   - Should show "Connection successful!"
 
-## System Architecture
+4. **Authenticate Your Account**
+   - Click **"Authenticate with Spotify"**
+   - Log in with your Spotify Premium account
+   - Click **"Agree"** to authorize
+   - You'll be redirected back to the admin panel
 
-```
-spotify-kids-manager/
-├── install.sh           # Complete installer with reset option
-├── player/              # Node.js web player application
-│   ├── server.js        # Express server with Spotify API
-│   ├── package.json     # Node dependencies
-│   └── client/          # Frontend files
-│       └── index.html   # Spotify Web Player clone UI
-├── web/                 # Admin web interface
-│   ├── app.py          # Flask admin panel
-│   └── static/         # Admin UI assets
-│       └── admin.js    # Admin panel JavaScript
-├── kiosk_launcher.sh   # Chromium kiosk mode launcher
-└── README.md           # This file
-```
+## ✅ Verification
+
+After setup, verify everything is working:
+
+1. **Check Service Status**
+   - In admin panel, go to Dashboard
+   - All services should show green checkmarks:
+     - ✅ Player
+     - ✅ Kiosk
+     - ✅ Spotify
+     - ✅ Bluetooth
+
+2. **Test the Player**
+   - The kiosk should auto-start showing the player
+   - Or navigate to `http://YOUR_IP:3000` on any device
+   - You should see your playlists
+   - Try playing a song
+
+## 🎮 Usage Guide
+
+### For Parents/Administrators
+
+1. **Access Admin Panel**
+   ```
+   https://YOUR_DEVICE_IP
+   ```
+
+2. **Dashboard Overview**
+   - System resources (CPU, Memory, Disk)
+   - Service status indicators
+   - Quick action buttons
+   - System control options
+
+3. **Manage Settings**
+   - **Spotify Setup**: Configure API credentials
+   - **Bluetooth**: Connect speakers/headphones
+   - **System Logs**: View and download logs
+   - **Admin Settings**: Change password
+
+### For Kids
+
+The player runs automatically in kiosk mode:
+- Browse playlists with visual covers
+- Tap songs to play
+- Use large, friendly control buttons
+- Volume slider on the right
+- Cannot exit or access system
+
+## 🛠️ System Architecture
 
 ### Services
 
-- **spotify-player.service** - Node.js web server serving Spotify clone (port 5000)
-- **spotify-admin.service** - Flask admin panel (port 5001)
-- **nginx** - HTTPS reverse proxy (port 443) with SSL termination
-- **lightdm** - Display manager for auto-login and kiosk mode
-- **bluetooth.service** - Bluetooth audio support
+| Service | Port | Description |
+|---------|------|-------------|
+| spotify-player | 3000 | Web player backend |
+| spotify-admin | 5001 | Admin panel |
+| spotify-kiosk | - | Chromium kiosk browser |
+| nginx | 80/443 | Reverse proxy |
 
-### User Accounts
+### Managing Services
 
-The installer creates two separate users for security:
-
-**spotify-kids** (Player user)
-- Auto-logs in via LightDM
-- Runs Chromium in kiosk mode
-- Owns the player service and files
-- NO sudo privileges at all
-- Member of audio, video, input groups
-- Cannot access system settings
-
-**spotify-admin** (Admin service user)
-- Runs the web admin panel service
-- Member of spotify-pkgmgr group for limited sudo
-- Has sudo rights for system updates and service control only
-- Cannot log in interactively
-- Service account only
-
-**spotify-config** (Shared group)
-- Allows both users to access configuration files
-- Ensures proper permission management
-
-## Troubleshooting
-
-### Player won't start
 ```bash
+# Check status
 sudo systemctl status spotify-player
-sudo journalctl -u spotify-player -f
-```
-
-### Admin panel not accessible
-```bash
 sudo systemctl status spotify-admin
-sudo systemctl status nginx
-sudo netstat -tlnp | grep 8080
+sudo systemctl status spotify-kiosk
+
+# Restart services
+sudo systemctl restart spotify-player
+sudo systemctl restart spotify-admin
+sudo systemctl restart spotify-kiosk
+
+# View logs
+sudo journalctl -u spotify-player -f
+sudo journalctl -u spotify-admin -f
+sudo journalctl -u spotify-kiosk -f
 ```
 
-### Reset everything
+## 🔧 Troubleshooting
+
+### Common Issues and Solutions
+
+#### "Spotify not configured" Error
+1. Ensure Client ID and Secret are correct
+2. Verify Redirect URI matches EXACTLY (including http/https and port)
+3. Make sure you clicked "Save" in Spotify Dashboard after adding URI
+4. Try re-authenticating
+
+#### Player Not Loading
 ```bash
-sudo spotify-kids-uninstall  # If installed
-# Then reinstall with:
-curl -sSL https://raw.githubusercontent.com/yourusername/spotify-kids-manager/main/install.sh | sudo bash -s -- --reset
+# Check if service is running
+sudo systemctl status spotify-player
+
+# Check for errors
+sudo journalctl -u spotify-player -n 100
+
+# Restart service
+sudo systemctl restart spotify-player
 ```
 
-### Manual uninstall
+#### No Sound / Bluetooth Issues
 ```bash
-sudo systemctl stop spotify-player spotify-admin
-sudo systemctl disable spotify-player spotify-admin
-sudo rm -rf /opt/spotify-kids
-sudo userdel -r spotify-kids
-sudo userdel spotify-admin
-sudo rm /etc/sudoers.d/spotify-admin
-sudo rm /etc/nginx/sites-*/spotify-admin
-sudo rm /etc/systemd/system/spotify-*.service
+# Check Bluetooth status
+sudo systemctl status bluetooth
+
+# List paired devices
+bluetoothctl paired-devices
+
+# Connect to speaker (replace XX with your device MAC)
+bluetoothctl connect XX:XX:XX:XX:XX:XX
+
+# Set as default audio
+pactl list sinks short
+pactl set-default-sink bluez_sink.XX_XX_XX_XX_XX_XX.a2dp_sink
 ```
 
-## Bluetooth Audio
+#### Kiosk Not Starting
+```bash
+# Check display
+echo $DISPLAY
 
-The admin panel provides complete Bluetooth management:
+# Restart kiosk
+sudo systemctl restart spotify-kiosk
 
-### Setup Bluetooth Speakers
-1. Open admin panel at `http://pi-ip:8080`
-2. Navigate to "Bluetooth Devices" section
-3. Click "Scan for Devices" 
-4. Select your speaker/headphones and click "Pair"
-5. Device will auto-connect when available
+# Manual test
+DISPLAY=:0 chromium-browser --kiosk http://localhost:3000
+```
 
-### Managing Devices
-- **Connect/Disconnect** - Control active audio output
-- **Remove** - Delete paired devices
-- **Enable/Disable** - Turn Bluetooth on/off completely
+#### Authentication Loop
+1. Clear browser cookies
+2. Check your Spotify account is Premium
+3. Verify redirect URI includes correct port (:5001)
+4. Try incognito/private browsing mode
 
-All Bluetooth audio devices work seamlessly with the Spotify player. The `spotify-kids` user has audio permissions but NO admin access.
+## 📁 File Structure
 
-## System Updates
+```
+/opt/spotify-kids/
+├── player/
+│   ├── server.js           # Express backend for player
+│   ├── client/
+│   │   └── index.html      # Player web interface
+│   └── package.json
+├── web/
+│   ├── app.py              # Flask admin panel
+│   └── static/
+│       └── admin.js        # Admin panel JavaScript
+├── config/
+│   ├── config.json         # Main configuration
+│   ├── schedule.json       # Time limits
+│   ├── playlists.json      # Approved playlists
+│   └── cache/              # Token cache
+├── ssl/
+│   ├── server.crt          # SSL certificate
+│   └── server.key          # SSL private key
+├── kiosk_launcher.sh       # Kiosk startup script
+└── install.sh              # Installation script
+```
 
-The admin panel includes a System Updates section where you can:
-1. Check for available updates
-2. Run system updates with live terminal output
-3. All prompts are automatically answered (no interaction needed)
+## 🔒 Security Features
 
-## Security Notes
+- **SSL/HTTPS**: All connections encrypted
+- **Session Authentication**: Secure admin panel
+- **Token Encryption**: Spotify tokens stored securely
+- **System Isolation**: Separate users for each service
+- **No Shell Access**: Kiosk mode prevents system access
+- **Content Filtering**: Automatic explicit content blocking
 
-- **Complete user separation**: Player user has NO sudo privileges
-- **Admin panel** runs as separate service account with limited sudo
-- **HTTPS encryption**: Self-signed SSL certificate for OAuth requirements
-- **Network isolation**: Admin panel only accessible via HTTPS (port 443)
-- **Player lockdown**: Chromium kiosk mode, cannot be closed
-- **Credentials**: Stored locally in `/opt/spotify-kids/config/`
-- **Token management**: Automatic refresh of Spotify access tokens
-- **No remote access** to player interface (localhost only)
+## 🎨 Customization
 
-## License
+### Change Player Theme
 
-MIT
+Edit `/opt/spotify-kids/player/client/index.html`:
 
-## Support
+```css
+:root {
+    --spotify-green: #1db954;
+    --background: #000;
+    --surface: #181818;
+    --text-primary: #fff;
+}
+```
 
-For issues, feature requests, or questions, please open an issue on GitHub.
+### Modify Time Limits
+
+Edit `/opt/spotify-kids/config/schedule.json`:
+
+```json
+{
+  "daily_limit_minutes": 120,
+  "schedule": {
+    "monday": {
+      "enabled": true,
+      "start": "15:00",
+      "end": "19:00"
+    }
+  }
+}
+```
+
+## 🔄 Updates
+
+To update to the latest version:
+
+```bash
+cd /opt/spotify-kids
+sudo git pull
+sudo systemctl restart spotify-player spotify-admin
+```
+
+## 🆘 Reset/Reinstall
+
+If you need to start fresh:
+
+```bash
+# Complete reset (removes all data)
+curl -sSL https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/main/force-reset.sh | sudo bash
+
+# Reinstall (keeps config)
+curl -sSL https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/main/install.sh | sudo bash -s -- --reset
+```
+
+## 📝 Environment Variables
+
+Create `/opt/spotify-kids/.env` for advanced configuration:
+
+```env
+# Spotify API
+SPOTIFY_CLIENT_ID=your_client_id_here
+SPOTIFY_CLIENT_SECRET=your_client_secret_here
+SPOTIFY_REDIRECT_URI=http://your_ip:5001/callback
+
+# Admin Panel
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD_HASH=your_bcrypt_hash
+
+# Player Settings
+PLAYER_PORT=3000
+ADMIN_PORT=5001
+SKIP_LIMIT=10
+EXPLICIT_FILTER=true
+```
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- Spotify Web API and Web Playback SDK
+- Raspberry Pi Foundation
+- The open source community
+
+## ⚠️ Disclaimer
+
+This project is not affiliated with Spotify AB. Spotify is a registered trademark of Spotify AB. This is an independent project that uses the official Spotify Web API.
+
+## 📧 Support
+
+For issues, questions, or suggestions:
+- Open an issue on [GitHub](https://github.com/socialoutcast/spotify-kids-manager/issues)
+- Check existing issues for solutions
+- Include logs when reporting problems:
+  ```bash
+  sudo journalctl -u spotify-player -n 100 > player.log
+  sudo journalctl -u spotify-admin -n 100 > admin.log
+  ```
+
+---
+
+**Made with ❤️ for parents who love music and want to share it safely with their kids**
