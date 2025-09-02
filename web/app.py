@@ -856,49 +856,6 @@ ADMIN_TEMPLATE = '''
                     <p class="page-subtitle">Configure Spotify integration and authentication</p>
                 </div>
                 
-                <!-- Setup Instructions -->
-                <div class="card" style="margin-bottom: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-                    <h2 style="color: white;">📚 Setup Instructions</h2>
-                    <div style="color: white; line-height: 1.8;">
-                        <h3 style="margin-top: 20px; color: #f0f0f0;">Step 1: Create a Spotify App</h3>
-                        <ol style="margin-left: 20px;">
-                            <li>Go to <a href="https://developer.spotify.com/dashboard" target="_blank" style="color: #1ed760;">developer.spotify.com/dashboard</a></li>
-                            <li>Log in with your Spotify account</li>
-                            <li>Click "Create App"</li>
-                            <li>Fill in:
-                                <ul style="margin-left: 20px; margin-top: 5px;">
-                                    <li><strong>App name:</strong> Spotify Kids Player</li>
-                                    <li><strong>App description:</strong> Kids music player</li>
-                                    <li><strong>Redirect URI:</strong> <code style="background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 3px;">https://YOUR_DEVICE_IP/callback</code></li>
-                                </ul>
-                            </li>
-                            <li>Check "Web API" under APIs used</li>
-                            <li>Click "Save"</li>
-                        </ol>
-                        
-                        <h3 style="margin-top: 20px; color: #f0f0f0;">Step 2: Get Your Credentials</h3>
-                        <ol style="margin-left: 20px;">
-                            <li>In your app's dashboard, click "Settings"</li>
-                            <li>Copy your <strong>Client ID</strong></li>
-                            <li>Click "View client secret" and copy your <strong>Client Secret</strong></li>
-                            <li>Paste them in the fields below</li>
-                        </ol>
-                        
-                        <h3 style="margin-top: 20px; color: #f0f0f0;">Step 3: Configure & Authenticate</h3>
-                        <ol style="margin-left: 20px;">
-                            <li>Enter your Client ID and Client Secret below</li>
-                            <li>Click "Save Config"</li>
-                            <li>Click "Test" to verify your credentials</li>
-                            <li>If successful, click "Authenticate with Spotify" when it appears</li>
-                            <li>Log in to Spotify and authorize the app</li>
-                        </ol>
-                        
-                        <div style="margin-top: 20px; padding: 15px; background: rgba(255,255,255,0.1); border-radius: 5px;">
-                            <strong>⚠️ Important:</strong> Make sure to add the exact Redirect URI shown below to your Spotify app settings!
-                        </div>
-                    </div>
-                </div>
-                
                 <div class="grid">
                     <!-- Spotify Configuration -->
                     <div class="card">
@@ -960,6 +917,50 @@ ADMIN_TEMPLATE = '''
                         {% if spotify_configured %}
                         <button onclick="refreshSpotifyToken()" style="margin-top: 15px;">Refresh Token</button>
                         {% endif %}
+                    </div>
+                </div>
+                
+                <!-- Setup Instructions -->
+                <div class="card" style="margin-top: 20px;">
+                    <h2>📚 Setup Instructions</h2>
+                    <div style="line-height: 1.8;">
+                        <h3 style="margin-top: 20px; color: #1DB954;">Step 1: Create a Spotify App</h3>
+                        <ol style="margin-left: 20px; color: #b3b3b3;">
+                            <li>Go to <a href="https://developer.spotify.com/dashboard" target="_blank" style="color: #1DB954;">developer.spotify.com/dashboard</a></li>
+                            <li>Log in with your Spotify account</li>
+                            <li>Click "Create App"</li>
+                            <li>Fill in:
+                                <ul style="margin-left: 20px; margin-top: 5px;">
+                                    <li><strong>App name:</strong> Spotify Kids Player</li>
+                                    <li><strong>App description:</strong> Kids music player</li>
+                                    <li><strong>Redirect URI:</strong> <code style="background: #282828; padding: 2px 6px; border-radius: 3px; color: #1DB954;">https://{{ request.host.split(':')[0] }}/callback</code></li>
+                                </ul>
+                            </li>
+                            <li>Check "Web API" under APIs used</li>
+                            <li>Click "Save"</li>
+                        </ol>
+                        
+                        <h3 style="margin-top: 20px; color: #1DB954;">Step 2: Get Your Credentials</h3>
+                        <ol style="margin-left: 20px; color: #b3b3b3;">
+                            <li>In your app's dashboard, click "Settings"</li>
+                            <li>Copy your <strong style="color: #fff;">Client ID</strong></li>
+                            <li>Click "View client secret" and copy your <strong style="color: #fff;">Client Secret</strong></li>
+                            <li>Paste them in the fields above</li>
+                        </ol>
+                        
+                        <h3 style="margin-top: 20px; color: #1DB954;">Step 3: Configure & Authenticate</h3>
+                        <ol style="margin-left: 20px; color: #b3b3b3;">
+                            <li>Enter your Client ID and Client Secret above</li>
+                            <li>Click "Save Config"</li>
+                            <li>Click "Test" to verify your credentials</li>
+                            <li>If successful, click "Authenticate with Spotify" when it appears</li>
+                            <li>Log in to Spotify and authorize the app</li>
+                        </ol>
+                        
+                        <div style="margin-top: 20px; padding: 15px; background: #282828; border-radius: 5px; border-left: 4px solid #1DB954;">
+                            <strong style="color: #f59e0b;">⚠️ Important:</strong>
+                            <span style="color: #b3b3b3;">Make sure to add the exact Redirect URI shown above to your Spotify app settings!</span>
+                        </div>
                     </div>
                 </div>
             </div>
