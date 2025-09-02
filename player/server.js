@@ -215,7 +215,11 @@ app.get('/api/token', async (req, res) => {
         res.json({ access_token: accessToken });
     } catch (error) {
         console.error('Error getting token:', error);
-        res.status(500).json({ error: 'Failed to get token' });
+        res.status(401).json({ 
+            error: 'Spotify not configured',
+            message: 'Please set up Spotify in the Admin Panel first',
+            setup_required: true 
+        });
     }
 });
 
