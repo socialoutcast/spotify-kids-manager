@@ -1527,7 +1527,16 @@ def update_spotify_config():
     try:
         save_spotify_config(config)
         app.logger.info("Spotify config saved successfully")
-        return jsonify({'success': True, 'message': 'Spotify configuration saved'})
+        
+        # Restart player to load new config
+        try:
+            subprocess.run(['sudo', 'systemctl', 'restart', 'spotify-player'], 
+                         capture_output=True, text=True, timeout=5)
+            app.logger.info("Player service restarted to load new config")
+            return jsonify({'success': True, 'message': 'Spotify configuration saved and player restarted'})
+        except Exception as restart_error:
+            app.logger.warning(f"Could not restart player: {restart_error}")
+            return jsonify({'success': True, 'message': 'Spotify configuration saved (restart player manually)'})
     except Exception as e:
         app.logger.error(f"Failed to save Spotify config: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -1566,9 +1575,20 @@ def test_spotify_config():
         if response.status_code == 200:
             # Success - credentials are valid
             token_data = response.json()
+            
+            # Restart player to ensure it uses the validated config
+            try:
+                subprocess.run(['sudo', 'systemctl', 'restart', 'spotify-player'], 
+                             capture_output=True, text=True, timeout=5)
+                app.logger.info("Player service restarted after successful config test")
+                message = 'Spotify API credentials validated successfully! Player has been restarted.'
+            except Exception as restart_error:
+                app.logger.warning(f"Could not restart player: {restart_error}")
+                message = 'Spotify API credentials validated successfully! Your configuration is working correctly.'
+            
             return jsonify({
                 'success': True, 
-                'message': 'Spotify API credentials validated successfully! Your configuration is working correctly.',
+                'message': message,
                 'scope': token_data.get('scope', 'client_credentials'),
                 'expires_in': token_data.get('expires_in', 3600)
             })
