@@ -860,26 +860,35 @@ ADMIN_TEMPLATE = '''
                     <!-- Spotify Configuration -->
                     <div class="card">
                         <h2>🎵 Spotify Configuration</h2>
-                <div id="spotifyAuthSection" style="display: none; margin-bottom: 15px;">
-                    <div style="background: #f59e0b; color: white; padding: 10px; border-radius: 5px; margin-bottom: 10px;">
-                        <strong>⚠️ Authentication Required</strong>
-                        <p style="margin: 5px 0; font-size: 12px;">The Spotify player needs to be authenticated.</p>
+                <div id="spotifyAuthStatus" style="margin-bottom: 15px;">
+                    <!-- Auth Required Section -->
+                    <div id="spotifyAuthRequired" style="display: none;">
+                        <div style="background: #f59e0b; color: white; padding: 10px; border-radius: 5px; margin-bottom: 10px;">
+                            <strong>⚠️ Authentication Required</strong>
+                            <p style="margin: 5px 0; font-size: 12px;">The Spotify player needs to be authenticated.</p>
+                        </div>
+                        
+                        <div style="background: #1f2937; padding: 15px; border-radius: 5px; margin-bottom: 10px;">
+                            <p style="margin: 0 0 10px 0; color: white; font-size: 13px;">Click the button below to authenticate with Spotify:</p>
+                            <a id="spotifyAuthLink" href="#" style="display: inline-block; background: #1db954; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; font-weight: bold;">
+                                🔐 Authenticate with Spotify
+                            </a>
+                        </div>
+                        
+                        <div style="margin-top: 10px; padding: 10px; background: #374151; border-radius: 5px;">
+                            <p style="margin: 0 0 5px 0; font-size: 11px; color: #9ca3af;">
+                                <strong>Important:</strong> Add this URL to your Spotify app's Redirect URIs:
+                            </p>
+                            <code id="redirectUriDisplay" style="background: #1f2937; padding: 4px 8px; border-radius: 3px; color: #10b981; font-size: 11px;">
+                                Loading...
+                            </code>
+                        </div>
                     </div>
                     
-                    <div style="background: #1f2937; padding: 15px; border-radius: 5px; margin-bottom: 10px;">
-                        <p style="margin: 0 0 10px 0; color: white; font-size: 13px;">Click the button below to authenticate with Spotify:</p>
-                        <a id="spotifyAuthLink" href="#" style="display: inline-block; background: #1db954; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; font-weight: bold;">
-                            🔐 Authenticate with Spotify
-                        </a>
-                    </div>
-                    
-                    <div style="margin-top: 10px; padding: 10px; background: #374151; border-radius: 5px;">
-                        <p style="margin: 0 0 5px 0; font-size: 11px; color: #9ca3af;">
-                            <strong>Important:</strong> Add this URL to your Spotify app's Redirect URIs:
-                        </p>
-                        <code id="redirectUriDisplay" style="background: #1f2937; padding: 4px 8px; border-radius: 3px; color: #10b981; font-size: 11px;">
-                            Loading...
-                        </code>
+                    <!-- Connected Status -->
+                    <div id="spotifyAuthConnected" style="display: none; background: #10b981; color: white; padding: 10px; border-radius: 5px;">
+                        <strong>✅ Spotify Connected</strong>
+                        <p style="margin: 5px 0; font-size: 12px;">The player is authenticated and ready to use.</p>
                     </div>
                 </div>
                 <div class="form-group">
@@ -1527,16 +1536,7 @@ def update_spotify_config():
     try:
         save_spotify_config(config)
         app.logger.info("Spotify config saved successfully")
-        
-        # Restart player to load new config
-        try:
-            subprocess.run(['sudo', 'systemctl', 'restart', 'spotify-player'], 
-                         capture_output=True, text=True, timeout=5)
-            app.logger.info("Player service restarted to load new config")
-            return jsonify({'success': True, 'message': 'Spotify configuration saved and player restarted'})
-        except Exception as restart_error:
-            app.logger.warning(f"Could not restart player: {restart_error}")
-            return jsonify({'success': True, 'message': 'Spotify configuration saved (restart player manually)'})
+        return jsonify({'success': True, 'message': 'Spotify configuration saved'})
     except Exception as e:
         app.logger.error(f"Failed to save Spotify config: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -1576,19 +1576,9 @@ def test_spotify_config():
             # Success - credentials are valid
             token_data = response.json()
             
-            # Restart player to ensure it uses the validated config
-            try:
-                subprocess.run(['sudo', 'systemctl', 'restart', 'spotify-player'], 
-                             capture_output=True, text=True, timeout=5)
-                app.logger.info("Player service restarted after successful config test")
-                message = 'Spotify API credentials validated successfully! Player has been restarted.'
-            except Exception as restart_error:
-                app.logger.warning(f"Could not restart player: {restart_error}")
-                message = 'Spotify API credentials validated successfully! Your configuration is working correctly.'
-            
             return jsonify({
                 'success': True, 
-                'message': message,
+                'message': 'Spotify API credentials validated successfully! Your configuration is working correctly.',
                 'scope': token_data.get('scope', 'client_credentials'),
                 'expires_in': token_data.get('expires_in', 3600)
             })
@@ -1823,6 +1813,15 @@ def oauth_callback():
         
         if token_info:
             app.logger.info("Successfully obtained Spotify access token via callback")
+            
+            # Restart the player service to load the new token
+            try:
+                import subprocess
+                subprocess.run(['sudo', 'systemctl', 'restart', 'spotify-player'], check=True)
+                app.logger.info("Spotify player service restarted after authentication")
+            except Exception as restart_error:
+                app.logger.error(f"Failed to restart player service: {restart_error}")
+            
             return f"""
             <html>
             <head>
@@ -1831,6 +1830,7 @@ def oauth_callback():
             <body style="font-family: Arial; text-align: center; padding: 50px;">
                 <h2 style="color: green;">✅ Authentication Successful!</h2>
                 <p>Spotify has been successfully authenticated.</p>
+                <p>The player is restarting to load your music...</p>
                 <p>Redirecting to admin panel in 3 seconds...</p>
                 <a href="/">Click here if not redirected</a>
             </body>
