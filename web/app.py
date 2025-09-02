@@ -2409,11 +2409,13 @@ def update_stream():
                     yield f"data: {line.strip()}\n\n"
                 proc.wait()
                 
-                # Run apt upgrade with auto-yes
+                # Run apt upgrade with auto-yes and handle held-back packages
                 yield "data: \n\n"
                 yield "data: Running system upgrade (this may take a while)...\n\n"
                 env = os.environ.copy()
                 env['DEBIAN_FRONTEND'] = 'noninteractive'
+                
+                # First try regular upgrade
                 proc = subprocess.Popen(['sudo', '-E', 'apt-get', 'upgrade', '-y', 
                                        '-o', 'Dpkg::Options::=--force-confdef', 
                                        '-o', 'Dpkg::Options::=--force-confold'],
@@ -2427,11 +2429,37 @@ def update_stream():
                 
                 proc.wait()
                 
-                # Clean up
+                # Handle held-back packages with dist-upgrade
                 yield "data: \n\n"
-                yield "data: Cleaning up...\n\n"
-                subprocess.run(['sudo', 'apt-get', 'autoremove', '-y'], 
-                             capture_output=True, check=False)
+                yield "data: Checking for held-back packages...\n\n"
+                proc = subprocess.Popen(['sudo', '-E', 'apt-get', 'dist-upgrade', '-y', 
+                                       '-o', 'Dpkg::Options::=--force-confdef', 
+                                       '-o', 'Dpkg::Options::=--force-confold'],
+                                      stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                      text=True, bufsize=1, env=env)
+                
+                for line in proc.stdout:
+                    cleaned_line = line.strip()
+                    if cleaned_line:
+                        yield f"data: {cleaned_line}\n\n"
+                
+                proc.wait()
+                
+                # Clean up - show output for autoremove
+                yield "data: \n\n"
+                yield "data: Removing unnecessary packages...\n\n"
+                proc = subprocess.Popen(['sudo', 'apt-get', 'autoremove', '-y'],
+                                      stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                      text=True, bufsize=1)
+                for line in proc.stdout:
+                    cleaned_line = line.strip()
+                    if cleaned_line:
+                        yield f"data: {cleaned_line}\n\n"
+                proc.wait()
+                
+                # Run autoclean
+                yield "data: \n\n"
+                yield "data: Cleaning package cache...\n\n"
                 subprocess.run(['sudo', 'apt-get', 'autoclean', '-y'], 
                              capture_output=True, check=False)
                 
@@ -2757,18 +2785,44 @@ def check_system_updates():
         check_result = subprocess.run(['sudo', 'apt', 'update'], 
                                     capture_output=True, text=True, timeout=30)
         
-        # Get list of upgradable packages
-        list_result = subprocess.run(['apt', 'list', '--upgradable'], 
-                                    capture_output=True, text=True)
+        # Simulate what would happen with upgrade to get accurate count
+        # This checks for held-back packages too
+        simulate_result = subprocess.run(['sudo', 'apt-get', 'dist-upgrade', '-s'], 
+                                        capture_output=True, text=True)
         
-        # Parse the output to count and list updates
-        lines = list_result.stdout.strip().split('\n')
+        # Parse simulation output for actual upgradable packages
         updates = []
-        for line in lines[1:]:  # Skip the first line (header)
-            if '/' in line:
-                package_info = line.split()[0].split('/')[0]
-                if package_info:
-                    updates.append(package_info)
+        in_upgrade_section = False
+        
+        for line in simulate_result.stdout.split('\n'):
+            if 'The following packages will be upgraded:' in line:
+                in_upgrade_section = True
+                continue
+            elif in_upgrade_section:
+                if line.strip() and not line.startswith(' '):
+                    # End of upgrade section
+                    break
+                elif line.strip():
+                    # Parse package names from the line
+                    packages = line.strip().split()
+                    updates.extend(packages)
+        
+        # Also check for autoremovable packages (subtract from count)
+        autoremove_result = subprocess.run(['sudo', 'apt-get', 'autoremove', '-s'],
+                                         capture_output=True, text=True)
+        autoremove_count = 0
+        if 'The following packages will be REMOVED:' in autoremove_result.stdout:
+            for line in autoremove_result.stdout.split('\n'):
+                if 'remov' in line.lower() and 'package' in line.lower():
+                    # Extract number from line like "0 upgraded, 0 newly installed, 8 to remove"
+                    parts = line.split(',')
+                    for part in parts:
+                        if 'to remove' in part:
+                            try:
+                                autoremove_count = int(part.split()[0])
+                            except:
+                                pass
+                    break
         
         update_count = len(updates)
         
