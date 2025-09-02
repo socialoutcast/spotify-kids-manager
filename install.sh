@@ -146,6 +146,51 @@ echo "Running apt-get upgrade..."
 DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -q || true
 echo "System update complete"
 
+# Remove unnecessary office and productivity software
+echo -e "${YELLOW}Removing unnecessary office software to free up space...${NC}"
+apt-get remove -y --purge \
+    libreoffice* \
+    libreoffice-* \
+    openoffice* \
+    thunderbird* \
+    evolution* \
+    pidgin* \
+    hexchat* \
+    gimp* \
+    inkscape* \
+    audacity* \
+    vlc* \
+    transmission* \
+    brasero* \
+    cheese* \
+    rhythmbox* \
+    totem* \
+    2>/dev/null || true
+
+# Clean up after removal
+apt-get autoremove -y
+apt-get autoclean -y
+
+# Install common fonts for web display
+echo -e "${YELLOW}Installing common fonts...${NC}"
+apt-get install -y \
+    fonts-liberation \
+    fonts-liberation2 \
+    fonts-dejavu-core \
+    fonts-dejavu-extra \
+    fonts-droid-fallback \
+    fonts-noto-mono \
+    fonts-noto-color-emoji \
+    fonts-roboto \
+    fonts-ubuntu \
+    fonts-font-awesome \
+    fonts-material-design-icons-iconfont \
+    2>/dev/null || true
+
+# Accept Microsoft fonts EULA automatically
+echo ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true | debconf-set-selections
+apt-get install -y ttf-mscorefonts-installer 2>/dev/null || true
+
 # Install dependencies
 echo -e "${YELLOW}Installing dependencies...${NC}"
 apt-get install -y \
@@ -374,7 +419,7 @@ update-alternatives --set x-session-manager /usr/bin/openbox-session 2>/dev/null
 # Install Node.js dependencies for player
 echo -e "${YELLOW}Installing player dependencies...${NC}"
 cd "$APP_DIR/player"
-sudo -u $APP_USER npm install --production
+sudo -u $APP_USER npm install --omit=dev
 
 # Create cache directory
 mkdir -p "$CONFIG_DIR/cache"
@@ -397,7 +442,7 @@ WorkingDirectory=$APP_DIR/player
 Environment="NODE_ENV=production"
 Environment="PORT=5000"
 Environment="SPOTIFY_CONFIG_DIR=$CONFIG_DIR"
-ExecStartPre=/bin/bash -c 'if [ ! -d "node_modules" ]; then npm install --production; fi'
+ExecStartPre=/bin/bash -c 'if [ ! -d "node_modules" ]; then npm install --omit=dev; fi'
 ExecStart=/usr/bin/node server.js
 Restart=always
 RestartSec=10
