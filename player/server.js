@@ -277,7 +277,7 @@ app.get('/api/playlists', async (req, res) => {
                 type: 'playlist',
                 owner: { display_name: 'Spotify' },
                 images: [{ 
-                    url: 'https://lineup-images.scdn.co/dj-f5d05fac-50e3-4932-8953-47b1e99661d4.jpg'
+                    url: 'https://champlaincrossover.org/wp-content/uploads/2023/03/Screen-Shot-2023-03-30-at-3.31.46-PM-898x900.png'
                 }],
                 description: 'Your personal AI DJ'
             }
@@ -346,6 +346,7 @@ app.get('/api/playlist/:id', async (req, res) => {
             res.json({
                 id: 'spotify-dj',
                 name: 'DJ',
+                image: 'https://champlaincrossover.org/wp-content/uploads/2023/03/Screen-Shot-2023-03-30-at-3.31.46-PM-898x900.png',
                 tracks: [{
                     id: 'dj-stream',
                     uri: 'spotify:playlist:37i9dQZF1EYkqdzj48dyYq',
@@ -354,7 +355,7 @@ app.get('/api/playlist/:id', async (req, res) => {
                     album: 'Personalized for you',
                     duration_ms: 0,
                     explicit: false,
-                    image: 'https://lineup-images.scdn.co/dj-f5d05fac-50e3-4932-8953-47b1e99661d4.jpg'
+                    image: 'https://champlaincrossover.org/wp-content/uploads/2023/03/Screen-Shot-2023-03-30-at-3.31.46-PM-898x900.png'
                 }],
                 total: 1,
                 description: 'Your personal AI DJ - tap to start listening',
