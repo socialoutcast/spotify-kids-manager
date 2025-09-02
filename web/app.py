@@ -1814,6 +1814,13 @@ def oauth_callback():
         if token_info:
             app.logger.info("Successfully obtained Spotify access token via callback")
             
+            # Fix token cache permissions so player can read it
+            try:
+                os.chmod(cache_file, 0o664)
+                app.logger.info(f"Fixed token cache permissions at {cache_file}")
+            except Exception as perm_error:
+                app.logger.error(f"Failed to fix token permissions: {perm_error}")
+            
             # Restart the player service to load the new token
             try:
                 import subprocess
@@ -1906,6 +1913,22 @@ def submit_auth_code():
         
         if token_info:
             app.logger.info("Successfully obtained Spotify access token")
+            
+            # Fix token cache permissions so player can read it
+            try:
+                os.chmod(cache_file, 0o664)
+                app.logger.info(f"Fixed token cache permissions at {cache_file}")
+            except Exception as perm_error:
+                app.logger.error(f"Failed to fix token permissions: {perm_error}")
+            
+            # Restart the player service to load the new token
+            try:
+                import subprocess
+                subprocess.run(['sudo', 'systemctl', 'restart', 'spotify-player'], check=True)
+                app.logger.info("Spotify player service restarted after authentication")
+            except Exception as restart_error:
+                app.logger.error(f"Failed to restart player service: {restart_error}")
+            
             return jsonify({'success': True, 'message': 'Authentication successful!'})
         else:
             return jsonify({'success': False, 'error': 'Failed to obtain access token'})
