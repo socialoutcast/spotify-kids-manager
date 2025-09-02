@@ -1089,24 +1089,27 @@
             const nameElement = document.getElementById('nowPlayingName');
             const artistElement = document.getElementById('nowPlayingArtist');
             
-            nameElement.textContent = track.name;
+            // Update artist immediately
             artistElement.textContent = track.artists.map(a => a.name).join(', ');
             
-            // Check if title needs scrolling
-            // Remove scrolling class first to measure properly
+            // Remove scrolling class and set text first
             nameElement.classList.remove('scrolling');
+            nameElement.textContent = track.name;
             
-            // Use a timeout to allow the DOM to update
-            setTimeout(() => {
-                if (nameElement.scrollWidth > nameElement.clientWidth) {
+            // Check if title needs scrolling after a brief delay
+            requestAnimationFrame(() => {
+                // Get the actual rendered width
+                const containerWidth = nameElement.parentElement.offsetWidth;
+                const textWidth = nameElement.scrollWidth;
+                
+                if (textWidth > containerWidth && containerWidth > 0) {
                     // Title is too long, enable scrolling
                     nameElement.classList.add('scrolling');
                     // Duplicate text for seamless scrolling
-                    nameElement.innerHTML = `<span>${track.name}</span><span style="padding-left: 50px;">${track.name}</span>`;
-                } else {
-                    nameElement.textContent = track.name;
+                    const escapedName = track.name.replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+                    nameElement.innerHTML = `<span>${escapedName}</span><span>${escapedName}</span>`;
                 }
-            }, 10);
+            });
             
             const cover = document.getElementById('nowPlayingCover');
             if (track.album.images[0]) {
