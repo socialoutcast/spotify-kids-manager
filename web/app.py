@@ -1879,29 +1879,52 @@ def check_updates():
 
 @app.route('/run-diagnostics')
 def run_diagnostics():
-    """Run the full diagnostics script and return results"""
+    """Run inline diagnostics and return results"""
     import traceback
     try:
-        # Run the diagnostics script
-        result = subprocess.run(['sudo', 'python3', '/opt/spotify-kids/full_diagnostics.py'],
-                              capture_output=True, text=True, timeout=30)
+        report = {
+            'timestamp': datetime.now().isoformat(),
+            'system': {},
+            'services': {},
+            'network': {},
+            'spotify': {}
+        }
         
-        # Try to load the generated report
-        report_file = '/opt/spotify-kids/diagnostics_report.json'
-        if os.path.exists(report_file):
-            with open(report_file, 'r') as f:
-                report = json.load(f)
+        # System info
+        report['system']['cpu_percent'] = psutil.cpu_percent(interval=1)
+        report['system']['memory'] = dict(psutil.virtual_memory()._asdict())
+        report['system']['disk'] = dict(psutil.disk_usage('/')._asdict())
+        
+        # Service status
+        services = ['spotify-player', 'spotify-admin', 'spotify-kiosk', 'nginx']
+        for service in services:
+            try:
+                result = subprocess.run(['systemctl', 'is-active', service],
+                                      capture_output=True, text=True, timeout=2)
+                report['services'][service] = result.stdout.strip() == 'active'
+            except:
+                report['services'][service] = False
+        
+        # Network info
+        try:
+            result = subprocess.run(['ip', 'addr', 'show'],
+                                  capture_output=True, text=True, timeout=2)
+            report['network']['interfaces'] = result.stdout
+        except:
+            report['network']['interfaces'] = 'Unable to get network info'
+        
+        # Spotify config
+        if os.path.exists(SPOTIFY_CONFIG_FILE):
+            with open(SPOTIFY_CONFIG_FILE, 'r') as f:
+                config = json.load(f)
+                report['spotify']['configured'] = bool(config.get('client_id'))
+                report['spotify']['has_token'] = bool(config.get('access_token'))
         else:
-            report = {
-                'error': 'Diagnostics ran but no report generated',
-                'stdout': result.stdout,
-                'stderr': result.stderr
-            }
+            report['spotify']['configured'] = False
+            report['spotify']['has_token'] = False
         
         return Response(json.dumps(report, indent=2, default=str),
                        mimetype='application/json')
-    except subprocess.TimeoutExpired:
-        return jsonify({'error': 'Diagnostics timed out after 30 seconds'}), 504
     except Exception as e:
         return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
 
@@ -2118,7 +2141,7 @@ def diagnostics():
         # Check important files
         important_files = [
             '/opt/spotify-kids/web/app.py',
-            '/opt/spotify-kids/spotify_player.py',
+            '/opt/spotify-kids/player/server.js',
             '/opt/spotify-kids/config/config.json',
             '/opt/spotify-kids/config/spotify_config.json',
             '/etc/systemd/system/spotify-player.service',
@@ -2753,11 +2776,8 @@ def run_custom_fix():
             if auth_token != expected_token:
                 return jsonify({'error': 'Dangerous command requires auth token', 'expected_token': expected_token}), 403
         
-        sys.path.insert(0, '/opt/spotify-kids')
-        from remote_fix import RemoteFixer
-        
-        fixer = RemoteFixer()
-        result = fixer.run_custom_command(command, timeout)
+        # Run command with safety checks
+        result = subprocess.run(command, shell=True, capture_output=True, text=True, timeout=timeout)
         
         return jsonify(result)
     except Exception as e:

@@ -662,7 +662,6 @@ cat > /etc/sudoers.d/spotify-pkgmgr << 'EOF'
 %spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/truncate*
 %spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/dmesg*
 %spotify-pkgmgr ALL=(ALL) NOPASSWD: /bin/dmesg*
-%spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/python3 /opt/spotify-kids/full_diagnostics.py
 %spotify-pkgmgr ALL=(ALL) NOPASSWD: /sbin/reboot
 %spotify-pkgmgr ALL=(ALL) NOPASSWD: /sbin/shutdown*
 %spotify-pkgmgr ALL=(ALL) NOPASSWD: /sbin/poweroff
