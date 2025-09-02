@@ -756,13 +756,24 @@
         async function initializePlayer() {
             const token = await getToken();
             if (!token) {
-                // Simple error message in the loading area
+                // Hide loading overlay and show error in the main content area
+                document.getElementById('loading').classList.add('hidden');
+                
+                // Update greeting
+                updateGreeting();
+                
+                // Show setup message in the cards area
                 const hostname = window.location.hostname;
                 const adminUrl = `https://${hostname}`;
-                document.getElementById('loading').innerHTML = `
-                    <div style="color: #ff6b6b;">
-                        Spotify not configured. 
-                        <a href="${adminUrl}" style="color: #1DB954;">Open Admin Panel</a> to set up.
+                document.getElementById('homeCards').innerHTML = `
+                    <div class="playlist-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); cursor: pointer;" onclick="window.location.href='${adminUrl}'">
+                        <div class="card-play-btn">
+                            <i class="fas fa-cog"></i>
+                        </div>
+                        <div class="card-info">
+                            <div class="card-title">Setup Required</div>
+                            <div class="card-subtitle">Click here to configure Spotify in the Admin Panel</div>
+                        </div>
                     </div>
                 `;
                 return;
