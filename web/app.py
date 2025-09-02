@@ -298,107 +298,294 @@ ADMIN_TEMPLATE = '''
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Spotify Kids Admin Panel</title>
+    <title>Spotify Kids Admin</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        :root {
+            --spotify-green: #1DB954;
+            --spotify-black: #191414;
+            --spotify-dark: #121212;
+            --sidebar-bg: #000;
+            --text-primary: #fff;
+            --text-secondary: #b3b3b3;
+            --hover-bg: rgba(255, 255, 255, 0.1);
+            --card-bg: #181818;
+            --border-color: #282828;
+        }
+        
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            background: var(--spotify-dark);
+            color: var(--text-primary);
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            overflow: hidden;
         }
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        .header {
-            background: white;
-            border-radius: 10px;
-            padding: 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        .header h1 {
-            color: #333;
-            margin-bottom: 10px;
-        }
-        .status {
-            display: inline-block;
-            padding: 5px 10px;
-            border-radius: 5px;
-            font-size: 14px;
-            font-weight: bold;
-        }
-        .status.online { background: #10b981; color: white; }
-        .status.offline { background: #ef4444; color: white; }
-        .grid {
+        
+        .app-container {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
+            grid-template-columns: 240px 1fr;
+            grid-template-rows: 1fr auto;
+            height: 100vh;
+            grid-template-areas:
+                "sidebar main"
+                "sidebar status";
         }
-        .card {
-            background: white;
-            border-radius: 10px;
-            padding: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        
+        /* Sidebar Navigation */
+        .sidebar {
+            grid-area: sidebar;
+            background: var(--sidebar-bg);
+            padding: 24px;
+            overflow-y: auto;
         }
-        .card h2 {
-            color: #333;
-            margin-bottom: 15px;
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 32px;
+            color: var(--text-primary);
+        }
+        
+        .logo svg {
+            width: 40px;
+            height: 40px;
+        }
+        
+        .logo h1 {
             font-size: 20px;
+            font-weight: 700;
         }
-        .form-group {
-            margin-bottom: 15px;
+        
+        .nav-section {
+            margin-bottom: 24px;
         }
-        label {
-            display: block;
-            margin-bottom: 5px;
-            color: #666;
-            font-size: 14px;
+        
+        .nav-title {
+            color: var(--text-secondary);
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-bottom: 8px;
         }
-        input, select, textarea {
-            width: 100%;
-            padding: 8px 12px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            font-size: 14px;
-        }
-        button {
-            background: #667eea;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
+        
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            border-radius: 4px;
+            transition: all 0.2s;
             cursor: pointer;
+            background: none;
+            border: none;
+            width: 100%;
+            text-align: left;
             font-size: 14px;
-            font-weight: bold;
         }
-        button:hover {
-            background: #5a67d8;
+        
+        .nav-item:hover {
+            color: var(--text-primary);
+            background: var(--hover-bg);
         }
-        button.danger {
+        
+        .nav-item.active {
+            color: var(--text-primary);
+            background: var(--hover-bg);
+        }
+        
+        .nav-item svg {
+            width: 20px;
+            height: 20px;
+        }
+        
+        /* Main Content Area */
+        .main-content {
+            grid-area: main;
+            overflow-y: auto;
+            padding: 32px;
+            background: var(--spotify-dark);
+        }
+        
+        .page-header {
+            margin-bottom: 32px;
+        }
+        
+        .page-title {
+            font-size: 48px;
+            font-weight: 900;
+            margin-bottom: 8px;
+        }
+        
+        .page-subtitle {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+        
+        /* Status Bar */
+        .status-bar {
+            grid-area: status;
+            background: var(--card-bg);
+            border-top: 1px solid var(--border-color);
+            padding: 16px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .status-info {
+            display: flex;
+            gap: 24px;
+            align-items: center;
+        }
+        
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+        
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--spotify-green);
+        }
+        
+        .status-indicator.offline {
             background: #ef4444;
         }
+        
+        /* Cards and Grid */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+        
+        .card {
+            background: var(--card-bg);
+            border-radius: 8px;
+            padding: 24px;
+            border: 1px solid var(--border-color);
+        }
+        
+        .card h2 {
+            color: var(--text-primary);
+            margin-bottom: 20px;
+            font-size: 18px;
+            font-weight: 700;
+        }
+        
+        .card h3 {
+            color: var(--text-primary);
+            margin-bottom: 16px;
+            font-size: 16px;
+            font-weight: 600;
+        }
+        /* Forms */
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text-secondary);
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            background: var(--spotify-dark);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            color: var(--text-primary);
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+        
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--spotify-green);
+        }
+        
+        /* Buttons */
+        button {
+            background: var(--spotify-green);
+            color: #000;
+            border: none;
+            padding: 12px 32px;
+            border-radius: 500px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 700;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        button:hover {
+            background: #1ed760;
+            transform: scale(1.04);
+        }
+        
+        button.secondary {
+            background: transparent;
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+        
+        button.secondary:hover {
+            border-color: var(--text-primary);
+            background: transparent;
+        }
+        
+        button.danger {
+            background: #ef4444;
+            color: white;
+        }
+        
         button.danger:hover {
             background: #dc2626;
         }
+        
+        button.small {
+            padding: 8px 16px;
+            font-size: 12px;
+        }
+        /* Toggle Switches */
         .toggle {
             display: flex;
             align-items: center;
             justify-content: space-between;
+            padding: 12px 0;
         }
+        
         .switch {
             position: relative;
             display: inline-block;
-            width: 50px;
+            width: 44px;
             height: 24px;
         }
+        
         .switch input {
             opacity: 0;
             width: 0;
             height: 0;
         }
+        
         .slider {
             position: absolute;
             cursor: pointer;
@@ -406,93 +593,191 @@ ADMIN_TEMPLATE = '''
             left: 0;
             right: 0;
             bottom: 0;
-            background-color: #ccc;
+            background-color: var(--border-color);
             transition: .4s;
             border-radius: 24px;
         }
+        
         .slider:before {
             position: absolute;
             content: "";
-            height: 18px;
-            width: 18px;
-            left: 3px;
-            bottom: 3px;
-            background-color: white;
+            height: 20px;
+            width: 20px;
+            left: 2px;
+            bottom: 2px;
+            background-color: var(--text-primary);
             transition: .4s;
             border-radius: 50%;
         }
+        
         input:checked + .slider {
-            background-color: #667eea;
+            background-color: var(--spotify-green);
         }
+        
         input:checked + .slider:before {
-            transform: translateX(26px);
+            transform: translateX(20px);
         }
+        /* Lists */
         .playlist-list {
-            max-height: 200px;
+            max-height: 300px;
             overflow-y: auto;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background: var(--spotify-dark);
         }
+        
         .playlist-item {
-            padding: 5px;
-            margin-bottom: 5px;
-            background: #f3f4f6;
-            border-radius: 3px;
+            padding: 12px;
+            border-bottom: 1px solid var(--border-color);
             display: flex;
             justify-content: space-between;
             align-items: center;
+            transition: background 0.2s;
         }
+        
+        .playlist-item:hover {
+            background: var(--hover-bg);
+        }
+        
+        .playlist-item:last-child {
+            border-bottom: none;
+        }
+        
+        /* Stats */
         .stats {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 10px;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
         }
+        
         .stat {
             text-align: center;
-            padding: 10px;
-            background: #f3f4f6;
-            border-radius: 5px;
+            padding: 20px;
+            background: var(--card-bg);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
         }
+        
         .stat-value {
-            font-size: 24px;
-            font-weight: bold;
-            color: #667eea;
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--spotify-green);
+            margin-bottom: 8px;
         }
+        
         .stat-label {
             font-size: 12px;
-            color: #666;
-            margin-top: 5px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
-        {% if not logged_in %}
+        
+        /* Page Sections */
+        .page-section {
+            display: none;
+        }
+        
+        .page-section.active {
+            display: block;
+        }
+        
+        /* Login */
         .login-container {
             max-width: 400px;
             margin: 100px auto;
+            padding: 32px;
+            background: var(--card-bg);
+            border-radius: 8px;
         }
-        {% endif %}
+        
+        .login-container h1 {
+            color: var(--text-primary);
+            margin-bottom: 24px;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        {% if logged_in %}
-        <div class="header">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <h1>🎵 Spotify Kids Admin Panel</h1>
-                <div style="display: flex; gap: 15px; align-items: center;">
-                    <span class="status {{ 'online' if player_status else 'offline' }}">
-                        Player: {{ 'Online' if player_status else 'Offline' }}
-                    </span>
-                    <span class="status {{ 'online' if spotify_configured else 'offline' }}">
-                        Spotify API: {{ 'Configured' if spotify_configured else 'Not Configured' }}
-                    </span>
-                    <button onclick="logout()" style="padding: 5px 15px; background: #ef4444;">Logout</button>
-                </div>
+    {% if logged_in %}
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="logo">
+                <svg viewBox="0 0 24 24">
+                    <path fill="#1DB954" d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
+                </svg>
+                <h1>Kids Admin</h1>
             </div>
-        </div>
+            
+            <nav>
+                <div class="nav-section">
+                    <div class="nav-title">Main</div>
+                    <button class="nav-item active" onclick="showSection('dashboard')">
+                        <svg viewBox="0 0 24 24"><path fill="currentColor" d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+                        Dashboard
+                    </button>
+                    <button class="nav-item" onclick="showSection('spotify')">
+                        <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+                        Spotify Setup
+                    </button>
+                </div>
+                
+                <div class="nav-section">
+                    <div class="nav-title">System</div>
+                    <button class="nav-item" onclick="showSection('system')">
+                        <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                        System Status
+                    </button>
+                    <button class="nav-item" onclick="showSection('bluetooth')">
+                        <svg viewBox="0 0 24 24"><path fill="currentColor" d="M17.71 7.71L12 2h-1v7.59L6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 11 14.41V22h1l5.71-5.71-4.3-4.29 4.3-4.29zM13 5.83l1.88 1.88L13 9.59V5.83zm1.88 10.46L13 18.17v-3.76l1.88 1.88z"/></svg>
+                        Bluetooth
+                    </button>
+                    <button class="nav-item" onclick="showSection('logs')">
+                        <svg viewBox="0 0 24 24"><path fill="currentColor" d="M3 3v18h18V3H3zm8 16H5v-2h6v2zm0-4H5v-2h6v2zm0-4H5V9h6v2zm8 8h-6v-2h6v2zm0-4h-6v-2h6v2zm0-4h-6V9h6v2z"/></svg>
+                        System Logs
+                    </button>
+                </div>
+                
+                <div class="nav-section">
+                    <div class="nav-title">Admin</div>
+                    <button class="nav-item" onclick="showSection('settings')">
+                        <svg viewBox="0 0 24 24"><path fill="currentColor" d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+                        Admin Settings
+                    </button>
+                </div>
+            </nav>
+        </aside>
         
-        <!-- Essential Configuration Section -->
-        <h2 style="color: white; margin: 20px 0 10px 0;">⚙️ Essential Configuration</h2>
-        <div class="grid">
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Dashboard Section -->
+            <div id="dashboard" class="page-section active">
+                <div class="page-header">
+                    <h1 class="page-title">Dashboard</h1>
+                    <p class="page-subtitle">System overview and quick stats</p>
+                </div>
+                
+                <div class="stats">
+                    <div class="stat">
+                        <div class="stat-value">{{ uptime }}</div>
+                        <div class="stat-label">Uptime</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">{{ cpu_usage }}%</div>
+                        <div class="stat-label">CPU Usage</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">{{ memory_usage }}%</div>
+                        <div class="stat-label">Memory</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">{{ disk_usage }}%</div>
+                        <div class="stat-label">Disk</div>
+                    </div>
+                </div>
+                
+                <div class="grid">
             <!-- Spotify Configuration -->
             <div class="card">
                 <h2>🎵 Spotify Configuration</h2>
