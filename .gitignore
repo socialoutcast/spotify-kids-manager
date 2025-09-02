@@ -27,3 +27,12 @@ config/
 data/
 *.log
 .DS_Store
+
+# Claude AI related files
+.claude/
+CLAUDE.md
+claude.md
+.clauderc
+*.claude
+.claude-*
+claude-*
