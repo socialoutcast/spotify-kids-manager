@@ -142,8 +142,23 @@ fi
 echo -e "${YELLOW}Updating system packages...${NC}"
 echo "Running apt-get update..."
 apt-get update || true
+
 echo "Running apt-get upgrade..."
-DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -q || true
+DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -q \
+    -o Dpkg::Options::="--force-confdef" \
+    -o Dpkg::Options::="--force-confold" || true
+
+echo "Handling held-back packages with dist-upgrade..."
+DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y -q \
+    -o Dpkg::Options::="--force-confdef" \
+    -o Dpkg::Options::="--force-confold" || true
+
+echo "Removing unnecessary packages..."
+apt-get autoremove -y || true
+
+echo "Cleaning package cache..."
+apt-get autoclean -y || true
+
 echo "System update complete"
 
 # Remove unnecessary office and productivity software
@@ -247,6 +262,11 @@ pip3 install --break-system-packages \
     pillow \
     requests \
     psutil
+
+# Final cleanup after all installations
+echo -e "${YELLOW}Final system cleanup...${NC}"
+apt-get autoremove -y || true
+apt-get autoclean -y || true
 
 # Create application user (NO SUDO PRIVILEGES)
 echo -e "${YELLOW}Creating application user...${NC}"
