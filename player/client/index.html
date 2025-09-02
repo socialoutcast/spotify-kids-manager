@@ -349,6 +349,8 @@
             display: flex;
             align-items: center;
             gap: 16px;
+            min-width: 0;
+            max-width: 30%;
         }
 
         .now-playing-cover {
@@ -357,6 +359,7 @@
             background: #282828;
             border-radius: 4px;
             overflow: hidden;
+            flex-shrink: 0;
         }
 
         .now-playing-cover img {
@@ -367,6 +370,7 @@
 
         .now-playing-info {
             min-width: 0;
+            overflow: hidden;
         }
 
         .now-playing-name {
@@ -376,6 +380,27 @@
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+            position: relative;
+        }
+
+        .now-playing-name.scrolling {
+            display: flex;
+            animation: scroll-text 15s linear infinite;
+            white-space: nowrap;
+        }
+
+        .now-playing-name.scrolling span {
+            padding-right: 50px;
+            white-space: nowrap;
+        }
+
+        @keyframes scroll-text {
+            0% {
+                transform: translateX(0);
+            }
+            100% {
+                transform: translateX(-50%);
+            }
         }
 
         .now-playing-artist {
@@ -1061,8 +1086,27 @@
             const track = state.track_window.current_track;
             if (!track) return;
             
-            document.getElementById('nowPlayingName').textContent = track.name;
-            document.getElementById('nowPlayingArtist').textContent = track.artists.map(a => a.name).join(', ');
+            const nameElement = document.getElementById('nowPlayingName');
+            const artistElement = document.getElementById('nowPlayingArtist');
+            
+            nameElement.textContent = track.name;
+            artistElement.textContent = track.artists.map(a => a.name).join(', ');
+            
+            // Check if title needs scrolling
+            // Remove scrolling class first to measure properly
+            nameElement.classList.remove('scrolling');
+            
+            // Use a timeout to allow the DOM to update
+            setTimeout(() => {
+                if (nameElement.scrollWidth > nameElement.clientWidth) {
+                    // Title is too long, enable scrolling
+                    nameElement.classList.add('scrolling');
+                    // Duplicate text for seamless scrolling
+                    nameElement.innerHTML = `<span>${track.name}</span><span style="padding-left: 50px;">${track.name}</span>`;
+                } else {
+                    nameElement.textContent = track.name;
+                }
+            }, 10);
             
             const cover = document.getElementById('nowPlayingCover');
             if (track.album.images[0]) {
