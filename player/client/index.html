@@ -163,7 +163,7 @@
         }
 
         .card-title {
-            font-size: 14px;
+            font-size: 18px;  /* Increased from 14px */
             font-weight: 600;
             margin-bottom: 4px;
             overflow: hidden;
@@ -184,6 +184,58 @@
             padding-bottom: 24px;
         }
 
+        .playlist-actions {
+            display: flex;
+            gap: 16px;
+            margin-top: 24px;
+        }
+
+        .download-btn {
+            padding: 12px 32px;
+            background: #1db954;
+            color: #000;
+            border: none;
+            border-radius: 500px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s;
+        }
+
+        .download-btn:hover {
+            background: #1ed760;
+            transform: scale(1.04);
+        }
+
+        .download-btn.downloading {
+            background: #535353;
+            color: #fff;
+            cursor: wait;
+        }
+
+        .download-btn.downloaded {
+            background: transparent;
+            color: #1db954;
+            border: 1px solid #1db954;
+        }
+
+        .download-btn svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .spin {
+            animation: spin 1s linear infinite;
+        }
+
         .playlist-cover {
             width: 232px;
             height: 232px;
@@ -201,14 +253,14 @@
         }
 
         .playlist-info h1 {
-            font-size: 48px;
+            font-size: 56px;  /* Increased from 48px */
             font-weight: 900;
             margin-bottom: 8px;
         }
 
         .playlist-meta {
             color: #b3b3b3;
-            font-size: 14px;
+            font-size: 18px;  /* Increased from 14px */
         }
 
         /* Track List */
@@ -218,9 +270,9 @@
 
         .track-row {
             display: grid;
-            grid-template-columns: 16px 1fr 200px 100px;
+            grid-template-columns: 30px 1fr 200px 100px;
             gap: 16px;
-            padding: 8px 16px;
+            padding: 12px 16px;  /* Increased padding */
             border-radius: 4px;
             align-items: center;
             color: #b3b3b3;
@@ -239,7 +291,7 @@
 
         .track-number {
             text-align: right;
-            font-size: 14px;
+            font-size: 18px;  /* Increased from 14px */
         }
 
         .track-info {
@@ -268,7 +320,7 @@
         }
 
         .track-name {
-            font-size: 16px;
+            font-size: 20px;  /* Increased from 16px */
             color: #fff;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -276,7 +328,7 @@
         }
 
         .track-artist {
-            font-size: 14px;
+            font-size: 16px;  /* Increased from 14px */
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
@@ -345,7 +397,7 @@
         .control-buttons {
             display: flex;
             align-items: center;
-            gap: 16px;
+            gap: 32px;  /* Increased from 16px for better spacing */
         }
 
         .control-button {
@@ -353,15 +405,17 @@
             border: none;
             color: #b3b3b3;
             cursor: pointer;
-            padding: 0;
+            padding: 8px;  /* Added padding for larger touch targets */
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: color 0.2s;
+            transition: color 0.2s, transform 0.2s;
+            border-radius: 50%;
         }
 
         .control-button:hover {
             color: #fff;
+            background: rgba(255, 255, 255, 0.1);
         }
 
         .control-button.active {
@@ -369,20 +423,27 @@
         }
 
         .control-button svg {
-            width: 16px;
-            height: 16px;
+            width: 24px;  /* Increased from 16px */
+            height: 24px;  /* Increased from 16px */
         }
 
         .control-button.play-pause {
-            width: 32px;
-            height: 32px;
+            width: 56px;  /* Increased from 32px */
+            height: 56px;  /* Increased from 32px */
             background: #fff;
             border-radius: 50%;
             color: #000;
+            padding: 0;
+        }
+
+        .control-button.play-pause svg {
+            width: 24px;  /* Keep play button icon reasonable size */
+            height: 24px;
         }
 
         .control-button.play-pause:hover {
-            transform: scale(1.06);
+            transform: scale(1.08);
+            background: #1db954;
         }
 
         /* Progress Bar */
@@ -423,6 +484,63 @@
             background: #1db954;
         }
 
+        /* Volume Control */
+        .now-playing-right {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 8px;
+            padding-right: 16px;
+        }
+
+        .volume-control {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 125px;
+        }
+
+        .volume-icon {
+            color: #b3b3b3;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 4px;
+            transition: color 0.2s;
+        }
+
+        .volume-icon:hover {
+            color: #fff;
+        }
+
+        .volume-icon svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .volume-slider {
+            width: 100px;
+            height: 4px;
+            background: #535353;
+            border-radius: 2px;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .volume-slider-fill {
+            height: 100%;
+            background: #fff;
+            border-radius: 2px;
+            position: relative;
+            pointer-events: none;
+            width: 50%;
+        }
+
+        .volume-slider:hover .volume-slider-fill {
+            background: #1db954;
+        }
+
         /* Playlists Section */
         .playlists-section {
             margin-top: 24px;
@@ -443,12 +561,12 @@
         .playlist-item {
             display: flex;
             align-items: center;
-            padding: 8px 16px;
+            padding: 12px 16px;
             color: #b3b3b3;
             text-decoration: none;
             cursor: pointer;
             transition: all 0.2s;
-            font-size: 14px;
+            font-size: 18px;  /* Increased from 14px */
             border-radius: 4px;
         }
 
@@ -500,8 +618,8 @@
     <aside class="sidebar">
         <!-- Logo -->
         <div class="logo">
-            <svg viewBox="0 0 1134 340">
-                <path fill="currentColor" d="M8 171c0 92 76 168 168 168s168-76 168-168S268 4 176 4 8 79 8 171zm230 78c-39-24-71-56-71-56s32-32 71-56c16-10 24-25 24-41 0-23-19-42-42-42s-42 19-42 42c0 16-8 31-24 41-39 24-71 56-71 56s32 32 71 56c16 10 24 25 24 41 0 23 19 42 42 42s42-19 42-42c0-16 8-31 24-41zm46-77c0-46-37-83-83-83s-83 37-83 83 37 83 83 83 83-37 83-83z"/>
+            <svg viewBox="0 0 24 24" style="width: 40px; height: 40px;">
+                <path fill="#1DB954" d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
             </svg>
         </div>
         
@@ -584,7 +702,19 @@
             </div>
         </div>
         
-        <div class="now-playing-right"></div>
+        <div class="now-playing-right">
+            <div class="volume-control">
+                <div class="volume-icon" id="volumeIcon">
+                    <svg viewBox="0 0 16 16">
+                        <path fill="currentColor" d="M9.741.85a.75.75 0 01.375.65v13a.75.75 0 01-1.125.65l-6.925-4a3.642 3.642 0 01-1.33-4.967 3.639 3.639 0 011.33-.983l6.925-4a.75.75 0 01.75 0zm-6.924 5.3a2.139 2.139 0 000 3.7l5.8 3.35V2.8l-5.8 3.35zm8.683 4.29V5.56a2.75 2.75 0 010 4.88z"/>
+                        <path fill="currentColor" d="M11.5 13.614a5.752 5.752 0 000-11.228v1.55a4.252 4.252 0 010 8.127v1.55z"/>
+                    </svg>
+                </div>
+                <div class="volume-slider" id="volumeSlider">
+                    <div class="volume-slider-fill" id="volumeSliderFill"></div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Spotify Web Playback SDK -->
@@ -646,6 +776,13 @@
                 document.getElementById('loading').classList.add('hidden');
                 document.getElementById('statusBadge').classList.remove('hidden');
                 
+                // Initialize volume slider
+                player.getVolume().then(volume => {
+                    currentVolume = volume;
+                    document.getElementById('volumeSliderFill').style.width = (volume * 100) + '%';
+                    updateVolumeIcon(volume);
+                });
+                
                 // Transfer playback
                 transferPlayback(device_id);
                 
@@ -663,8 +800,21 @@
             player.addListener('player_state_changed', state => {
                 if (!state) return;
                 updateNowPlaying(state);
-                updatePlayButton(!state.paused);
+                updatePlayButton(state.paused);
                 updateProgress(state.position, state.duration);
+                
+                // Update shuffle and repeat states
+                if (state.shuffle !== undefined) {
+                    AppState.shuffleState = state.shuffle;
+                    document.getElementById('shuffleBtn').classList.toggle('active', AppState.shuffleState);
+                }
+                if (state.repeat_mode !== undefined) {
+                    // Spotify uses 0 = off, 1 = context, 2 = track
+                    if (state.repeat_mode === 0) AppState.repeatState = 'off';
+                    else if (state.repeat_mode === 1) AppState.repeatState = 'context';
+                    else if (state.repeat_mode === 2) AppState.repeatState = 'track';
+                    updateRepeatButton();
+                }
             });
 
             // Errors
@@ -721,23 +871,52 @@
 
         function renderHomeCards() {
             const container = document.getElementById('homeCards');
-            container.innerHTML = AppState.playlists.slice(0, 6).map(p => `
-                <div class="card" data-id="${p.id}">
-                    <div class="card-image">
-                        ${p.images?.[0]?.url ? 
-                            `<img src="${p.images[0].url}" alt="">` : 
-                            '<div style="background: #282828; width: 100%; height: 100%;"></div>'
-                        }
-                        <button class="play-button" data-uri="${p.uri}">
-                            <svg viewBox="0 0 24 24" width="24" height="24">
-                                <path fill="currentColor" d="M7.05 3.606l13.49 7.788a.7.7 0 010 1.212L7.05 20.394A.7.7 0 016 19.788V4.212a.7.7 0 011.05-.606z"/>
+            container.innerHTML = AppState.playlists.slice(0, 6).map(p => {
+                // Special handling for liked songs and DJ
+                const isLikedSongs = p.id === 'liked-songs';
+                const isDJ = p.id === 'spotify-dj';
+                let imageHtml;
+                
+                if (isLikedSongs) {
+                    // Custom heart icon for liked songs
+                    imageHtml = `
+                        <div style="background: linear-gradient(135deg, #450af5, #c4efd9); width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
+                            <svg viewBox="0 0 24 24" width="80" height="80">
+                                <path fill="#fff" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
                             </svg>
-                        </button>
+                        </div>
+                    `;
+                } else if (isDJ) {
+                    // Custom DJ icon with microphone and music notes
+                    imageHtml = `
+                        <div style="background: linear-gradient(135deg, #AF2896, #509BF5); width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
+                            <svg viewBox="0 0 24 24" width="80" height="80">
+                                <path fill="#fff" d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6zm-2 16c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/>
+                                <path fill="#fff" opacity="0.7" d="M19 9c0-1.11-.89-2-2-2s-2 .89-2 2 .89 2 2 2 2-.89 2-2zm0 4c0-1.11-.89-2-2-2s-2 .89-2 2 .89 2 2 2 2-.89 2-2z"/>
+                            </svg>
+                        </div>
+                    `;
+                } else if (p.images?.[0]?.url) {
+                    imageHtml = `<img src="${p.images[0].url}" alt="">`;
+                } else {
+                    imageHtml = '<div style="background: #282828; width: 100%; height: 100%;"></div>';
+                }
+                
+                return `
+                    <div class="card" data-id="${p.id}">
+                        <div class="card-image">
+                            ${imageHtml}
+                            <button class="play-button" data-uri="${p.uri}">
+                                <svg viewBox="0 0 24 24" width="24" height="24">
+                                    <path fill="currentColor" d="M7.05 3.606l13.49 7.788a.7.7 0 010 1.212L7.05 20.394A.7.7 0 016 19.788V4.212a.7.7 0 011.05-.606z"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="card-title">${p.name}</div>
+                        <div class="card-subtitle">Playlist</div>
                     </div>
-                    <div class="card-title">${p.name}</div>
-                    <div class="card-subtitle">Playlist</div>
-                </div>
-            `).join('');
+                `;
+            }).join('');
         }
 
         async function loadPlaylistView(playlistId) {
@@ -747,18 +926,59 @@
                 const data = await res.json();
                 console.log('Playlist data:', data);
                 
+                // Special handling for liked songs and DJ cover
+                const isLikedSongs = playlistId === 'liked-songs';
+                const isDJ = playlistId === 'spotify-dj';
+                let coverHtml;
+                
+                if (isLikedSongs) {
+                    coverHtml = `
+                        <div style="background: linear-gradient(135deg, #450af5, #c4efd9); width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
+                            <svg viewBox="0 0 24 24" width="100" height="100">
+                                <path fill="#fff" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                            </svg>
+                        </div>
+                    `;
+                } else if (isDJ) {
+                    coverHtml = `
+                        <div style="background: linear-gradient(135deg, #AF2896, #509BF5); width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
+                            <svg viewBox="0 0 24 24" width="100" height="100">
+                                <path fill="#fff" d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6zm-2 16c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/>
+                                <path fill="#fff" opacity="0.7" d="M19 9c0-1.11-.89-2-2-2s-2 .89-2 2 .89 2 2 2 2-.89 2-2zm0 4c0-1.11-.89-2-2-2s-2 .89-2 2 .89 2 2 2 2-.89 2-2z"/>
+                            </svg>
+                        </div>
+                    `;
+                } else if (data.image) {
+                    coverHtml = `<img src="${data.image}" alt="">`;
+                } else {
+                    coverHtml = '';
+                }
+                
                 document.getElementById('mainContent').innerHTML = `
                     <div class="playlist-header">
                         <div class="playlist-cover">
-                            ${data.image ? 
-                                `<img src="${data.image}" alt="">` : 
-                                ''
-                            }
+                            ${coverHtml}
                         </div>
                         <div class="playlist-info">
                             <div style="font-size: 12px; font-weight: 700; text-transform: uppercase;">Playlist</div>
                             <h1>${data.name}</h1>
                             <div class="playlist-meta">${data.tracks?.length || 0} songs</div>
+                            <div class="playlist-actions">
+                                <button class="play-button" style="width: auto; padding: 12px 32px; background: #1db954; color: #000; border-radius: 500px; font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px;" onclick="playPlaylist('${data.uri || 'spotify:playlist:' + playlistId}')">
+                                    <svg viewBox="0 0 24 24" width="24" height="24">
+                                        <path fill="currentColor" d="M7.05 3.606l13.49 7.788a.7.7 0 010 1.212L7.05 20.394A.7.7 0 016 19.788V4.212a.7.7 0 011.05-.606z"/>
+                                    </svg>
+                                    Play
+                                </button>
+                                ${!isDJ && !isLikedSongs ? `
+                                <button class="download-btn" id="downloadBtn" data-playlist-id="${playlistId}" onclick="downloadPlaylist('${playlistId}')">
+                                    <svg viewBox="0 0 24 24">
+                                        <path fill="currentColor" d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                                    </svg>
+                                    Download
+                                </button>
+                                ` : ''}
+                            </div>
                         </div>
                     </div>
                     <div class="track-list">
@@ -860,9 +1080,34 @@
         function updatePlayButton(isPaused) {
             const btn = document.getElementById('playPauseBtn');
             if (isPaused) {
+                // Show play icon when paused
                 btn.innerHTML = '<svg viewBox="0 0 16 16"><path fill="currentColor" d="M3 1.713a.7.7 0 011.05-.607l10.89 6.288a.7.7 0 010 1.212L4.05 14.894A.7.7 0 013 14.288V1.713z"/></svg>';
             } else {
+                // Show pause icon when playing
                 btn.innerHTML = '<svg viewBox="0 0 16 16"><path fill="currentColor" d="M2.7 1a.7.7 0 00-.7.7v12.6a.7.7 0 00.7.7h2.6a.7.7 0 00.7-.7V1.7a.7.7 0 00-.7-.7H2.7zm8 0a.7.7 0 00-.7.7v12.6a.7.7 0 00.7.7h2.6a.7.7 0 00.7-.7V1.7a.7.7 0 00-.7-.7h-2.6z"/></svg>';
+            }
+        }
+
+        function updateRepeatButton() {
+            const btn = document.getElementById('repeatBtn');
+            btn.classList.remove('active');
+            
+            if (AppState.repeatState === 'off') {
+                // Default repeat icon
+                btn.innerHTML = '<svg viewBox="0 0 16 16"><path fill="currentColor" d="M0 4.75A3.75 3.75 0 013.75 1h8.5A3.75 3.75 0 0116 4.75v5a3.75 3.75 0 01-3.75 3.75H9.81l1.018 1.018a.75.75 0 11-1.06 1.06L6.939 12.75l2.829-2.828a.75.75 0 111.06 1.06L9.811 12h2.439a2.25 2.25 0 002.25-2.25v-5a2.25 2.25 0 00-2.25-2.25h-8.5A2.25 2.25 0 001.5 4.75v5A2.25 2.25 0 003.75 12H5v1.5H3.75A3.75 3.75 0 010 9.75v-5z"/></svg>';
+            } else if (AppState.repeatState === 'context') {
+                // Repeat all - same icon but active
+                btn.classList.add('active');
+                btn.innerHTML = '<svg viewBox="0 0 16 16"><path fill="currentColor" d="M0 4.75A3.75 3.75 0 013.75 1h8.5A3.75 3.75 0 0116 4.75v5a3.75 3.75 0 01-3.75 3.75H9.81l1.018 1.018a.75.75 0 11-1.06 1.06L6.939 12.75l2.829-2.828a.75.75 0 111.06 1.06L9.811 12h2.439a2.25 2.25 0 002.25-2.25v-5a2.25 2.25 0 00-2.25-2.25h-8.5A2.25 2.25 0 001.5 4.75v5A2.25 2.25 0 003.75 12H5v1.5H3.75A3.75 3.75 0 010 9.75v-5z"/></svg>';
+            } else if (AppState.repeatState === 'track') {
+                // Repeat one - with "1" indicator
+                btn.classList.add('active');
+                btn.innerHTML = `
+                    <svg viewBox="0 0 16 16">
+                        <path fill="currentColor" d="M0 4.75A3.75 3.75 0 013.75 1h8.5A3.75 3.75 0 0116 4.75v5a3.75 3.75 0 01-3.75 3.75H9.81l1.018 1.018a.75.75 0 11-1.06 1.06L6.939 12.75l2.829-2.828a.75.75 0 111.06 1.06L9.811 12h2.439a2.25 2.25 0 002.25-2.25v-5a2.25 2.25 0 00-2.25-2.25h-8.5A2.25 2.25 0 001.5 4.75v5A2.25 2.25 0 003.75 12H5v1.5H3.75A3.75 3.75 0 010 9.75v-5z"/>
+                        <text x="8" y="10" font-size="8" font-weight="bold" text-anchor="middle" fill="currentColor">1</text>
+                    </svg>
+                `;
             }
         }
 
@@ -882,6 +1127,48 @@
 
         function formatDuration(ms) {
             return formatTime(ms);
+        }
+
+        async function downloadPlaylist(playlistId) {
+            const btn = document.getElementById('downloadBtn');
+            if (!btn || btn.classList.contains('downloading')) return;
+            
+            btn.classList.add('downloading');
+            btn.innerHTML = `
+                <svg viewBox="0 0 24 24" class="spin">
+                    <path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                </svg>
+                Downloading...
+            `;
+            
+            try {
+                const response = await fetch(`/api/download/playlist/${playlistId}`, {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    localStorage.setItem(`downloaded_${playlistId}`, 'true');
+                    btn.classList.remove('downloading');
+                    btn.classList.add('downloaded');
+                    btn.innerHTML = `
+                        <svg viewBox="0 0 24 24">
+                            <path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
+                        </svg>
+                        Downloaded
+                    `;
+                } else {
+                    throw new Error('Download failed');
+                }
+            } catch (error) {
+                console.error('Download error:', error);
+                btn.classList.remove('downloading');
+                btn.innerHTML = `
+                    <svg viewBox="0 0 24 24">
+                        <path fill="currentColor" d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                    </svg>
+                    Download Failed - Retry
+                `;
+            }
         }
 
         function updateGreeting() {
@@ -941,6 +1228,48 @@
             if (player) player.nextTrack();
         };
 
+        document.getElementById('shuffleBtn').onclick = async () => {
+            if (!accessToken) return;
+            AppState.shuffleState = !AppState.shuffleState;
+            
+            try {
+                await fetch('/api/shuffle', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ state: AppState.shuffleState })
+                });
+                
+                document.getElementById('shuffleBtn').classList.toggle('active', AppState.shuffleState);
+            } catch (error) {
+                console.error('Failed to toggle shuffle:', error);
+            }
+        };
+
+        document.getElementById('repeatBtn').onclick = async () => {
+            if (!accessToken) return;
+            
+            // Cycle through: off -> context (all) -> track (single) -> off
+            if (AppState.repeatState === 'off') {
+                AppState.repeatState = 'context';
+            } else if (AppState.repeatState === 'context') {
+                AppState.repeatState = 'track';
+            } else {
+                AppState.repeatState = 'off';
+            }
+            
+            try {
+                await fetch('/api/repeat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ state: AppState.repeatState })
+                });
+                
+                updateRepeatButton();
+            } catch (error) {
+                console.error('Failed to toggle repeat:', error);
+            }
+        };
+
         document.getElementById('progressBar').onclick = (e) => {
             if (!player) return;
             const rect = e.currentTarget.getBoundingClientRect();
@@ -951,6 +1280,64 @@
                 }
             });
         };
+
+        // Volume control
+        let currentVolume = 0.5; // Default 50%
+        
+        document.getElementById('volumeSlider').onclick = (e) => {
+            if (!player) return;
+            const rect = e.currentTarget.getBoundingClientRect();
+            const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+            currentVolume = percent;
+            player.setVolume(percent).then(() => {
+                document.getElementById('volumeSliderFill').style.width = (percent * 100) + '%';
+                updateVolumeIcon(percent);
+            });
+        };
+
+        document.getElementById('volumeIcon').onclick = () => {
+            if (!player) return;
+            if (currentVolume > 0) {
+                // Mute
+                player.setVolume(0).then(() => {
+                    document.getElementById('volumeSliderFill').style.width = '0%';
+                    updateVolumeIcon(0);
+                });
+            } else {
+                // Unmute to previous volume or 50%
+                const newVolume = 0.5;
+                player.setVolume(newVolume).then(() => {
+                    currentVolume = newVolume;
+                    document.getElementById('volumeSliderFill').style.width = (newVolume * 100) + '%';
+                    updateVolumeIcon(newVolume);
+                });
+            }
+        };
+
+        function updateVolumeIcon(volume) {
+            const icon = document.getElementById('volumeIcon');
+            if (volume === 0) {
+                icon.innerHTML = `
+                    <svg viewBox="0 0 16 16">
+                        <path fill="currentColor" d="M13.86 5.47a.75.75 0 00-1.061 0l-1.47 1.47-1.47-1.47A.75.75 0 008.8 6.53L10.269 8l-1.47 1.47a.75.75 0 101.06 1.06l1.47-1.47 1.47 1.47a.75.75 0 001.06-1.06L12.39 8l1.47-1.47a.75.75 0 000-1.06z"/>
+                        <path fill="currentColor" d="M10.116 1.5A.75.75 0 008.991.85l-6.925 4a3.642 3.642 0 00-1.33 4.967 3.639 3.639 0 001.33.983l6.925 4a.75.75 0 001.125-.649v-13a.75.75 0 00-.375-.65zM9.25 8.945l-4.183 2.418a2.139 2.139 0 010-3.7l4.183 2.418V2.8l-5.8 3.35a2.139 2.139 0 000 3.7l5.8 3.35V8.945z"/>
+                    </svg>
+                `;
+            } else if (volume < 0.5) {
+                icon.innerHTML = `
+                    <svg viewBox="0 0 16 16">
+                        <path fill="currentColor" d="M9.741.85a.75.75 0 01.375.65v13a.75.75 0 01-1.125.65l-6.925-4a3.642 3.642 0 01-1.33-4.967 3.639 3.639 0 011.33-.983l6.925-4a.75.75 0 01.75 0zm-6.924 5.3a2.139 2.139 0 000 3.7l5.8 3.35V2.8l-5.8 3.35zm8.683 4.29V5.56a2.75 2.75 0 010 4.88z"/>
+                    </svg>
+                `;
+            } else {
+                icon.innerHTML = `
+                    <svg viewBox="0 0 16 16">
+                        <path fill="currentColor" d="M9.741.85a.75.75 0 01.375.65v13a.75.75 0 01-1.125.65l-6.925-4a3.642 3.642 0 01-1.33-4.967 3.639 3.639 0 011.33-.983l6.925-4a.75.75 0 01.75 0zm-6.924 5.3a2.139 2.139 0 000 3.7l5.8 3.35V2.8l-5.8 3.35zm8.683 4.29V5.56a2.75 2.75 0 010 4.88z"/>
+                        <path fill="currentColor" d="M11.5 13.614a5.752 5.752 0 000-11.228v1.55a4.252 4.252 0 010 8.127v1.55z"/>
+                    </svg>
+                `;
+            }
+        }
 
         // Update progress periodically
         setInterval(() => {

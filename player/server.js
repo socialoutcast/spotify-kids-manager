@@ -268,28 +268,33 @@ app.get('/api/playlists', async (req, res) => {
                 uri: 'spotify:collection:tracks',
                 type: 'collection',
                 owner: { display_name: 'You' },
-                images: [{ url: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNDgiIHZpZXdCb3g9IjAgMCA0OCA0OCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjQ4IiBoZWlnaHQ9IjQ4IiBmaWxsPSJsaW5lYXItZ3JhZGllbnQoMTM1ZGVnLCAjNDUwYWY1LCAjYzRlZWZmKSIvPgo8cGF0aCBkPSJNMjQgMzZDMjQgMzYgMzcgMjcuNSAzNyAxOC41QzM3IDEzLjUgMzMgMTAgMjguNSAxMEMyNi41IDEwIDI0LjUgMTEgMjQgMTJDMjMuNSAxMSAyMS41IDEwIDE5LjUgMTBDMTUgMTAgMTEgMTMuNSAxMSAxOC41QzExIDI3LjUgMjQgMzYgMjQgMzZaIiBmaWxsPSJ3aGl0ZSIvPgo8L3N2Zz4=' }]
+                images: [{ url: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNDgiIHZpZXdCb3g9IjAgMCA0OCA0OCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjQ4IiBoZWlnaHQ9IjQ4IiBmaWxsPSJsaW5lYXItZ3JhZGllbnRoMTM1ZGVnLCAjNDUwYWY1LCAjYzRlZWZmKSIvPgo8cGF0aCBkPSJNMjQgMzZDMjQgMzYgMzcgMjcuNSAzNyAxOC41QzM3IDEzLjUgMzMgMTAgMjguNSAxMEMyNi41IDEwIDI0LjUgMTEgMjQgMTJDMjMuNSAxMSAyMS41IDEwIDE5LjUgMTBDMTUgMTAgMTEgMTMuNSAxMSAxOC41QzExIDI3LjUgMjQgMzYgMjQgMzZaIiBmaWxsPSJ3aGl0ZSIvPgo8L3N2Zz4=' }]
+            },
+            {
+                id: 'spotify-dj',
+                name: 'DJ',
+                uri: 'spotify:playlist:37i9dQZF1EYkqdzj48dyYq',  // DJ playlist URI
+                type: 'playlist',
+                owner: { display_name: 'Spotify' },
+                images: [{ 
+                    url: 'https://lineup-images.scdn.co/dj-f5d05fac-50e3-4932-8953-47b1e99661d4.jpg'
+                }],
+                description: 'Your personal AI DJ'
             }
         ];
         
-        // Try to get DJ (if available)
-        try {
-            // DJ is usually a made-for-you playlist
-            const madeForYou = await spotifyApi.getPlaylistsForCategory('made_for_you', { limit: 10 });
-            const djPlaylist = madeForYou.body.playlists?.items?.find(p => 
-                p.name.toLowerCase().includes('dj') || 
-                p.name.toLowerCase().includes('daily mix')
-            );
-            if (djPlaylist) {
-                specialPlaylists.push(djPlaylist);
-            }
-        } catch (e) {
-            // DJ might not be available in all regions
-            console.log('DJ playlist not available');
-        }
+        // Also check user's playlists for any Spotify-made playlists like Daily Mixes
+        const spotifyMadePlaylists = playlists.filter(p => 
+            p.owner?.id === 'spotify' && 
+            (p.name.includes('Daily Mix') || p.name.includes('Discover') || p.name.includes('Release Radar'))
+        );
         
-        // Add special playlists at the beginning
-        playlists = [...specialPlaylists, ...playlists];
+        // Organize playlists: special playlists first, then Spotify-made, then user playlists
+        const userPlaylists = playlists.filter(p => 
+            p.owner?.id !== 'spotify' && p.type !== 'collection'
+        );
+        
+        playlists = [...specialPlaylists, ...spotifyMadePlaylists, ...userPlaylists];
         
         // Filter by parental controls if configured
         if (parentalConfig.allowed_playlists && parentalConfig.allowed_playlists.length > 0) {
@@ -334,6 +339,26 @@ app.get('/api/playlist/:id', async (req, res) => {
                 name: 'Liked Songs',
                 tracks: formattedTracks,
                 total: tracks.body.total
+            });
+        } else if (playlistId === 'spotify-dj') {
+            // For DJ, we'll return it as a special playlist that can be played directly
+            // DJ doesn't have tracks we can list, it's an AI-generated stream
+            res.json({
+                id: 'spotify-dj',
+                name: 'DJ',
+                tracks: [{
+                    id: 'dj-stream',
+                    uri: 'spotify:playlist:37i9dQZF1EYkqdzj48dyYq',
+                    name: 'Start DJ Session',
+                    artists: 'AI-powered music and commentary',
+                    album: 'Personalized for you',
+                    duration_ms: 0,
+                    explicit: false,
+                    image: 'https://lineup-images.scdn.co/dj-f5d05fac-50e3-4932-8953-47b1e99661d4.jpg'
+                }],
+                total: 1,
+                description: 'Your personal AI DJ - tap to start listening',
+                isDJ: true
             });
         } else {
             // Get regular playlist tracks
@@ -482,7 +507,9 @@ app.post('/api/shuffle', async (req, res) => {
     
     try {
         const { state } = req.body;
-        await spotifyApi.setShuffle(state === 'on' || state === 'smart');
+        // Accept boolean or string values
+        const shuffleOn = state === true || state === 'on' || state === 'smart';
+        await spotifyApi.setShuffle(shuffleOn);
         res.json({ success: true });
     } catch (error) {
         console.error('Error setting shuffle:', error);
@@ -556,6 +583,106 @@ app.post('/api/like', async (req, res) => {
         res.json({ success: true });
     } catch (error) {
         console.error('Error toggling like:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/download/playlist/:id', async (req, res) => {
+    if (!spotifyApi) {
+        return res.status(503).json({ error: 'Spotify not connected' });
+    }
+    
+    try {
+        const playlistId = req.params.id;
+        const downloadDir = path.join(__dirname, 'downloads');
+        
+        // Create downloads directory if it doesn't exist
+        if (!fs.existsSync(downloadDir)) {
+            fs.mkdirSync(downloadDir, { recursive: true });
+        }
+        
+        // Get playlist details
+        let playlistData;
+        
+        if (playlistId === 'liked-songs') {
+            // Get liked songs
+            const tracks = await spotifyApi.getMySavedTracks({ limit: 50 });
+            playlistData = {
+                id: 'liked-songs',
+                name: 'Liked Songs',
+                tracks: tracks.body.items.map(item => ({
+                    id: item.track.id,
+                    uri: item.track.uri,
+                    name: item.track.name,
+                    artists: item.track.artists.map(a => a.name).join(', '),
+                    album: item.track.album.name,
+                    duration_ms: item.track.duration_ms,
+                    image: item.track.album.images?.[0]?.url
+                })),
+                total: tracks.body.total,
+                downloaded_at: new Date().toISOString()
+            };
+        } else {
+            // Get regular playlist
+            const playlist = await spotifyApi.getPlaylist(playlistId);
+            playlistData = {
+                id: playlist.body.id,
+                name: playlist.body.name,
+                description: playlist.body.description,
+                image: playlist.body.images?.[0]?.url,
+                tracks: playlist.body.tracks.items
+                    .filter(item => item.track)
+                    .map(item => ({
+                        id: item.track.id,
+                        uri: item.track.uri,
+                        name: item.track.name,
+                        artists: item.track.artists.map(a => a.name).join(', '),
+                        album: item.track.album.name,
+                        duration_ms: item.track.duration_ms,
+                        image: item.track.album.images?.[0]?.url
+                    })),
+                total: playlist.body.tracks.total,
+                downloaded_at: new Date().toISOString()
+            };
+        }
+        
+        // Save playlist metadata to file
+        const fileName = `${playlistId}.json`;
+        const filePath = path.join(downloadDir, fileName);
+        fs.writeFileSync(filePath, JSON.stringify(playlistData, null, 2));
+        
+        // Store in parental config for offline access
+        if (!parentalConfig.downloaded_playlists) {
+            parentalConfig.downloaded_playlists = [];
+        }
+        
+        // Update or add playlist in downloaded list
+        const existingIndex = parentalConfig.downloaded_playlists.findIndex(p => p.id === playlistId);
+        if (existingIndex >= 0) {
+            parentalConfig.downloaded_playlists[existingIndex] = {
+                id: playlistId,
+                name: playlistData.name,
+                track_count: playlistData.tracks.length,
+                downloaded_at: playlistData.downloaded_at
+            };
+        } else {
+            parentalConfig.downloaded_playlists.push({
+                id: playlistId,
+                name: playlistData.name,
+                track_count: playlistData.tracks.length,
+                downloaded_at: playlistData.downloaded_at
+            });
+        }
+        
+        saveConfig(PARENTAL_CONFIG_FILE, parentalConfig);
+        
+        res.json({ 
+            success: true, 
+            message: `Downloaded ${playlistData.tracks.length} tracks from "${playlistData.name}"`,
+            playlist_id: playlistId
+        });
+    } catch (error) {
+        console.error('Error downloading playlist:', error);
         res.status(500).json({ error: error.message });
     }
 });
