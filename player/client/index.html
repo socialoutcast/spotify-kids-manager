@@ -756,39 +756,13 @@
         async function initializePlayer() {
             const token = await getToken();
             if (!token) {
-                // Get the device IP for the admin panel link
+                // Simple error message in the loading area
                 const hostname = window.location.hostname;
                 const adminUrl = `https://${hostname}`;
-                
                 document.getElementById('loading').innerHTML = `
-                    <div style="text-align: center; padding: 40px; max-width: 600px; margin: 0 auto;">
-                        <h2 style="color: #1DB954; margin-bottom: 20px;">Setup Required</h2>
-                        <p style="color: #ffffff; font-size: 18px; line-height: 1.6; margin-bottom: 30px;">
-                            To use the Spotify Kids Player, you need to set up your Spotify API credentials first.
-                        </p>
-                        <div style="background: rgba(255,255,255,0.1); border-radius: 10px; padding: 25px; margin-bottom: 30px;">
-                            <h3 style="color: #1DB954; margin-bottom: 15px;">Setup Instructions:</h3>
-                            <ol style="text-align: left; color: #ffffff; font-size: 16px; line-height: 1.8;">
-                                <li>Open the Admin Panel</li>
-                                <li>Go to the "Spotify Setup" section</li>
-                                <li>Follow the instructions to connect your Spotify account</li>
-                                <li>Once connected, return here and refresh the page</li>
-                            </ol>
-                        </div>
-                        <a href="${adminUrl}" 
-                           style="display: inline-block; 
-                                  background: #1DB954; 
-                                  color: white; 
-                                  padding: 15px 30px; 
-                                  text-decoration: none; 
-                                  border-radius: 50px; 
-                                  font-size: 18px; 
-                                  font-weight: bold;
-                                  transition: background 0.3s;"
-                           onmouseover="this.style.background='#1ed760'"
-                           onmouseout="this.style.background='#1DB954'">
-                            Open Admin Panel →
-                        </a>
+                    <div style="color: #ff6b6b;">
+                        Spotify not configured. 
+                        <a href="${adminUrl}" style="color: #1DB954;">Open Admin Panel</a> to set up.
                     </div>
                 `;
                 return;
