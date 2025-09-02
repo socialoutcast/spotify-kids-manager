@@ -766,13 +766,13 @@
                 const hostname = window.location.hostname;
                 const adminUrl = `https://${hostname}`;
                 document.getElementById('homeCards').innerHTML = `
-                    <div class="playlist-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); cursor: pointer;" onclick="window.location.href='${adminUrl}'">
+                    <div class="playlist-card" style="background: #282828; cursor: pointer;" onclick="window.location.href='${adminUrl}'">
                         <div class="card-play-btn">
                             <i class="fas fa-cog"></i>
                         </div>
                         <div class="card-info">
-                            <div class="card-title">Setup Required</div>
-                            <div class="card-subtitle">Please log into the admin panel from your PC to complete the Spotify setup</div>
+                            <div class="card-title" style="font-size: 20px; font-weight: bold;">Setup Required</div>
+                            <div class="card-subtitle" style="font-size: 16px; line-height: 1.4;">Please log into the admin panel from your PC to complete the Spotify setup</div>
                         </div>
                     </div>
                 `;
