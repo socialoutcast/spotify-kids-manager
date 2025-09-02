@@ -526,14 +526,17 @@ ADMIN_TEMPLATE = '''
             background: var(--spotify-green);
             color: #000;
             border: none;
-            padding: 12px 32px;
+            padding: 10px 16px;
             border-radius: 500px;
             cursor: pointer;
-            font-size: 14px;
-            font-weight: 700;
+            font-size: 13px;
+            font-weight: 600;
             transition: all 0.3s;
-            text-transform: uppercase;
-            letter-spacing: 1px;
+            text-transform: none;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         
         button:hover {
@@ -562,8 +565,8 @@ ADMIN_TEMPLATE = '''
         }
         
         button.small {
-            padding: 8px 16px;
-            font-size: 12px;
+            padding: 6px 12px;
+            font-size: 11px;
         }
         /* Toggle Switches */
         .toggle {
@@ -725,10 +728,6 @@ ADMIN_TEMPLATE = '''
                 
                 <div class="nav-section">
                     <div class="nav-title">System</div>
-                    <button class="nav-item" onclick="showSection('system')">
-                        <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
-                        System Status
-                    </button>
                     <button class="nav-item" onclick="showSection('bluetooth')">
                         <svg viewBox="0 0 24 24"><path fill="currentColor" d="M17.71 7.71L12 2h-1v7.59L6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 11 14.41V22h1l5.71-5.71-4.3-4.29 4.3-4.29zM13 5.83l1.88 1.88L13 9.59V5.83zm1.88 10.46L13 18.17v-3.76l1.88 1.88z"/></svg>
                         Bluetooth
@@ -758,29 +757,109 @@ ADMIN_TEMPLATE = '''
                     <p class="page-subtitle">System overview and quick stats</p>
                 </div>
                 
-                <div class="stats">
-                    <div class="stat">
-                        <div class="stat-value">{{ uptime }}</div>
-                        <div class="stat-label">Uptime</div>
+                <div class="grid">
+                    <!-- System Stats -->
+                    <div class="card">
+                        <h2>📊 System Status</h2>
+                        <div class="stats">
+                            <div class="stat">
+                                <div class="stat-value">{{ cpu_usage }}%</div>
+                                <div class="stat-label">CPU Usage</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value">{{ memory_usage }}%</div>
+                                <div class="stat-label">Memory Usage</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value">{{ disk_usage }}%</div>
+                                <div class="stat-label">Disk Usage</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value">{{ uptime }}</div>
+                                <div class="stat-label">Uptime</div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="stat">
-                        <div class="stat-value">{{ cpu_usage }}%</div>
-                        <div class="stat-label">CPU Usage</div>
+                    
+                    <!-- Service Status -->
+                    <div class="card">
+                        <h2>🚦 Service Status</h2>
+                        <div class="stats">
+                            <div class="stat">
+                                <div class="stat-value" style="color: {{ '#1ed760' if player_status else '#ef4444' }};">{{ '✓' if player_status else '✗' }}</div>
+                                <div class="stat-label">Player</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value" style="color: {{ '#1ed760' if kiosk_status else '#ef4444' }};">{{ '✓' if kiosk_status else '✗' }}</div>
+                                <div class="stat-label">Kiosk</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value" style="color: {{ '#1ed760' if spotify_configured else '#ef4444' }};">{{ '✓' if spotify_configured else '✗' }}</div>
+                                <div class="stat-label">Spotify</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value" style="color: {{ '#1ed760' if bluetooth_enabled else '#ef4444' }};">{{ '✓' if bluetooth_enabled else '✗' }}</div>
+                                <div class="stat-label">Bluetooth</div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="stat">
-                        <div class="stat-value">{{ memory_usage }}%</div>
-                        <div class="stat-label">Memory</div>
+                    
+                    <!-- Quick Actions -->
+                    <div class="card">
+                        <h2>⚡ Quick Actions</h2>
+                        <div style="display: grid; grid-template-columns: 1fr; gap: 8px;">
+                            <button onclick="restartServices()" style="width: 100%;">🔄 Restart Services</button>
+                            <button onclick="showSection('spotify')" style="width: 100%;">🎵 Configure Spotify</button>
+                            <button onclick="showSection('bluetooth')" style="width: 100%;">🎧 Bluetooth</button>
+                            <button onclick="showSection('logs')" style="width: 100%;">📋 View Logs</button>
+                        </div>
                     </div>
-                    <div class="stat">
-                        <div class="stat-value">{{ disk_usage }}%</div>
-                        <div class="stat-label">Disk</div>
+                    
+                    <!-- System Control -->
+                    <div class="card">
+                        <h2>🖥️ System Control</h2>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                            <button onclick="rebootSystem()" style="background: #f59e0b;">
+                                🔄 Reboot
+                            </button>
+                            <button onclick="powerOffSystem()" class="danger">
+                                ⏻ Power Off
+                            </button>
+                        </div>
+                        <div style="margin-top: 15px; padding: 10px; background: #fef3c7; border-radius: 5px; border: 1px solid #fbbf24;">
+                            <p style="font-size: 11px; color: #92400e; margin: 0;">
+                                <strong>Warning:</strong> These actions will immediately affect the system.
+                            </p>
+                        </div>
                     </div>
+                    
+                    <!-- System Updates -->
+                    <div class="card">
+                        <h2>🔄 System Updates</h2>
+                        <div id="systemUpdateStatus" style="margin-bottom: 15px;">
+                            <span id="updateStatusText" class="status offline" style="font-size: 12px;">
+                                Updates: <span id="updateCount">Checking...</span>
+                            </span>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                            <button onclick="checkUpdates()">Check</button>
+                            <button onclick="runUpdate()">Update</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Spotify Section -->
+            <div id="spotify" class="page-section">
+                <div class="page-header">
+                    <h1 class="page-title">Spotify Setup</h1>
+                    <p class="page-subtitle">Configure Spotify integration and authentication</p>
                 </div>
                 
                 <div class="grid">
-            <!-- Spotify Configuration -->
-            <div class="card">
-                <h2>🎵 Spotify Configuration</h2>
+                    <!-- Spotify Configuration -->
+                    <div class="card">
+                        <h2>🎵 Spotify Configuration</h2>
                 <div id="spotifyAuthSection" style="display: none; margin-bottom: 15px;">
                     <div style="background: #f59e0b; color: white; padding: 10px; border-radius: 5px; margin-bottom: 10px;">
                         <strong>⚠️ Authentication Required</strong>
@@ -811,130 +890,48 @@ ADMIN_TEMPLATE = '''
                     <label>Client Secret</label>
                     <input type="password" id="clientSecret" value="{{ spotify_config.get('client_secret', '') }}" placeholder="Enter Spotify Client Secret">
                 </div>
-                <div style="display: flex; gap: 10px;">
-                    <button onclick="saveSpotifyConfig()" style="flex: 1;">Save Configuration</button>
-                    <button onclick="testSpotifyConfig()" style="flex: 1; background: #10b981;">Test Connection</button>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                    <button onclick="saveSpotifyConfig()">Save Config</button>
+                    <button onclick="testSpotifyConfig()" style="background: #10b981;">Test</button>
                 </div>
                 <div id="spotifyStatus" style="margin-top: 10px; display: none;">
                     <div style="padding: 10px; border-radius: 5px;" id="spotifyStatusBox">
                         <div id="spotifyStatusMessage" style="font-size: 12px;"></div>
                     </div>
                 </div>
-            </div>
-            
-            <!-- Admin Settings -->
-            <div class="card">
-                <h2>🔐 Admin Settings</h2>
-                <div class="form-group">
-                    <label>Admin Username</label>
-                    <input type="text" id="adminUser" value="{{ config.admin_user }}">
-                </div>
-                <div class="form-group">
-                    <label>New Password (leave blank to keep current)</label>
-                    <input type="password" id="adminPass" placeholder="Enter new password">
-                </div>
-                <button onclick="saveAdminSettings()">Update Credentials</button>
-            </div>
-        </div>
-        
-        <!-- System Management Section -->
-        <h2 style="color: white; margin: 20px 0 10px 0;">🖥️ System Management</h2>
-        <div class="grid">
-            <!-- System Stats -->
-            <div class="card">
-                <h2>📊 System Status</h2>
-                <div class="stats">
-                    <div class="stat">
-                        <div class="stat-value">{{ cpu_usage }}%</div>
-                        <div class="stat-label">CPU Usage</div>
                     </div>
-                    <div class="stat">
-                        <div class="stat-value">{{ memory_usage }}%</div>
-                        <div class="stat-label">Memory Usage</div>
-                    </div>
-                    <div class="stat">
-                        <div class="stat-value">{{ disk_usage }}%</div>
-                        <div class="stat-label">Disk Usage</div>
-                    </div>
-                    <div class="stat">
-                        <div class="stat-value">{{ uptime }}</div>
-                        <div class="stat-label">Uptime</div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- System Control -->
-            <div class="card">
-                <h2>⚡ System Control</h2>
-                <p style="color: #666; font-size: 12px; margin-bottom: 15px;">
-                    Manage system power and restart services.
-                </p>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                    <button onclick="rebootSystem()" style="background: #f59e0b;">
-                        🔄 Reboot System
-                    </button>
-                    <button onclick="powerOffSystem()" class="danger">
-                        ⏻ Power Off
-                    </button>
-                    <button onclick="restartServices()" style="grid-column: span 2;">
-                        🔧 Restart All Services
-                    </button>
-                </div>
-                <div style="margin-top: 15px; padding: 10px; background: #fef3c7; border-radius: 5px; border: 1px solid #fbbf24;">
-                    <p style="font-size: 11px; color: #92400e; margin: 0;">
-                        <strong>Warning:</strong> Reboot and power off will immediately affect the system.
-                    </p>
-                </div>
-            </div>
-            
-            <!-- System Updates -->
-            <div class="card">
-                <h2>🔄 System Updates</h2>
-                <p style="color: #666; font-size: 12px; margin-bottom: 15px;">
-                    Keep your system up to date with security patches.
-                </p>
-                <div id="systemUpdateStatus" style="margin-bottom: 15px;">
-                    <span id="updateStatusText" class="status offline" style="font-size: 12px;">
-                        Updates: <span id="updateCount">Checking...</span>
-                    </span>
-                    <div id="updateDetails" style="display: none; margin-top: 10px; padding: 10px; background: #f3f4f6; border-radius: 5px;">
-                        <div style="font-size: 12px; color: #666;">
-                            <strong>Available Updates:</strong>
-                            <div id="updateList" style="margin-top: 5px; max-height: 150px; overflow-y: auto;"></div>
+                    
+                    <!-- Spotify Status -->
+                    <div class="card">
+                        <h2>📊 Spotify Status</h2>
+                        <div class="stats">
+                            <div class="stat">
+                                <div class="stat-value" style="color: {{ '#1ed760' if spotify_configured else '#ef4444' }};">{{ '✓' if spotify_configured else '✗' }}</div>
+                                <div class="stat-label">API Connected</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value" style="color: {{ '#1ed760' if player_status else '#ef4444' }};">{{ '✓' if player_status else '✗' }}</div>
+                                <div class="stat-label">Player Online</div>
+                            </div>
                         </div>
-                    </div>
-                </div>
-                <button onclick="checkUpdates()">Check for Updates</button>
-                <button onclick="runUpdate()" style="margin-left: 10px;">Quick Update</button>
-                <button onclick="showPackageManager()" style="margin-left: 10px; background: #3b82f6;">📦 Package Manager</button>
-                <div id="updateStatus" style="margin-top: 15px; display: none;">
-                    <div style="padding: 10px; background: #f3f4f6; border-radius: 5px;">
-                        <div id="updateMessage" style="font-size: 12px; color: #666;"></div>
+                        {% if spotify_configured %}
+                        <button onclick="refreshSpotifyToken()" style="margin-top: 15px;">Refresh Token</button>
+                        {% endif %}
                     </div>
                 </div>
             </div>
             
-            <!-- System Logs -->
-            <div class="card">
-                <h2>📋 System Logs</h2>
-                <p style="color: #666; font-size: 12px; margin-bottom: 15px;">
-                    View logs for troubleshooting.
-                </p>
-                <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
-                    <button onclick="openLogModal('player')">Player</button>
-                    <button onclick="openLogModal('admin')">Admin</button>
-                    <button onclick="openLogModal('system')">System</button>
-                    <button onclick="openLogModal('all')">All Logs</button>
+            <!-- Bluetooth Section -->
+            <div id="bluetooth" class="page-section">
+                <div class="page-header">
+                    <h1 class="page-title">Bluetooth</h1>
+                    <p class="page-subtitle">Manage audio devices and connections</p>
                 </div>
-                <div style="display: flex; gap: 10px;">
-                    <button onclick="downloadLogs()">Download Logs</button>
-                    <button onclick="clearLogs()" class="danger">Clear Logs</button>
-                </div>
-            </div>
-            
-            <!-- Bluetooth Devices -->
-            <div class="card">
-                <h2>🎧 Bluetooth Devices</h2>
+                
+                <div class="grid">
+                    <!-- Bluetooth Devices -->
+                    <div class="card">
+                        <h2>🎧 Bluetooth Devices</h2>
                 <p style="color: #666; font-size: 12px; margin-bottom: 15px;">
                     Manage Bluetooth speakers and headphones for audio output.
                 </p>
@@ -952,11 +949,11 @@ ADMIN_TEMPLATE = '''
                             <span>{{ device.name|e }} ({{ device.address|e }})</span>
                             <div>
                                 {% if device.connected %}
-                                <button onclick="disconnectBluetooth('{{ device.address|e }}')" style="font-size: 12px; padding: 5px 10px;">Disconnect</button>
+                                <button onclick="disconnectBluetooth('{{ device.address|e }}')" class="small">Disconnect</button>
                                 {% else %}
-                                <button onclick="connectBluetooth('{{ device.address|e }}')" style="font-size: 12px; padding: 5px 10px;">Connect</button>
+                                <button onclick="connectBluetooth('{{ device.address|e }}')" class="small">Connect</button>
                                 {% endif %}
-                                <button onclick="removeBluetooth('{{ device.address|e }}')" class="danger" style="font-size: 12px; padding: 5px 10px; margin-left: 5px;">Remove</button>
+                                <button onclick="removeBluetooth('{{ device.address|e }}')" class="danger small" style="margin-left: 5px;">Remove</button>
                             </div>
                         </div>
                         {% else %}
@@ -964,12 +961,124 @@ ADMIN_TEMPLATE = '''
                         {% endfor %}
                     </div>
                 </div>
-                <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-                    <button onclick="enableBluetooth()" id="enableBtBtn" style="background: #10b981;" {{ 'disabled' if bluetooth_enabled else '' }}>Enable Bluetooth</button>
-                    <button onclick="disableBluetooth()" id="disableBtBtn" class="danger" {{ 'disabled' if not bluetooth_enabled else '' }}>Disable Bluetooth</button>
-                    <button onclick="checkBluetoothStatus()">Refresh Status</button>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 10px;">
+                    <button onclick="enableBluetooth()" id="enableBtBtn" style="background: #10b981;" {{ 'disabled' if bluetooth_enabled else '' }}>Enable</button>
+                    <button onclick="disableBluetooth()" id="disableBtBtn" class="danger" {{ 'disabled' if not bluetooth_enabled else '' }}>Disable</button>
+                    <button onclick="checkBluetoothStatus()">Refresh</button>
                 </div>
                 <button onclick="scanBluetooth()" id="scanBtBtn">Scan for Devices</button>
+            </div>
+            
+            <!-- Audio Settings -->
+            <div class="card">
+                <h2>🔊 Audio Configuration</h2>
+                <p style="color: #666; font-size: 12px; margin-bottom: 15px;">
+                    Configure audio output settings.
+                </p>
+                <div class="form-group">
+                    <label>Default Audio Output</label>
+                    <select id="audioOutput">
+                        <option value="auto">Automatic</option>
+                        <option value="hdmi">HDMI</option>
+                        <option value="analog">3.5mm Jack</option>
+                        <option value="bluetooth">Bluetooth</option>
+                    </select>
+                </div>
+                <button onclick="setAudioOutput()">Apply Settings</button>
+            </div>
+            </div>
+        </div>
+        
+        <!-- Logs Section -->
+        <div id="logs" class="page-section">
+            <div class="page-header">
+                <h1 class="page-title">System Logs</h1>
+                <p class="page-subtitle">View and manage system logs</p>
+            </div>
+            
+            <div class="grid">
+                <!-- System Logs -->
+                <div class="card">
+                    <h2>📋 Log Viewer</h2>
+                    <p style="color: #666; font-size: 12px; margin-bottom: 15px;">
+                        View logs for troubleshooting.
+                    </p>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 15px;">
+                        <button onclick="openLogModal('player')">Player</button>
+                        <button onclick="openLogModal('admin')">Admin</button>
+                        <button onclick="openLogModal('system')">System</button>
+                        <button onclick="openLogModal('nginx')">Nginx</button>
+                        <button onclick="openLogModal('all')" style="grid-column: span 2;">All Logs</button>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                        <button onclick="downloadLogs()">Download</button>
+                        <button onclick="clearLogs()" class="danger">Clear</button>
+                    </div>
+                </div>
+                
+                <!-- Service Status -->
+                <div class="card">
+                    <h2>🚦 Service Status</h2>
+                    <div class="stats">
+                        <div class="stat">
+                            <div class="stat-value" style="color: {{ '#1ed760' if player_status else '#ef4444' }};">{{ '✓' if player_status else '✗' }}</div>
+                            <div class="stat-label">Player</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value" style="color: {{ '#1ed760' if kiosk_status else '#ef4444' }};">{{ '✓' if kiosk_status else '✗' }}</div>
+                            <div class="stat-label">Kiosk</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value" style="color: #1ed760;">✓</div>
+                            <div class="stat-label">Admin</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value" style="color: #1ed760;">✓</div>
+                            <div class="stat-label">Nginx</div>
+                        </div>
+                    </div>
+                    <button onclick="restartServices()" style="margin-top: 15px; width: 100%;">Restart All Services</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Settings Section -->
+        <div id="settings" class="page-section">
+            <div class="page-header">
+                <h1 class="page-title">Admin Settings</h1>
+                <p class="page-subtitle">Configure admin access and preferences</p>
+            </div>
+            
+            <div class="grid">
+                <!-- Admin Settings -->
+                <div class="card">
+                    <h2>🔐 Admin Credentials</h2>
+                    <div class="form-group">
+                        <label>Admin Username</label>
+                        <input type="text" id="adminUser" value="{{ config.admin_user }}">
+                    </div>
+                    <div class="form-group">
+                        <label>New Password (leave blank to keep current)</label>
+                        <input type="password" id="adminPass" placeholder="Enter new password">
+                    </div>
+                    <button onclick="saveAdminSettings()">Update Credentials</button>
+                </div>
+                
+                <!-- Network Settings -->
+                <div class="card">
+                    <h2>🌐 Network Configuration</h2>
+                    <div class="stats">
+                        <div class="stat">
+                            <div class="stat-value" style="font-size: 16px;">{{ request.host.split(':')[0] }}</div>
+                            <div class="stat-label">IP Address</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">{{ request.host.split(':')[1] if ':' in request.host else '443' }}</div>
+                            <div class="stat-label">Port</div>
+                        </div>
+                    </div>
+                    <button onclick="showNetworkInfo()" style="margin-top: 15px;">View Network Info</button>
+                </div>
             </div>
         </div>
         
@@ -1063,19 +1172,20 @@ ADMIN_TEMPLATE = '''
                 <div id="modalLogOutput" style="background: #1a1a1a; color: #00ff00; font-family: 'Courier New', monospace; font-size: 12px; padding: 20px; border-radius: 5px; flex: 1; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word; border: 1px solid #444;">
                     Loading logs...
                 </div>
-                <div style="margin-top: 15px; display: flex; gap: 10px; justify-content: center;">
-                    <button onclick="openLogModal('player')" style="padding: 8px 20px;">Player</button>
-                    <button onclick="openLogModal('admin')" style="padding: 8px 20px;">Admin</button>
-                    <button onclick="openLogModal('nginx')" style="padding: 8px 20px;">Nginx</button>
-                    <button onclick="openLogModal('system')" style="padding: 8px 20px;">System</button>
-                    <button onclick="openLogModal('auth')" style="padding: 8px 20px;">Auth</button>
-                    <button onclick="openLogModal('all')" style="padding: 8px 20px;">All</button>
-                    <button onclick="copyLogsToClipboard()" style="padding: 8px 20px; background: #667eea;">Copy to Clipboard</button>
+                <div style="margin-top: 15px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;">
+                    <button onclick="openLogModal('player')" class="small">Player</button>
+                    <button onclick="openLogModal('admin')" class="small">Admin</button>
+                    <button onclick="openLogModal('nginx')" class="small">Nginx</button>
+                    <button onclick="openLogModal('system')" class="small">System</button>
+                    <button onclick="openLogModal('auth')" class="small">Auth</button>
+                    <button onclick="openLogModal('all')" class="small">All</button>
+                    <button onclick="copyLogsToClipboard()" class="small" style="background: #667eea; grid-column: span 2;">Copy to Clipboard</button>
                 </div>
             </div>
         </div>
         
         {% else %}
+        </main>
         <!-- Login Form -->
         <div class="login-container">
             <div class="card">
@@ -1094,11 +1204,59 @@ ADMIN_TEMPLATE = '''
                 </p>
             </div>
         </div>
-        {% endif %}
+        </main>
+        
+        <!-- Status Bar -->
+        <div class="status-bar">
+            <div class="status-info">
+                <div class="status-item">
+                    <div class="status-indicator {{ 'offline' if not player_status else '' }}"></div>
+                    Player {{ 'Online' if player_status else 'Offline' }}
+                </div>
+                <div class="status-item">
+                    <div class="status-indicator {{ 'offline' if not spotify_configured else '' }}"></div>
+                    Spotify {{ 'Connected' if spotify_configured else 'Not Configured' }}
+                </div>
+                <div class="status-item">
+                    <div class="status-indicator {{ 'offline' if not bluetooth_enabled else '' }}"></div>
+                    Bluetooth {{ 'Enabled' if bluetooth_enabled else 'Disabled' }}
+                </div>
+            </div>
+            <button onclick="logout()" class="small secondary">Logout</button>
+        </div>
     </div>
+    {% endif %}
     
     <!-- Load admin JavaScript -->
     {% if logged_in %}
+    <script>
+        // Section navigation
+        function showSection(sectionId) {
+            // Hide all sections
+            document.querySelectorAll('.page-section').forEach(section => {
+                section.classList.remove('active');
+            });
+            
+            // Remove active from all nav items
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            // Show selected section
+            const section = document.getElementById(sectionId);
+            if (section) {
+                section.classList.add('active');
+            }
+            
+            // Mark nav item as active
+            event.target.closest('.nav-item').classList.add('active');
+        }
+        
+        function logout() {
+            fetch('/api/logout', { method: 'POST' })
+                .then(() => location.reload());
+        }
+    </script>
     <script src="/static/admin.js"></script>
     {% else %}
     <script>
@@ -1191,12 +1349,23 @@ def index():
     schedule = load_schedule()
     rewards = load_rewards()
     
-    # Check if player is running
+    # Check if player service is running
     player_status = False
-    for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
-        if 'spotify_player.py' in ' '.join(proc.info.get('cmdline', [])):
-            player_status = True
-            break
+    try:
+        result = subprocess.run(['systemctl', 'is-active', 'spotify-player'], 
+                              capture_output=True, text=True, timeout=2)
+        player_status = result.stdout.strip() == 'active'
+    except:
+        player_status = False
+    
+    # Check if kiosk service is running
+    kiosk_status = False
+    try:
+        result = subprocess.run(['systemctl', 'is-active', 'spotify-kiosk'], 
+                              capture_output=True, text=True, timeout=2)
+        kiosk_status = result.stdout.strip() == 'active'
+    except:
+        kiosk_status = False
     
     # Get system stats
     cpu_usage = psutil.cpu_percent(interval=1)
@@ -1241,6 +1410,7 @@ def index():
                                  schedule=schedule,
                                  rewards=rewards,
                                  player_status=player_status,
+                                 kiosk_status=kiosk_status,
                                  cpu_usage=cpu_usage,
                                  memory_usage=memory_usage,
                                  disk_usage=disk_usage,
@@ -3177,6 +3347,9 @@ def restart_services():
     try:
         # Restart player service
         subprocess.run(['sudo', 'systemctl', 'restart', 'spotify-player'], check=False)
+        
+        # Restart kiosk service
+        subprocess.run(['sudo', 'systemctl', 'restart', 'spotify-kiosk'], check=False)
         
         # Restart admin service (this will interrupt the connection briefly)
         subprocess.Popen(['sudo', 'systemctl', 'restart', 'spotify-admin'],
