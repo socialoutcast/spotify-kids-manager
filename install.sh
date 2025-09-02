@@ -189,7 +189,8 @@ if ! command -v node &> /dev/null; then
     curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
     apt-get install -y nodejs
 fi
-echo -e "${GREEN}Node.js version: $(node --version)${NC}"
+NODE_VERSION=$(node --version 2>/dev/null || echo "not installed")
+echo -e "${GREEN}Node.js version: ${NODE_VERSION}${NC}"
 
 # Install Python packages
 echo -e "${YELLOW}Installing Python packages...${NC}"
@@ -444,7 +445,7 @@ EOF
 echo -e "${YELLOW}Generating SSL certificate for HTTPS...${NC}"
 SSL_DIR="$APP_DIR/ssl"
 mkdir -p $SSL_DIR
-IP_ADDRESS=$(hostname -I | awk '{print $1}')
+IP_ADDRESS=$(hostname -I 2>/dev/null | awk '{print $1}')
 
 # Generate self-signed certificate
 openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
@@ -869,7 +870,7 @@ EOF
 chmod +x /usr/local/bin/spotify-kids-uninstall
 
 # Get the device IP address
-DEVICE_IP=$(hostname -I | awk '{print $1}')
+DEVICE_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
 CALLBACK_URL="https://${DEVICE_IP}/callback"
 
 echo -e "${GREEN}================================${NC}"
