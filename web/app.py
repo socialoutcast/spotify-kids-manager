@@ -959,7 +959,11 @@ ADMIN_TEMPLATE = '''
                         
                         <div style="margin-top: 20px; padding: 15px; background: #282828; border-radius: 5px; border-left: 4px solid #1DB954;">
                             <strong style="color: #f59e0b;">⚠️ Important:</strong>
-                            <span style="color: #b3b3b3;">Make sure to add the exact Redirect URI shown above to your Spotify app settings!</span>
+                            <ul style="color: #b3b3b3; margin: 10px 0 0 20px; list-style-type: disc;">
+                                <li>Add the exact Redirect URI shown above to your Spotify app settings</li>
+                                <li><strong style="color: #1DB954;">No port forwarding needed!</strong> The callback only needs to work from your local network</li>
+                                <li>You'll authenticate from this same PC, so the local IP address is perfect</li>
+                            </ul>
                         </div>
                     </div>
                 </div>
