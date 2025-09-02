@@ -861,21 +861,20 @@ sed -i 's/#PairableTimeout = 0/PairableTimeout = 0/' /etc/bluetooth/main.conf
 sed -i 's/#Class = 0x000100/Class = 0x0c0420/' /etc/bluetooth/main.conf  # Audio device class
 
 # Ensure Bluetooth service starts with proper settings
-cat > /etc/systemd/system/bluetooth-audio-setup.service << EOF
+cat > /etc/systemd/system/bluetooth-audio-setup.service << 'EOF'
 [Unit]
 Description=Bluetooth Audio Setup
-After=bluetooth.service
+After=bluetooth.service dbus.service
 Requires=bluetooth.service
+Wants=dbus.service
 
 [Service]
 Type=oneshot
-ExecStartPre=/bin/sleep 2
-ExecStart=/usr/bin/bluetoothctl power on
-ExecStart=/usr/bin/bluetoothctl agent NoInputNoOutput
-ExecStart=/usr/bin/bluetoothctl default-agent
-ExecStart=/usr/bin/bluetoothctl discoverable on
-ExecStart=/usr/bin/bluetoothctl pairable on
+ExecStartPre=/bin/sleep 5
+ExecStart=/bin/bash -c 'timeout 2 bluetoothctl power on; timeout 2 bluetoothctl agent NoInputNoOutput; timeout 2 bluetoothctl default-agent; timeout 2 bluetoothctl discoverable on; timeout 2 bluetoothctl pairable on; exit 0'
 RemainAfterExit=yes
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
