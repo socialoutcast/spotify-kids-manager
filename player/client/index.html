@@ -896,7 +896,7 @@
         function renderPlaylists() {
             const container = document.getElementById('playlists');
             container.innerHTML = AppState.playlists.map(p => `
-                <div class="playlist-item" data-id="${p.id}">${p.name}</div>
+                <div class="playlist-item" data-id="${p.id}" style="cursor: pointer;">${p.name}</div>
             `).join('');
         }
 
@@ -940,11 +940,9 @@
         }
 
         async function loadPlaylistView(playlistId) {
-            console.log('Loading playlist:', playlistId);
             try {
                 const res = await fetch(`/api/playlist/${playlistId}`);
                 const data = await res.json();
-                console.log('Playlist data:', data);
                 
                 // Special handling for liked songs cover
                 const isLikedSongs = playlistId === 'liked-songs';
@@ -1193,9 +1191,13 @@
         document.addEventListener('click', (e) => {
             // Playlist selection
             if (e.target.closest('.playlist-item')) {
+                e.stopPropagation();
+                e.preventDefault();
                 const playlistItem = e.target.closest('.playlist-item');
-                console.log('Playlist clicked:', playlistItem.dataset.id);
-                loadPlaylistView(playlistItem.dataset.id);
+                const playlistId = playlistItem.dataset.id;
+                if (playlistId) {
+                    loadPlaylistView(playlistId);
+                }
             }
             
             // Play button on card
