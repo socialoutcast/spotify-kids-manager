@@ -939,13 +939,110 @@
             }).join('');
         }
 
+        async function loadDJView() {
+            // Start playing DJ immediately
+            const djUri = 'spotify:playlist:37i9dQZF1EYkqdzj48dyYq';
+            
+            // Show DJ interface
+            document.getElementById('mainContent').innerHTML = `
+                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: calc(100vh - 200px); text-align: center;">
+                    <div style="width: 200px; height: 200px; margin-bottom: 30px; position: relative;">
+                        <div style="width: 100%; height: 100%; background: linear-gradient(135deg, #8B5CF6, #EC4899); border-radius: 20px; display: flex; align-items: center; justify-content: center; animation: pulse 2s infinite;">
+                            <svg viewBox="0 0 24 24" width="100" height="100">
+                                <path fill="white" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                                <circle cx="12" cy="12" r="3" fill="white"/>
+                                <path fill="white" d="M12 3v6m0 6v6m-9-9h6m6 0h6" stroke="white" stroke-width="0.5" opacity="0.3"/>
+                            </svg>
+                        </div>
+                        <div style="position: absolute; bottom: -10px; right: -10px; background: #1DB954; border-radius: 50%; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+                            <span style="font-size: 24px;">🎵</span>
+                        </div>
+                    </div>
+                    
+                    <h1 style="font-size: 48px; font-weight: 700; margin-bottom: 10px;">DJ</h1>
+                    <p style="font-size: 20px; color: #b3b3b3; margin-bottom: 30px;">Your AI DJ is picking the perfect music for you</p>
+                    
+                    <div id="djStatus" style="font-size: 18px; color: #1DB954; margin-bottom: 40px;">
+                        <span style="animation: fadeInOut 2s infinite;">● Starting your mix...</span>
+                    </div>
+                    
+                    <div style="display: flex; gap: 20px;">
+                        <button onclick="playPlaylist('${djUri}')" style="padding: 15px 40px; background: #1DB954; color: black; border: none; border-radius: 30px; font-size: 18px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 10px;">
+                            <svg viewBox="0 0 16 16" width="20" height="20">
+                                <path fill="currentColor" d="M3 1.713a.7.7 0 011.05-.607l10.89 6.288a.7.7 0 010 1.212L4.05 14.894A.7.7 0 013 14.288V1.713z"/>
+                            </svg>
+                            Start DJ
+                        </button>
+                        <button onclick="skipDJSet()" style="padding: 15px 30px; background: transparent; color: white; border: 1px solid white; border-radius: 30px; font-size: 18px; font-weight: 700; cursor: pointer;">
+                            Change
+                        </button>
+                    </div>
+                    
+                    <div style="margin-top: 60px; padding: 20px; background: rgba(255,255,255,0.05); border-radius: 10px; max-width: 500px;">
+                        <p style="font-size: 16px; line-height: 1.6;">DJ learns from your listening habits and creates a personalized radio experience just for you. Hit "Change" anytime to switch up the vibe!</p>
+                    </div>
+                </div>
+                
+                <style>
+                    @keyframes pulse {
+                        0% { transform: scale(1); }
+                        50% { transform: scale(1.05); }
+                        100% { transform: scale(1); }
+                    }
+                    @keyframes fadeInOut {
+                        0%, 100% { opacity: 0.5; }
+                        50% { opacity: 1; }
+                    }
+                </style>
+            `;
+            
+            // Update sidebar to show DJ as active
+            document.querySelectorAll('.playlist-item').forEach(item => {
+                item.classList.toggle('active', item.dataset.id === 'spotify-dj');
+            });
+            
+            // Start playing automatically
+            setTimeout(() => {
+                playPlaylist(djUri);
+                document.getElementById('djStatus').innerHTML = '<span style="color: #1DB954;">● Now playing your personalized mix</span>';
+            }, 1000);
+        }
+        
+        async function skipDJSet() {
+            // Skip to next track (simulating changing the DJ set)
+            if (player) {
+                await player.nextTrack();
+                document.getElementById('djStatus').innerHTML = '<span style="color: #1DB954;">● Switching things up...</span>';
+                setTimeout(() => {
+                    document.getElementById('djStatus').innerHTML = '<span style="color: #1DB954;">● Now playing your new mix</span>';
+                }, 2000);
+            }
+        }
+
         async function loadPlaylistView(playlistId) {
+            // Special handling for DJ
+            if (playlistId === 'spotify-dj') {
+                loadDJView();
+                return;
+            }
+            
+            // Show loading state
+            document.getElementById('mainContent').innerHTML = `
+                <div style="padding: 50px; text-align: center;">
+                    <h2>Loading playlist...</h2>
+                </div>
+            `;
+            
             try {
                 const res = await fetch(`/api/playlist/${playlistId}`);
+                if (!res.ok) {
+                    throw new Error(`Failed to load playlist: ${res.status}`);
+                }
                 const data = await res.json();
                 
-                // Special handling for liked songs cover
+                // Special handling for liked songs and DJ playlist
                 const isLikedSongs = playlistId === 'liked-songs';
+                const isDJ = playlistId === 'spotify-dj';
                 let coverHtml;
                 
                 if (isLikedSongs) {
@@ -1018,6 +1115,15 @@
                 });
             } catch (error) {
                 console.error('Failed to load playlist:', error);
+                document.getElementById('mainContent').innerHTML = `
+                    <div style="padding: 50px; text-align: center; color: #ff4444;">
+                        <h2>Error loading playlist</h2>
+                        <p>${error.message}</p>
+                        <button onclick="location.reload()" style="margin-top: 20px; padding: 10px 20px; background: #1db954; color: white; border: none; border-radius: 20px; cursor: pointer;">
+                            Go Back
+                        </button>
+                    </div>
+                `;
             }
         }
 
