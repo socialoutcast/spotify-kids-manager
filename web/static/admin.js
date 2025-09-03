@@ -462,6 +462,8 @@ async function pairBluetoothDevice(address) {
         // Refresh both the scan and paired devices list
         startBluetoothScan();
         loadPairedDevices();
+        // Auto-connect and switch audio to newly paired device
+        await connectBluetooth(address);
     } else {
         alert('Pairing failed: ' + (result.error || 'Unknown error'));
     }
@@ -473,6 +475,8 @@ async function connectBluetooth(address) {
     if (result.success) {
         alert('Connected successfully');
         loadPairedDevices();
+        // Switch audio to the newly connected device
+        await switchAudioToBluetoothDevice(address);
     } else {
         alert('Connection failed: ' + (result.error || 'Unknown error'));
     }
@@ -540,6 +544,19 @@ async function loadPairedDevices() {
         }
     } catch (error) {
         pairedList.innerHTML = `<p class="error-message" style="text-align: center;">Error loading paired devices: ${error.message}</p>`;
+    }
+}
+
+async function switchAudioToBluetoothDevice(address) {
+    try {
+        const result = await apiCall('/api/bluetooth/set-audio-sink', 'POST', {address: address});
+        if (result.success) {
+            console.log('Audio switched to Bluetooth device:', address);
+        } else {
+            console.error('Failed to switch audio:', result.error);
+        }
+    } catch (error) {
+        console.error('Error switching audio:', error);
     }
 }
 

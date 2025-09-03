@@ -2940,6 +2940,45 @@ def bluetooth_paired_devices():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/bluetooth/set-audio-sink', methods=['POST'])
+def set_bluetooth_audio_sink():
+    """Set a Bluetooth device as the default audio sink"""
+    if 'logged_in' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    data = request.get_json()
+    address = data.get('address')
+    
+    if not address:
+        return jsonify({'error': 'Device address is required'}), 400
+    
+    try:
+        # Convert MAC address to PulseAudio sink format
+        sink_name = f"bluez_sink.{address.replace(':', '_')}.a2dp_sink"
+        
+        # Wait a moment for the sink to be available
+        time.sleep(2)
+        
+        # Set as default sink for system PulseAudio
+        result = subprocess.run(['sudo', '-u', 'spotify-kids', 'env', 'PULSE_SERVER=unix:/tmp/pulse-socket', 
+                               'pactl', 'set-default-sink', sink_name], 
+                              capture_output=True, text=True, timeout=10)
+        
+        if result.returncode == 0:
+            return jsonify({
+                'success': True, 
+                'message': f'Audio switched to Bluetooth device {address}',
+                'sink_name': sink_name
+            })
+        else:
+            return jsonify({
+                'error': f'Failed to set audio sink: {result.stderr}',
+                'sink_name': sink_name
+            }), 500
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/system/updates-check')
 def check_system_updates():
     """Check for available system updates"""
