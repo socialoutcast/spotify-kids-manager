@@ -45,10 +45,9 @@ A comprehensive parental control system for Spotify that provides a safe, manage
 Before you begin, ensure you have:
 
 - ✅ **Spotify Premium Account** (required for web playback)
-- ✅ **Spotify Developer Account** (free - we'll show you how to set this up)
-- ✅ **Node.js 16+** and **Python 3.8+**
-- ✅ **Raspberry Pi** (recommended) or any Linux system
-- ✅ **Chromium Browser** (for kiosk mode)
+- ✅ **Raspberry Pi 4 Model B (4GB RAM recommended)**
+- ✅ **MicroSD Card (32GB minimum)** with Raspberry Pi OS 64-bit
+- ✅ **Touch Display** (recommended: [7" 1024x600 HDMI LCD](https://www.amazon.com/dp/B09B29T8YF) for optimal kiosk experience)
 
 ## 🚀 Quick Installation
 
