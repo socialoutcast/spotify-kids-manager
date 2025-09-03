@@ -31,6 +31,40 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
+# Function to wait for apt/dpkg locks to be released
+wait_for_apt() {
+    echo -e "${YELLOW}Checking for running package managers...${NC}"
+    
+    while true; do
+        # Check if apt, apt-get, dpkg, or unattended-upgrades are running
+        if pgrep -x "apt" > /dev/null || \
+           pgrep -x "apt-get" > /dev/null || \
+           pgrep -x "dpkg" > /dev/null || \
+           pgrep -f "unattended-upgrade" > /dev/null; then
+            echo -e "${YELLOW}Another package manager is running. Waiting...${NC}"
+            sleep 5
+        else
+            # Also check for lock files
+            if fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || \
+               fuser /var/lib/dpkg/lock >/dev/null 2>&1 || \
+               fuser /var/lib/apt/lists/lock >/dev/null 2>&1 || \
+               fuser /var/cache/apt/archives/lock >/dev/null 2>&1; then
+                echo -e "${YELLOW}Package database is locked. Waiting...${NC}"
+                sleep 5
+            else
+                echo -e "${GREEN}Package manager is available.${NC}"
+                break
+            fi
+        fi
+    done
+    
+    # Give it a moment to ensure everything is clear
+    sleep 2
+}
+
+# Wait for apt to be available before starting
+wait_for_apt
+
 # Clean up old spotify-terminal installation if exists
 if [ -d "/opt/spotify-terminal" ] || systemctl list-units --all | grep -q "spotify-terminal"; then
     echo -e "${YELLOW}Found old spotify-terminal installation. Cleaning up...${NC}"
@@ -140,8 +174,14 @@ fi
 
 # Update system
 echo -e "${YELLOW}Updating system packages...${NC}"
+wait_for_apt
 echo "Running apt-get update..."
-apt-get update || true
+apt-get update || {
+    echo -e "${YELLOW}Initial update failed, retrying...${NC}"
+    sleep 2
+    wait_for_apt
+    apt-get update
+}
 
 echo "Running apt-get upgrade..."
 DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -q \
@@ -161,8 +201,9 @@ apt-get autoclean -y || true
 
 echo "System update complete"
 
-# Remove unnecessary office and productivity software
-echo -e "${YELLOW}Removing unnecessary office software to free up space...${NC}"
+# Remove bloatware to free up space for kiosk device
+echo -e "${YELLOW}Removing unnecessary software to free up space...${NC}"
+wait_for_apt
 apt-get remove -y --purge \
     libreoffice* \
     libreoffice-* \
@@ -208,12 +249,23 @@ apt-get install -y ttf-mscorefonts-installer 2>/dev/null || true
 
 # Install dependencies
 echo -e "${YELLOW}Installing dependencies...${NC}"
+
+# First ensure package lists are up to date
+echo -e "${BLUE}Ensuring package lists are current...${NC}"
+wait_for_apt
+apt-get update || true
+
+# Install packages in smaller groups to handle failures better
+echo -e "${BLUE}Installing Python packages...${NC}"
 apt-get install -y \
     python3 \
     python3-pip \
     python3-tk \
     python3-pil \
-    python3-pil.imagetk \
+    python3-pil.imagetk || true
+
+echo -e "${BLUE}Installing X server packages...${NC}"
+apt-get install -y \
     xserver-xorg \
     xserver-xorg-video-all \
     xserver-xorg-input-all \
@@ -221,9 +273,30 @@ apt-get install -y \
     x11-xserver-utils \
     x11-utils \
     x11-apps \
-    nginx \
-    git \
-    unclutter \
+    xterm || true
+
+echo -e "${BLUE}Installing web server...${NC}"
+# Update again before nginx to avoid 404 errors
+wait_for_apt
+apt-get update
+apt-get install -y nginx || {
+    echo -e "${YELLOW}nginx installation failed, updating repos and retrying...${NC}"
+    wait_for_apt
+    apt-get update
+    apt-get install -y nginx
+}
+
+echo -e "${BLUE}Installing window manager and display packages...${NC}"
+apt-get install -y \
+    openbox \
+    lightdm \
+    unclutter || true
+
+echo -e "${BLUE}Installing browser...${NC}"
+apt-get install -y chromium || apt-get install -y chromium-browser || true
+
+echo -e "${BLUE}Installing Bluetooth and audio packages...${NC}"
+apt-get install -y \
     bluez \
     bluez-firmware \
     bluez-tools \
@@ -233,15 +306,15 @@ apt-get install -y \
     libasound2-plugins \
     libspa-0.2-bluetooth \
     pi-bluetooth \
+    pulseaudio-utils || true
+
+echo -e "${BLUE}Installing utility packages...${NC}"
+apt-get install -y \
+    git \
     rfkill \
     scrot \
-    xterm \
-    chromium \
-    openbox \
-    lightdm \
     curl \
-    expect \
-    pulseaudio-utils
+    expect || true
 
 # Install Node.js for the web player
 echo -e "${YELLOW}Installing Node.js...${NC}"
