@@ -286,12 +286,22 @@
         }
 
         .track-row.playing {
+            background: rgba(29, 185, 84, 0.1);
+        }
+        
+        .track-row.playing .track-name {
+            color: #1db954;
+        }
+        
+        .track-row.playing .track-number::before {
+            content: '♪ ';
             color: #1db954;
         }
 
         .track-number {
             text-align: right;
             font-size: 18px;  /* Increased from 14px */
+            min-width: 40px;
         }
 
         .track-info {
@@ -349,8 +359,8 @@
             display: flex;
             align-items: center;
             gap: 16px;
+            max-width: 400px;
             min-width: 0;
-            max-width: 30%;
         }
 
         .now-playing-cover {
@@ -359,7 +369,6 @@
             background: #282828;
             border-radius: 4px;
             overflow: hidden;
-            flex-shrink: 0;
         }
 
         .now-playing-cover img {
@@ -370,7 +379,6 @@
 
         .now-playing-info {
             min-width: 0;
-            overflow: hidden;
         }
 
         .now-playing-name {
@@ -380,27 +388,6 @@
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
-            position: relative;
-        }
-
-        .now-playing-name.scrolling {
-            display: flex;
-            animation: scroll-text 15s linear infinite;
-            white-space: nowrap;
-        }
-
-        .now-playing-name.scrolling span {
-            padding-right: 50px;
-            white-space: nowrap;
-        }
-
-        @keyframes scroll-text {
-            0% {
-                transform: translateX(0);
-            }
-            100% {
-                transform: translateX(-50%);
-            }
         }
 
         .now-playing-artist {
@@ -1086,30 +1073,8 @@
             const track = state.track_window.current_track;
             if (!track) return;
             
-            const nameElement = document.getElementById('nowPlayingName');
-            const artistElement = document.getElementById('nowPlayingArtist');
-            
-            // Update artist immediately
-            artistElement.textContent = track.artists.map(a => a.name).join(', ');
-            
-            // Remove scrolling class and set text first
-            nameElement.classList.remove('scrolling');
-            nameElement.textContent = track.name;
-            
-            // Check if title needs scrolling after a brief delay
-            requestAnimationFrame(() => {
-                // Get the actual rendered width
-                const containerWidth = nameElement.parentElement.offsetWidth;
-                const textWidth = nameElement.scrollWidth;
-                
-                if (textWidth > containerWidth && containerWidth > 0) {
-                    // Title is too long, enable scrolling
-                    nameElement.classList.add('scrolling');
-                    // Duplicate text for seamless scrolling
-                    const escapedName = track.name.replace(/'/g, '&#39;').replace(/"/g, '&quot;');
-                    nameElement.innerHTML = `<span>${escapedName}</span><span>${escapedName}</span>`;
-                }
-            });
+            document.getElementById('nowPlayingName').textContent = track.name;
+            document.getElementById('nowPlayingArtist').textContent = track.artists.map(a => a.name).join(', ');
             
             const cover = document.getElementById('nowPlayingCover');
             if (track.album.images[0]) {
