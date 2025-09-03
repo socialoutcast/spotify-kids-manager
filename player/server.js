@@ -199,6 +199,12 @@ async function updatePlaybackState() {
 
 // API Routes
 
+// Debug endpoint for browser console
+app.post('/api/debug', express.json(), (req, res) => {
+    console.log('[BROWSER]:', req.body.message);
+    res.json({ ok: true });
+});
+
 app.get('/api/token', async (req, res) => {
     if (!spotifyApi) {
         return res.status(503).json({ error: 'Spotify not connected' });
