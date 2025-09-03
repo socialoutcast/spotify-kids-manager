@@ -1280,30 +1280,98 @@
             }
         };
 
-        document.getElementById('progressBar').onclick = (e) => {
+        // Progress bar control
+        let isDraggingProgress = false;
+        const progressBar = document.getElementById('progressBar');
+        
+        function updateSeek(e) {
             if (!player) return;
-            const rect = e.currentTarget.getBoundingClientRect();
-            const percent = (e.clientX - rect.left) / rect.width;
+            const rect = progressBar.getBoundingClientRect();
+            const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
             player.getCurrentState().then(state => {
                 if (state) {
                     player.seek(percent * state.duration);
                 }
             });
+        }
+        
+        progressBar.onmousedown = (e) => {
+            isDraggingProgress = true;
+            updateSeek(e);
+            e.preventDefault();
+        };
+        
+        // Touch support for progress bar
+        progressBar.ontouchstart = (e) => {
+            isDraggingProgress = true;
+            const touch = e.touches[0];
+            const mockEvent = { clientX: touch.clientX };
+            updateSeek(mockEvent);
+            e.preventDefault();
         };
 
         // Volume control
         let currentVolume = 0.5; // Default 50%
+        let isDraggingVolume = false;
         
-        document.getElementById('volumeSlider').onclick = (e) => {
+        const volumeSlider = document.getElementById('volumeSlider');
+        
+        function updateVolume(e) {
             if (!player) return;
-            const rect = e.currentTarget.getBoundingClientRect();
+            const rect = volumeSlider.getBoundingClientRect();
             const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
             currentVolume = percent;
             player.setVolume(percent).then(() => {
                 document.getElementById('volumeSliderFill').style.width = (percent * 100) + '%';
                 updateVolumeIcon(percent);
             });
+        }
+        
+        volumeSlider.onmousedown = (e) => {
+            isDraggingVolume = true;
+            updateVolume(e);
+            e.preventDefault();
         };
+        
+        // Touch support for mobile/touchscreen
+        volumeSlider.ontouchstart = (e) => {
+            isDraggingVolume = true;
+            const touch = e.touches[0];
+            const mockEvent = { clientX: touch.clientX };
+            updateVolume(mockEvent);
+            e.preventDefault();
+        };
+        
+        // Consolidated mouse/touch event listeners
+        document.addEventListener('mousemove', (e) => {
+            if (isDraggingProgress) {
+                updateSeek(e);
+            }
+            if (isDraggingVolume) {
+                updateVolume(e);
+            }
+        });
+        
+        document.addEventListener('mouseup', () => {
+            isDraggingProgress = false;
+            isDraggingVolume = false;
+        });
+        
+        document.addEventListener('touchmove', (e) => {
+            const touch = e.touches[0];
+            const mockEvent = { clientX: touch.clientX };
+            if (isDraggingProgress) {
+                updateSeek(mockEvent);
+            }
+            if (isDraggingVolume) {
+                updateVolume(mockEvent);
+            }
+        });
+        
+        document.addEventListener('touchend', () => {
+            isDraggingProgress = false;
+            isDraggingVolume = false;
+        });
 
         document.getElementById('volumeIcon').onclick = () => {
             if (!player) return;
