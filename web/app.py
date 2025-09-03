@@ -732,6 +732,13 @@ ADMIN_TEMPLATE = '''
             color: var(--text-secondary) !important;
         }
         
+        /* Device button container */
+        .device-buttons {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        
         /* Log viewer */
         pre, .log-viewer {
             background: var(--card-bg) !important;
@@ -2716,9 +2723,16 @@ def bluetooth_pair():
                               capture_output=True, text=True, timeout=30)
         
         if 'successful' in result.stdout.lower() or 'already' in result.stdout.lower():
-            # Try to connect after successful pairing
-            connect_result = subprocess.run(['sudo', 'bluetoothctl', 'connect', address],
-                                         capture_output=True, text=True, timeout=10)
+            # Check if already connected first
+            info_result = subprocess.run(['sudo', 'bluetoothctl', 'info', address],
+                                       capture_output=True, text=True, timeout=5)
+            
+            if 'Connected: yes' in info_result.stdout:
+                connect_result = type('obj', (object,), {'stdout': 'successful'})()
+            else:
+                # Try to connect after successful pairing
+                connect_result = subprocess.run(['sudo', 'bluetoothctl', 'connect', address],
+                                             capture_output=True, text=True, timeout=10)
             
             if 'successful' in connect_result.stdout.lower():
                 # Set as default audio output for spotify-kids user
@@ -2741,9 +2755,16 @@ def bluetooth_pair():
             else:
                 return jsonify({'success': True, 'message': 'Device paired. You may need to connect manually.'})
         elif 'already' in result.stderr.lower():
-            # Device already paired, try to connect
-            connect_result = subprocess.run(['sudo', 'bluetoothctl', 'connect', address],
-                                         capture_output=True, text=True, timeout=10)
+            # Device already paired, check if connected first
+            info_result = subprocess.run(['sudo', 'bluetoothctl', 'info', address],
+                                       capture_output=True, text=True, timeout=5)
+            
+            if 'Connected: yes' in info_result.stdout:
+                connect_result = type('obj', (object,), {'stdout': 'successful'})()
+            else:
+                # Try to connect
+                connect_result = subprocess.run(['sudo', 'bluetoothctl', 'connect', address],
+                                             capture_output=True, text=True, timeout=10)
             if 'successful' in connect_result.stdout.lower():
                 # Set as default audio output for spotify-kids user
                 import time
@@ -2788,7 +2809,14 @@ def bluetooth_connect():
         return jsonify({'error': 'No address provided'}), 400
     
     try:
-        # Simple connect using bluetoothctl
+        # First check if device is already connected
+        info_result = subprocess.run(['sudo', 'bluetoothctl', 'info', address],
+                                   capture_output=True, text=True, timeout=5)
+        
+        if 'Connected: yes' in info_result.stdout:
+            return jsonify({'success': True, 'message': 'Already connected'})
+        
+        # If not connected, try to connect
         result = subprocess.run(['sudo', 'bluetoothctl', 'connect', address],
                               capture_output=True, text=True, timeout=10)
         
@@ -2798,6 +2826,8 @@ def bluetooth_connect():
             return jsonify({'success': True, 'message': 'Already connected'})
         else:
             return jsonify({'success': False, 'message': 'Connection failed: ' + result.stdout[:200]})
+    except subprocess.TimeoutExpired:
+        return jsonify({'error': 'Connection attempt timed out'}), 500
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

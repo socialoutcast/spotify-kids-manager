@@ -4,7 +4,8 @@
 async function apiCall(url, method = 'GET', data = null) {
     const options = {
         method: method,
-        headers: {'Content-Type': 'application/json'}
+        headers: {'Content-Type': 'application/json'},
+        credentials: 'same-origin'
     };
     if (data) {
         options.body = JSON.stringify(data);
@@ -529,12 +530,12 @@ async function loadPairedDevices() {
                             <small>${address}</small>
                             ${isConnected ? '<span class="success-message" style="margin-left: 10px;">✓ Connected</span>' : '<span class="scan-status" style="margin-left: 10px;">Disconnected</span>'}
                         </div>
-                        <div onclick="event.stopPropagation();">
+                        <div class="device-buttons" onclick="event.stopPropagation();">
                             ${isConnected ? 
                                 `<button onclick="disconnectBluetooth('${address}')" class="small">Disconnect</button>` : 
                                 `<button onclick="connectBluetooth('${address}')" class="small">Connect</button>`
                             }
-                            <button onclick="removeBluetooth('${address}')" class="danger small" style="margin-left: 5px;">Remove</button>
+                            <button onclick="removeBluetooth('${address}')" class="danger small">Remove</button>
                         </div>
                     </div>`;
             }

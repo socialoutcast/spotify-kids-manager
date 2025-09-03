@@ -524,8 +524,8 @@ echo -e "${YELLOW}Creating systemd service for player...${NC}"
 cat > /etc/systemd/system/spotify-player.service << EOF
 [Unit]
 Description=Spotify Kids Web Player
-After=network.target
-Wants=network-online.target
+After=network.target bluetooth.service pulseaudio.service
+Wants=network-online.target bluetooth.service
 
 [Service]
 Type=simple
@@ -536,6 +536,8 @@ Environment="NODE_ENV=production"
 Environment="PORT=5000"
 Environment="SPOTIFY_CONFIG_DIR=$CONFIG_DIR"
 Environment="PULSE_SERVER=unix:/tmp/pulse-socket"
+Environment="PULSE_RUNTIME_PATH=/tmp"
+Environment="XDG_RUNTIME_DIR=/tmp"
 ExecStartPre=/bin/bash -c 'if [ ! -d "node_modules" ]; then npm install --omit=dev; fi'
 ExecStart=/usr/bin/node server.js
 Restart=always
@@ -842,6 +844,7 @@ systemctl enable spotify-kiosk.service
 systemctl enable nginx
 systemctl start spotify-player.service
 systemctl start spotify-admin.service
+systemctl start bluetooth-a2dp-switch.service
 systemctl restart nginx
 
 # Configure X11
@@ -996,9 +999,101 @@ EOF
 
 systemctl enable bluetooth-audio-setup.service
 
-# Start PulseAudio in system mode
+# Start PulseAudio in system mode with proper settings
 echo -e "${BLUE}Starting PulseAudio in system mode...${NC}"
-pulseaudio --system --daemonize --disallow-exit --verbose
+# Kill any existing PulseAudio processes
+killall pulseaudio 2>/dev/null || true
+sleep 2
+
+# Start PulseAudio in system mode with module loading enabled
+pulseaudio --system --daemonize --disallow-exit --disallow-module-loading=false
+sleep 3
+
+# Wait for PulseAudio to start and test connection
+for i in {1..10}; do
+    if PULSE_SERVER=unix:/tmp/pulse-socket pactl info >/dev/null 2>&1; then
+        echo -e "${GREEN}PulseAudio started successfully${NC}"
+        break
+    fi
+    echo "Waiting for PulseAudio to start... ($i/10)"
+    sleep 1
+done
+
+# Add automatic A2DP profile switching script
+echo -e "${BLUE}Creating Bluetooth A2DP auto-switching service...${NC}"
+cat > /opt/spotify-kids/bluetooth-a2dp-switch.sh << 'EOF'
+#!/bin/bash
+# Script to automatically switch Bluetooth devices to A2DP profile when connected
+
+# Function to switch device to A2DP
+switch_to_a2dp() {
+    local device_mac=$1
+    local card_name="bluez_card.${device_mac//:/_}"
+    
+    echo "Attempting to switch $device_mac to A2DP profile..."
+    
+    # Wait for card to be available
+    for i in {1..10}; do
+        if PULSE_SERVER=unix:/tmp/pulse-socket pactl list cards short | grep -q "$card_name"; then
+            echo "Card $card_name found, switching to A2DP..."
+            
+            # Try to set A2DP profile
+            if PULSE_SERVER=unix:/tmp/pulse-socket pactl set-card-profile "$card_name" a2dp_sink 2>/dev/null; then
+                echo "Successfully switched to A2DP profile"
+                
+                # Set as default audio sink
+                local sink_name="bluez_sink.${device_mac//:/_}.a2dp_sink"
+                if PULSE_SERVER=unix:/tmp/pulse-socket pactl set-default-sink "$sink_name" 2>/dev/null; then
+                    echo "Set $sink_name as default audio sink"
+                fi
+                return 0
+            else
+                echo "Failed to set A2DP profile, trying again..."
+            fi
+        fi
+        sleep 2
+    done
+    echo "Failed to switch $device_mac to A2DP after 20 seconds"
+    return 1
+}
+
+# Monitor bluetoothctl events
+bluetoothctl | while read -r line; do
+    # Look for device connection events
+    if echo "$line" | grep -q "Device.*Connected: yes"; then
+        device_mac=$(echo "$line" | grep -o '[A-F0-9:]\{17\}')
+        if [ -n "$device_mac" ]; then
+            echo "Device connected: $device_mac"
+            # Switch to A2DP in background
+            switch_to_a2dp "$device_mac" &
+        fi
+    fi
+done
+EOF
+
+chmod +x /opt/spotify-kids/bluetooth-a2dp-switch.sh
+
+# Create systemd service for Bluetooth A2DP switching
+cat > /etc/systemd/system/bluetooth-a2dp-switch.service << 'EOF'
+[Unit]
+Description=Bluetooth A2DP Auto-Switch Service
+After=bluetooth.service pulseaudio.service
+Requires=bluetooth.service
+Wants=pulseaudio.service
+
+[Service]
+Type=simple
+ExecStart=/opt/spotify-kids/bluetooth-a2dp-switch.sh
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl enable bluetooth-a2dp-switch.service
 
 # Disable unnecessary services
 echo -e "${YELLOW}Optimizing system...${NC}"
