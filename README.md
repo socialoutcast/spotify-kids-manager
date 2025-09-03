@@ -58,6 +58,13 @@ Before you begin, ensure you have:
 curl -sSL https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/main/install.sh | sudo bash
 ```
 
+> ⏳ **Please be patient!** This installation will take 10-20 minutes as it:
+> - Removes unnecessary software to free up space
+> - Updates all system packages to latest versions  
+> - Installs all dependencies and configures services
+> - Sets up audio, Bluetooth, and display systems
+> - Configures SSL certificates and security
+
 ### Option 2: Download and Review First
 
 ```bash
@@ -65,6 +72,8 @@ wget https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/main/i
 chmod +x install.sh
 sudo ./install.sh
 ```
+
+> ⏳ **Installation time:** Allow 10-20 minutes for complete setup
 
 The installer will automatically:
 - Install all dependencies
