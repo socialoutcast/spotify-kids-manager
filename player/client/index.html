@@ -569,16 +569,18 @@
 
         /* Track List */
         .track-list {
-            padding: 0 32px;
+            padding: 0;
+            width: 100%;
+            margin-left: -8px;
         }
 
         .track-list-header {
             display: grid;
-            grid-template-columns: [index] 16px [title] 6fr [album] 4fr [date] 3fr [duration] minmax(120px, 1fr);
+            grid-template-columns: [index] 40px [title] minmax(300px, 1fr) [album] minmax(200px, 0.8fr) [duration] 80px;
             gap: 16px;
-            padding: 0 16px 8px;
+            padding: 8px 16px 8px 8px;
             border-bottom: 1px solid rgba(255,255,255,0.1);
-            margin-bottom: 16px;
+            margin-bottom: 8px;
             color: var(--text-secondary);
             font-size: 12px;
             font-weight: 400;
@@ -588,9 +590,9 @@
 
         .track-row {
             display: grid;
-            grid-template-columns: [index] 16px [title] 6fr [album] 4fr [date] 3fr [duration] minmax(120px, 1fr);
+            grid-template-columns: [index] 40px [title] minmax(300px, 1fr) [album] minmax(200px, 0.8fr) [duration] 80px;
             gap: 16px;
-            padding: 8px 16px;
+            padding: 8px 16px 8px 8px;
             border-radius: 4px;
             color: var(--text-secondary);
             cursor: pointer;
@@ -1058,6 +1060,251 @@
         .hidden {
             display: none !important;
         }
+
+        /* Search View */
+        .search-container {
+            padding: 32px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .search-input-wrapper {
+            position: relative;
+            margin-bottom: 32px;
+        }
+        
+        /* Home Search Bar */
+        .home-search-bar {
+            position: relative;
+            margin-bottom: 32px;
+            max-width: 400px;
+        }
+        
+        .home-search-input {
+            width: 100%;
+            padding: 12px 40px;
+            background: var(--card-bg);
+            border: none;
+            border-radius: 500px;
+            color: var(--text-primary);
+            font-size: 14px;
+            outline: none;
+        }
+        
+        .home-search-input::placeholder {
+            color: var(--text-secondary);
+        }
+        
+        .home-search-input:focus {
+            outline: 2px solid var(--text-primary);
+        }
+        
+        .home-search-icon {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 20px;
+            height: 20px;
+            fill: var(--text-secondary);
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 14px 48px;
+            background: var(--card-bg);
+            border: none;
+            border-radius: 500px;
+            color: var(--text-primary);
+            font-size: 16px;
+            outline: none;
+        }
+
+        .search-input:focus {
+            outline: 2px solid var(--text-primary);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 24px;
+            height: 24px;
+            fill: var(--text-secondary);
+        }
+
+        .search-clear {
+            position: absolute;
+            right: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 32px;
+            height: 32px;
+            background: transparent;
+            border: none;
+            border-radius: 50%;
+            color: var(--text-primary);
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .search-clear.visible {
+            display: flex;
+        }
+
+        .search-results {
+            display: grid;
+            gap: 24px;
+        }
+
+        .search-section {
+            margin-bottom: 32px;
+        }
+
+        .search-section-title {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 16px;
+        }
+
+        .search-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 24px;
+        }
+
+        .search-item {
+            background: var(--card-bg);
+            border-radius: 6px;
+            padding: 16px;
+            transition: background 0.3s;
+            cursor: pointer;
+        }
+
+        .search-item:hover {
+            background: var(--card-hover);
+        }
+
+        .search-item-image {
+            width: 100%;
+            aspect-ratio: 1;
+            border-radius: 4px;
+            margin-bottom: 12px;
+            background: var(--border-color);
+        }
+
+        .search-item-image.artist {
+            border-radius: 50%;
+        }
+
+        .search-item-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: inherit;
+        }
+
+        .search-item-name {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .search-item-type {
+            font-size: 14px;
+            color: var(--text-secondary);
+            text-transform: capitalize;
+        }
+
+        /* On-screen Keyboard */
+        .keyboard-container {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--card-bg);
+            border-top: 1px solid var(--border-color);
+            padding: 12px;
+            display: none;
+            z-index: 1000;
+        }
+
+        .keyboard-container.active {
+            display: block;
+        }
+
+        .keyboard-row {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 6px;
+            justify-content: center;
+        }
+
+        .keyboard-key {
+            min-width: 32px;
+            height: 48px;
+            padding: 0 12px;
+            background: var(--main-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 18px;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.1s;
+            user-select: none;
+        }
+
+        .keyboard-key:active {
+            background: var(--spotify-green);
+            transform: scale(0.95);
+        }
+
+        .keyboard-key.space {
+            flex: 1;
+            max-width: 300px;
+        }
+
+        .keyboard-key.backspace,
+        .keyboard-key.enter {
+            min-width: 80px;
+            background: var(--border-color);
+        }
+
+        .keyboard-key.shift {
+            min-width: 100px;
+            background: var(--border-color);
+        }
+
+        .keyboard-key.shift.active {
+            background: var(--spotify-green);
+        }
+
+        .keyboard-close {
+            position: absolute;
+            top: -40px;
+            right: 12px;
+            width: 36px;
+            height: 36px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 50%;
+            color: var(--text-primary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
     </style>
 </head>
 <body>
@@ -1284,8 +1531,13 @@
                 
                 // Initialize UI
                 initializeUI();
-                loadPlaylists();
-                showHomeView();
+                // Load playlists then show home view
+                loadPlaylists().then(() => {
+                    showHomeView();
+                    // Mark home as active
+                    document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+                    document.querySelector('.nav-link[data-view="home"]').classList.add('active');
+                });
             });
 
             // Not Ready
@@ -1349,7 +1601,11 @@
             try {
                 const res = await fetch('http://localhost:5000/api/playlists');
                 const data = await res.json();
-                state.playlists = data.playlists;
+                // Filter out DJ playlists
+                state.playlists = data.playlists.filter(playlist => 
+                    !playlist.name.toLowerCase().includes('dj') &&
+                    !playlist.name.toLowerCase().includes('spotify dj')
+                );
                 renderPlaylists();
             } catch (error) {
                 console.error('Failed to load playlists:', error);
@@ -1388,6 +1644,17 @@
             
             document.getElementById('mainContent').innerHTML = `
                 <div class="home-view">
+                    <div class="home-search-bar">
+                        <svg class="home-search-icon" viewBox="0 0 24 24">
+                            <path fill="currentColor" d="M10.533 1.279c-5.18 0-9.407 4.14-9.407 9.279s4.226 9.279 9.407 9.279c2.234 0 4.29-.77 5.907-2.058l4.353 4.353a1 1 0 101.414-1.414l-4.344-4.344a9.157 9.157 0 002.077-5.816c0-5.14-4.226-9.28-9.407-9.28zm-7.407 9.279c0-4.006 3.302-7.28 7.407-7.28s7.407 3.274 7.407 7.28-3.302 7.279-7.407 7.279-7.407-3.273-7.407-7.28z"/>
+                        </svg>
+                        <input type="text" 
+                               class="home-search-input" 
+                               id="homeSearchInput" 
+                               placeholder="What do you want to listen to?"
+                               autocomplete="off">
+                    </div>
+                    
                     <h1 class="section-title" style="margin-bottom: 24px;">${greeting}</h1>
                     
                     <div class="quick-access-grid">
@@ -1445,6 +1712,279 @@
             // Update gradient
             document.querySelector('.main-view').style.background = 
                 'linear-gradient(to bottom, #535353 0, #121212 250px)';
+                
+            // Add home search bar functionality
+            const homeSearchInput = document.getElementById('homeSearchInput');
+            if (homeSearchInput) {
+                // Focus on search when clicked
+                homeSearchInput.addEventListener('focus', () => {
+                    currentSearchInput = homeSearchInput;
+                    document.getElementById('keyboard').classList.add('active');
+                });
+                
+                // Handle typing in home search
+                homeSearchInput.addEventListener('input', (e) => {
+                    const query = e.target.value;
+                    
+                    if (query.length > 0) {
+                        // Debounce search
+                        clearTimeout(searchTimeout);
+                        searchTimeout = setTimeout(() => {
+                            // Switch to search view with results
+                            showSearchView();
+                            const searchInput = document.getElementById('searchInput');
+                            if (searchInput) {
+                                searchInput.value = query;
+                                performSearch(query);
+                            }
+                        }, 500);
+                    }
+                });
+            }
+        }
+
+        let searchTimeout = null;
+        let currentSearchInput = null;
+
+        function showSearchView() {
+            document.getElementById('mainContent').innerHTML = `
+                <div class="search-container">
+                    <div class="search-input-wrapper">
+                        <svg class="search-icon" viewBox="0 0 24 24">
+                            <path fill="currentColor" d="M10.533 1.279c-5.18 0-9.407 4.14-9.407 9.279s4.226 9.279 9.407 9.279c2.234 0 4.29-.77 5.907-2.058l4.353 4.353a1 1 0 101.414-1.414l-4.344-4.344a9.157 9.157 0 002.077-5.816c0-5.14-4.226-9.28-9.407-9.28zm-7.407 9.279c0-4.006 3.302-7.28 7.407-7.28s7.407 3.274 7.407 7.28-3.302 7.279-7.407 7.279-7.407-3.273-7.407-7.28z"/>
+                        </svg>
+                        <input type="text" 
+                               class="search-input" 
+                               id="searchInput" 
+                               placeholder="What do you want to listen to?"
+                               autocomplete="off">
+                        <button class="search-clear" id="searchClear">
+                            <svg width="24" height="24" viewBox="0 0 24 24">
+                                <path fill="currentColor" d="M12 10.586L6.707 5.293a1 1 0 00-1.414 1.414L10.586 12l-5.293 5.293a1 1 0 001.414 1.414L12 13.414l5.293 5.293a1 1 0 001.414-1.414L13.414 12l5.293-5.293a1 1 0 00-1.414-1.414L12 10.586z"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="search-results" id="searchResults"></div>
+                </div>
+            `;
+
+            // Update gradient
+            document.querySelector('.main-view').style.background = 
+                'linear-gradient(to bottom, #121212 0, #121212 100%)';
+
+            const searchInput = document.getElementById('searchInput');
+            const searchClear = document.getElementById('searchClear');
+            const keyboard = document.getElementById('keyboard');
+            
+            currentSearchInput = searchInput;
+
+            // Show keyboard when input is focused
+            searchInput.addEventListener('focus', () => {
+                keyboard.classList.add('active');
+            });
+
+            // Handle search input
+            searchInput.addEventListener('input', (e) => {
+                const query = e.target.value;
+                
+                if (query) {
+                    searchClear.classList.add('visible');
+                } else {
+                    searchClear.classList.remove('visible');
+                    document.getElementById('searchResults').innerHTML = '';
+                    return;
+                }
+
+                // Debounce search
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    performSearch(query);
+                }, 500);
+            });
+
+            // Clear button
+            searchClear.addEventListener('click', () => {
+                searchInput.value = '';
+                searchClear.classList.remove('visible');
+                document.getElementById('searchResults').innerHTML = '';
+                searchInput.focus();
+            });
+        }
+
+        async function performSearch(query) {
+            try {
+                console.log('Searching for:', query);
+                const response = await fetch('http://localhost:5000/api/search', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        query,
+                        // Only search for music content, no podcasts/shows/videos
+                        types: ['track', 'album', 'artist', 'playlist']
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Search failed: ${response.status}`);
+                }
+
+                const data = await response.json();
+                console.log('Search response:', data);
+                
+                if (!data.results) {
+                    console.error('No results field in response');
+                    displaySearchResults([]);
+                    return;
+                }
+                
+                // Filter out any podcasts, shows, or audiobooks that might slip through
+                const filteredResults = data.results.filter(item => {
+                    // Exclude podcast episodes, shows, and audiobooks
+                    if (item.type === 'show' || item.type === 'episode' || item.type === 'audiobook') {
+                        return false;
+                    }
+                    // For tracks, check if they're from a podcast show
+                    if (item.type === 'track' && item.show_name) {
+                        return false;
+                    }
+                    return true;
+                });
+
+                console.log('Filtered results:', filteredResults);
+                displaySearchResults(filteredResults);
+            } catch (error) {
+                console.error('Search error:', error);
+                document.getElementById('searchResults').innerHTML = 
+                    `<div style="text-align: center; color: var(--text-secondary); padding: 48px;">Search failed: ${error.message}</div>`;
+            }
+        }
+
+        function displaySearchResults(results) {
+            if (!results || results.length === 0) {
+                document.getElementById('searchResults').innerHTML = 
+                    '<div style="text-align: center; color: var(--text-secondary); padding: 48px;">No results found</div>';
+                return;
+            }
+
+            // Group results by type
+            const grouped = {};
+            results.forEach(item => {
+                if (!grouped[item.type]) grouped[item.type] = [];
+                grouped[item.type].push(item);
+            });
+
+            let html = '';
+
+            // Display tracks first
+            if (grouped.track) {
+                html += `
+                    <div class="search-section">
+                        <h2 class="search-section-title">Songs</h2>
+                        <div class="track-list">
+                            <div class="track-list-header">
+                                <div style="grid-column: index;">#</div>
+                                <div style="grid-column: title;">Title</div>
+                                <div style="grid-column: album;">Album</div>
+                                <div style="grid-column: duration;">
+                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                        <path d="M8 3.999a4 4 0 100 8 4 4 0 000-8zM1.5 8a6.5 6.5 0 1113 0 6.5 6.5 0 01-13 0z"/>
+                                        <path d="M8 8.25H6.25V5.5h1.5V7h.75v1.25z"/>
+                                    </svg>
+                                </div>
+                            </div>
+                            ${grouped.track.slice(0, 10).map((track, index) => `
+                                <div class="track-row" data-uri="${track.uri}">
+                                    <div class="track-index">${index + 1}</div>
+                                    <div class="track-title-group">
+                                        ${track.image ? `
+                                            <div class="track-image">
+                                                <img src="${track.image}" alt="">
+                                            </div>
+                                        ` : ''}
+                                        <div class="track-title-info">
+                                            <div class="track-title">${track.name}</div>
+                                            <div class="track-artists">${track.artist}</div>
+                                        </div>
+                                    </div>
+                                    <div class="track-album">${track.album || ''}</div>
+                                    <div class="track-duration">${track.duration || ''}</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Display artists
+            if (grouped.artist) {
+                html += `
+                    <div class="search-section">
+                        <h2 class="search-section-title">Artists</h2>
+                        <div class="search-grid">
+                            ${grouped.artist.slice(0, 6).map(artist => `
+                                <div class="search-item" data-type="artist" data-id="${artist.id}">
+                                    <div class="search-item-image artist">
+                                        ${artist.image ? 
+                                            `<img src="${artist.image}" alt="${artist.name}">` :
+                                            '<div style="width:100%;height:100%;background:var(--border-color);"></div>'
+                                        }
+                                    </div>
+                                    <div class="search-item-name">${artist.name}</div>
+                                    <div class="search-item-type">Artist</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Display albums
+            if (grouped.album) {
+                html += `
+                    <div class="search-section">
+                        <h2 class="search-section-title">Albums</h2>
+                        <div class="search-grid">
+                            ${grouped.album.slice(0, 6).map(album => `
+                                <div class="search-item" data-type="album" data-id="${album.id}">
+                                    <div class="search-item-image">
+                                        ${album.image ? 
+                                            `<img src="${album.image}" alt="${album.name}">` :
+                                            '<div style="width:100%;height:100%;background:var(--border-color);"></div>'
+                                        }
+                                    </div>
+                                    <div class="search-item-name">${album.name}</div>
+                                    <div class="search-item-type">${album.artist}</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Display playlists
+            if (grouped.playlist) {
+                html += `
+                    <div class="search-section">
+                        <h2 class="search-section-title">Playlists</h2>
+                        <div class="search-grid">
+                            ${grouped.playlist.slice(0, 6).map(playlist => `
+                                <div class="search-item" data-type="playlist" data-id="${playlist.id}">
+                                    <div class="search-item-image">
+                                        ${playlist.image ? 
+                                            `<img src="${playlist.image}" alt="${playlist.name}">` :
+                                            '<div style="width:100%;height:100%;background:var(--border-color);"></div>'
+                                        }
+                                    </div>
+                                    <div class="search-item-name">${playlist.name}</div>
+                                    <div class="search-item-type">Playlist</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            document.getElementById('searchResults').innerHTML = html;
         }
 
         async function showPlaylistView(playlistId) {
@@ -1500,7 +2040,6 @@
                                 <div style="grid-column: index;">#</div>
                                 <div style="grid-column: title;">Title</div>
                                 <div style="grid-column: album;">Album</div>
-                                <div style="grid-column: date;"></div>
                                 <div style="grid-column: duration;">
                                     <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                                         <path d="M8 3.999a4 4 0 100 8 4 4 0 000-8zM1.5 8a6.5 6.5 0 1113 0 6.5 6.5 0 01-13 0z"/>
@@ -1521,7 +2060,6 @@
                                         </div>
                                     </div>
                                     <div class="track-album">${track.album || ''}</div>
-                                    <div class="track-date"></div>
                                     <div class="track-duration">${formatDuration(track.duration_ms)}</div>
                                 </div>
                             `).join('') || '<div style="padding: 32px; color: var(--text-secondary);">No tracks in this playlist</div>'}
@@ -1635,19 +2173,105 @@
             return 'Good evening';
         }
 
+        // Initialize Keyboard
+        function initializeKeyboard() {
+            const keyboard = document.getElementById('keyboard');
+            const keyboardClose = document.getElementById('keyboardClose');
+            let shiftActive = false;
+
+            // Close keyboard button
+            keyboardClose.addEventListener('click', () => {
+                keyboard.classList.remove('active');
+            });
+
+            // Handle all keyboard keys
+            document.querySelectorAll('.keyboard-key').forEach(key => {
+                key.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    const keyValue = key.dataset.key;
+                    
+                    if (!currentSearchInput) return;
+
+                    if (keyValue === 'backspace') {
+                        currentSearchInput.value = currentSearchInput.value.slice(0, -1);
+                        currentSearchInput.dispatchEvent(new Event('input'));
+                    } else if (keyValue === 'enter') {
+                        // Force immediate search if there's a value
+                        if (currentSearchInput && currentSearchInput.value.trim()) {
+                            clearTimeout(searchTimeout); // Cancel any pending search
+                            performSearch(currentSearchInput.value.trim());
+                            // Close keyboard after a brief delay for visual feedback
+                            setTimeout(() => {
+                                keyboard.classList.remove('active');
+                            }, 100);
+                        } else {
+                            // If no search text, just close the keyboard
+                            keyboard.classList.remove('active');
+                        }
+                    } else if (keyValue === 'shift') {
+                        shiftActive = !shiftActive;
+                        key.classList.toggle('active', shiftActive);
+                        
+                        // Update all letter keys
+                        document.querySelectorAll('.keyboard-key').forEach(k => {
+                            const kValue = k.dataset.key;
+                            if (kValue && kValue.length === 1 && /[a-z]/.test(kValue)) {
+                                k.textContent = shiftActive ? kValue.toUpperCase() : kValue.toLowerCase();
+                                k.dataset.key = shiftActive ? kValue.toUpperCase() : kValue.toLowerCase();
+                            }
+                        });
+                    } else {
+                        // Add the character
+                        const char = shiftActive && keyValue.length === 1 ? keyValue.toUpperCase() : keyValue;
+                        currentSearchInput.value += char;
+                        currentSearchInput.dispatchEvent(new Event('input'));
+                        
+                        // Auto-disable shift after typing a letter
+                        if (shiftActive && keyValue.length === 1 && /[a-zA-Z]/.test(keyValue)) {
+                            shiftActive = false;
+                            document.querySelector('.keyboard-key.shift').classList.remove('active');
+                            
+                            // Reset all letter keys to lowercase
+                            document.querySelectorAll('.keyboard-key').forEach(k => {
+                                const kValue = k.dataset.key;
+                                if (kValue && kValue.length === 1 && /[A-Z]/.test(kValue)) {
+                                    k.textContent = kValue.toLowerCase();
+                                    k.dataset.key = kValue.toLowerCase();
+                                }
+                            });
+                        }
+                    }
+                    
+                    // Keep focus on input
+                    currentSearchInput.focus();
+                });
+            });
+        }
+
         // Initialize UI
         function initializeUI() {
             // Navigation
             document.querySelectorAll('.nav-link').forEach(link => {
                 link.addEventListener('click', (e) => {
                     const view = e.currentTarget.dataset.view;
+                    document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+                    e.currentTarget.classList.add('active');
+                    
+                    // Hide keyboard when switching views
+                    document.getElementById('keyboard').classList.remove('active');
+                    
                     if (view === 'home') {
                         showHomeView();
-                        document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-                        e.currentTarget.classList.add('active');
+                    } else if (view === 'search') {
+                        showSearchView();
                     }
                 });
             });
+
+            // Keyboard functionality
+            initializeKeyboard();
             
             // Playlist clicks
             document.addEventListener('click', (e) => {
@@ -1680,6 +2304,23 @@
                 if (e.target.closest('.track-row')) {
                     const row = e.target.closest('.track-row');
                     playTrack(row.dataset.uri, row.dataset.playlist, row.dataset.offset);
+                }
+                
+                // Search result clicks
+                if (e.target.closest('.search-item')) {
+                    const item = e.target.closest('.search-item');
+                    const type = item.dataset.type;
+                    const id = item.dataset.id;
+                    
+                    if (type === 'playlist') {
+                        showPlaylistView(id);
+                    } else if (type === 'album') {
+                        // For now, treat albums like playlists
+                        showPlaylistView(id);
+                    } else if (type === 'artist') {
+                        // Could show artist view in future
+                        console.log('Artist clicked:', id);
+                    }
                 }
             });
             
@@ -1897,5 +2538,60 @@
             });
         }
     </script>
+
+    <!-- On-screen Keyboard -->
+    <div class="keyboard-container" id="keyboard">
+        <button class="keyboard-close" id="keyboardClose">✕</button>
+        <div class="keyboard-row">
+            <button class="keyboard-key" data-key="1">1</button>
+            <button class="keyboard-key" data-key="2">2</button>
+            <button class="keyboard-key" data-key="3">3</button>
+            <button class="keyboard-key" data-key="4">4</button>
+            <button class="keyboard-key" data-key="5">5</button>
+            <button class="keyboard-key" data-key="6">6</button>
+            <button class="keyboard-key" data-key="7">7</button>
+            <button class="keyboard-key" data-key="8">8</button>
+            <button class="keyboard-key" data-key="9">9</button>
+            <button class="keyboard-key" data-key="0">0</button>
+            <button class="keyboard-key backspace" data-key="backspace">⌫</button>
+        </div>
+        <div class="keyboard-row">
+            <button class="keyboard-key" data-key="q">q</button>
+            <button class="keyboard-key" data-key="w">w</button>
+            <button class="keyboard-key" data-key="e">e</button>
+            <button class="keyboard-key" data-key="r">r</button>
+            <button class="keyboard-key" data-key="t">t</button>
+            <button class="keyboard-key" data-key="y">y</button>
+            <button class="keyboard-key" data-key="u">u</button>
+            <button class="keyboard-key" data-key="i">i</button>
+            <button class="keyboard-key" data-key="o">o</button>
+            <button class="keyboard-key" data-key="p">p</button>
+        </div>
+        <div class="keyboard-row">
+            <button class="keyboard-key" data-key="a">a</button>
+            <button class="keyboard-key" data-key="s">s</button>
+            <button class="keyboard-key" data-key="d">d</button>
+            <button class="keyboard-key" data-key="f">f</button>
+            <button class="keyboard-key" data-key="g">g</button>
+            <button class="keyboard-key" data-key="h">h</button>
+            <button class="keyboard-key" data-key="j">j</button>
+            <button class="keyboard-key" data-key="k">k</button>
+            <button class="keyboard-key" data-key="l">l</button>
+        </div>
+        <div class="keyboard-row">
+            <button class="keyboard-key shift" data-key="shift">Shift</button>
+            <button class="keyboard-key" data-key="z">z</button>
+            <button class="keyboard-key" data-key="x">x</button>
+            <button class="keyboard-key" data-key="c">c</button>
+            <button class="keyboard-key" data-key="v">v</button>
+            <button class="keyboard-key" data-key="b">b</button>
+            <button class="keyboard-key" data-key="n">n</button>
+            <button class="keyboard-key" data-key="m">m</button>
+            <button class="keyboard-key enter" data-key="enter">Enter</button>
+        </div>
+        <div class="keyboard-row">
+            <button class="keyboard-key space" data-key=" ">Space</button>
+        </div>
+    </div>
 </body>
 </html>

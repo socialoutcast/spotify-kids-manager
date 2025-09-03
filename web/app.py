@@ -298,7 +298,7 @@ ADMIN_TEMPLATE = '''
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Spotify Kids Admin</title>
+    <title>Kids Music Admin</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -707,10 +707,23 @@ ADMIN_TEMPLATE = '''
         <!-- Sidebar Navigation -->
         <aside class="sidebar">
             <div class="logo">
-                <svg viewBox="0 0 24 24">
-                    <path fill="#1DB954" d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
+                <svg viewBox="0 0 24 24" style="width: 48px; height: 48px;">
+                    <!-- Custom Kids Music Icon - Headphones with Heart -->
+                    <defs>
+                        <linearGradient id="kidsGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" style="stop-color:#FF6B6B;stop-opacity:1" />
+                            <stop offset="100%" style="stop-color:#4ECDC4;stop-opacity:1" />
+                        </linearGradient>
+                    </defs>
+                    <!-- Headphones -->
+                    <path fill="url(#kidsGradient)" d="M12 1C6.5 1 2 5.5 2 11v7c0 1.1.9 2 2 2h2c.6 0 1-.4 1-1v-5c0-.6-.4-1-1-1H4v-2c0-4.4 3.6-8 8-8s8 3.6 8 8v2h-2c-.6 0-1 .4-1 1v5c0 .6.4 1 1 1h2c1.1 0 2-.9 2-2v-7c0-5.5-4.5-10-10-10z"/>
+                    <!-- Heart in center -->
+                    <path fill="#FF69B4" d="M12 10.5c-.3-.5-.7-.8-1.2-.8-.7 0-1.3.6-1.3 1.3 0 .3.1.6.3.8l2.2 2.2 2.2-2.2c.2-.2.3-.5.3-.8 0-.7-.6-1.3-1.3-1.3-.5 0-.9.3-1.2.8z"/>
+                    <!-- Musical notes -->
+                    <circle fill="#FFD93D" cx="8" cy="17" r="1"/>
+                    <circle fill="#FFD93D" cx="16" cy="17" r="1"/>
                 </svg>
-                <h1>Kids Admin</h1>
+                <h1>Kids Music Admin</h1>
             </div>
             
             <nav>
@@ -940,7 +953,7 @@ ADMIN_TEMPLATE = '''
                             <li>Click "Create App"</li>
                             <li>Fill in:
                                 <ul style="margin-left: 20px; margin-top: 5px;">
-                                    <li><strong>App name:</strong> Spotify Kids Player</li>
+                                    <li><strong>App name:</strong> Kids Music Player</li>
                                     <li><strong>App description:</strong> Kids music player</li>
                                     <li><strong>Redirect URI:</strong> <code style="background: #282828; padding: 2px 6px; border-radius: 3px; color: #1DB954;">https://{{ request.host.split(':')[0] }}/callback</code></li>
                                 </ul>
@@ -2025,7 +2038,7 @@ def diagnostics_ui():
     html = '''<!DOCTYPE html>
 <html>
 <head>
-    <title>Spotify Kids Manager - System Diagnostics</title>
+    <title>Kids Music Manager - System Diagnostics</title>
     <style>
         body { font-family: monospace; background: #1a1a1a; color: #fff; padding: 20px; }
         .header { background: #667eea; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
@@ -2045,7 +2058,7 @@ def diagnostics_ui():
 </head>
 <body>
     <div class="header">
-        <h1>🔍 Spotify Kids Manager - Complete System Diagnostics</h1>
+        <h1>🔍 Kids Music Manager - Complete System Diagnostics</h1>
         <button onclick="runDiagnostics()">🔄 Run Full Diagnostics</button>
         <button onclick="window.location.href='/diagnostics'">📊 View Raw JSON</button>
         <button onclick="window.location.href='/'">🏠 Back to Admin Panel</button>
@@ -2941,7 +2954,7 @@ def fix_ui():
     html = '''<!DOCTYPE html>
 <html>
 <head>
-    <title>Spotify Kids - Remote Fix System</title>
+    <title>Kids Music - Remote Fix System</title>
     <style>
         body { font-family: monospace; background: #1a1a1a; color: #fff; padding: 20px; }
         .header { background: #ef4444; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
@@ -3214,7 +3227,7 @@ def download_logs():
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         
         logs = []
-        logs.append(f"Spotify Kids Manager - System Logs Export\n")
+        logs.append(f"Kids Music Manager - System Logs Export\n")
         logs.append(f"Generated: {datetime.now()}\n")
         logs.append("="*60 + "\n\n")
         
@@ -3498,7 +3511,7 @@ def poweroff_system():
 
 @app.route('/api/system/restart-services', methods=['POST'])
 def restart_services():
-    """Restart all Spotify Kids services"""
+    """Restart all Kids Music services"""
     if 'logged_in' not in session:
         return jsonify({'error': 'Not authenticated'}), 401
     
