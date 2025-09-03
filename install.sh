@@ -843,7 +843,9 @@ systemctl set-default graphical.target
 
 # Enable services
 echo -e "${YELLOW}Enabling services...${NC}"
+# Reload systemd to recognize all new service files
 systemctl daemon-reload
+# Enable display manager
 systemctl enable lightdm
 systemctl enable spotify-player.service
 systemctl enable spotify-admin.service
@@ -851,7 +853,6 @@ systemctl enable spotify-kiosk.service
 systemctl enable nginx
 systemctl start spotify-player.service
 systemctl start spotify-admin.service
-systemctl start bluetooth-a2dp-switch.service
 systemctl restart nginx
 
 # Configure X11
@@ -1100,7 +1101,10 @@ StandardError=journal
 WantedBy=multi-user.target
 EOF
 
+# Reload systemd to recognize the new bluetooth service
+systemctl daemon-reload
 systemctl enable bluetooth-a2dp-switch.service
+systemctl start bluetooth-a2dp-switch.service 2>/dev/null || true
 
 # Disable unnecessary services
 echo -e "${YELLOW}Optimizing system...${NC}"

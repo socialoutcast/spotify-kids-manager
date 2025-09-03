@@ -16,7 +16,8 @@
     "axios": "^1.6.2",
     "ws": "^8.14.2",
     "express-session": "^1.17.3",
-    "spotify-web-api-node": "^5.0.2"
+    "spotify-web-api-node": "^5.0.2",
+    "formidable": "^3.5.1"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
