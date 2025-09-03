@@ -142,9 +142,69 @@ fi
 echo -e "${YELLOW}Updating system packages...${NC}"
 echo "Running apt-get update..."
 apt-get update || true
+
 echo "Running apt-get upgrade..."
-DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -q || true
+DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -q \
+    -o Dpkg::Options::="--force-confdef" \
+    -o Dpkg::Options::="--force-confold" || true
+
+echo "Handling held-back packages with dist-upgrade..."
+DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y -q \
+    -o Dpkg::Options::="--force-confdef" \
+    -o Dpkg::Options::="--force-confold" || true
+
+echo "Removing unnecessary packages..."
+apt-get autoremove -y || true
+
+echo "Cleaning package cache..."
+apt-get autoclean -y || true
+
 echo "System update complete"
+
+# Remove unnecessary office and productivity software
+echo -e "${YELLOW}Removing unnecessary office software to free up space...${NC}"
+apt-get remove -y --purge \
+    libreoffice* \
+    libreoffice-* \
+    openoffice* \
+    thunderbird* \
+    evolution* \
+    pidgin* \
+    hexchat* \
+    gimp* \
+    inkscape* \
+    audacity* \
+    vlc* \
+    transmission* \
+    brasero* \
+    cheese* \
+    rhythmbox* \
+    totem* \
+    2>/dev/null || true
+
+# Clean up after removal
+apt-get autoremove -y
+apt-get autoclean -y
+
+# Install common fonts for web display
+echo -e "${YELLOW}Installing common fonts...${NC}"
+apt-get install -y \
+    fonts-liberation \
+    fonts-liberation2 \
+    fonts-dejavu-core \
+    fonts-dejavu-extra \
+    fonts-droid-fallback \
+    fonts-noto-mono \
+    fonts-noto-color-emoji \
+    fonts-roboto \
+    fonts-ubuntu \
+    fonts-font-awesome \
+    fonts-material-design-icons-iconfont \
+    2>/dev/null || true
+
+# Accept Microsoft fonts EULA automatically
+echo ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true | debconf-set-selections
+apt-get install -y ttf-mscorefonts-installer 2>/dev/null || true
 
 # Install dependencies
 echo -e "${YELLOW}Installing dependencies...${NC}"
@@ -189,7 +249,8 @@ if ! command -v node &> /dev/null; then
     curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
     apt-get install -y nodejs
 fi
-echo -e "${GREEN}Node.js version: $(node --version)${NC}"
+NODE_VERSION=$(node --version 2>/dev/null || echo "not installed")
+echo -e "${GREEN}Node.js version: ${NODE_VERSION}${NC}"
 
 # Install Python packages
 echo -e "${YELLOW}Installing Python packages...${NC}"
@@ -201,6 +262,11 @@ pip3 install --break-system-packages \
     pillow \
     requests \
     psutil
+
+# Final cleanup after all installations
+echo -e "${YELLOW}Final system cleanup...${NC}"
+apt-get autoremove -y || true
+apt-get autoclean -y || true
 
 # Create application user (NO SUDO PRIVILEGES)
 echo -e "${YELLOW}Creating application user...${NC}"
@@ -373,7 +439,7 @@ update-alternatives --set x-session-manager /usr/bin/openbox-session 2>/dev/null
 # Install Node.js dependencies for player
 echo -e "${YELLOW}Installing player dependencies...${NC}"
 cd "$APP_DIR/player"
-sudo -u $APP_USER npm install --production
+sudo -u $APP_USER npm install --omit=dev
 
 # Create cache directory
 mkdir -p "$CONFIG_DIR/cache"
@@ -396,7 +462,7 @@ WorkingDirectory=$APP_DIR/player
 Environment="NODE_ENV=production"
 Environment="PORT=5000"
 Environment="SPOTIFY_CONFIG_DIR=$CONFIG_DIR"
-ExecStartPre=/bin/bash -c 'if [ ! -d "node_modules" ]; then npm install --production; fi'
+ExecStartPre=/bin/bash -c 'if [ ! -d "node_modules" ]; then npm install --omit=dev; fi'
 ExecStart=/usr/bin/node server.js
 Restart=always
 RestartSec=10
@@ -444,7 +510,7 @@ EOF
 echo -e "${YELLOW}Generating SSL certificate for HTTPS...${NC}"
 SSL_DIR="$APP_DIR/ssl"
 mkdir -p $SSL_DIR
-IP_ADDRESS=$(hostname -I | awk '{print $1}')
+IP_ADDRESS=$(hostname -I 2>/dev/null | awk '{print $1}')
 
 # Generate self-signed certificate
 openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
@@ -662,7 +728,6 @@ cat > /etc/sudoers.d/spotify-pkgmgr << 'EOF'
 %spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/truncate*
 %spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/dmesg*
 %spotify-pkgmgr ALL=(ALL) NOPASSWD: /bin/dmesg*
-%spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/python3 /opt/spotify-kids/full_diagnostics.py
 %spotify-pkgmgr ALL=(ALL) NOPASSWD: /sbin/reboot
 %spotify-pkgmgr ALL=(ALL) NOPASSWD: /sbin/shutdown*
 %spotify-pkgmgr ALL=(ALL) NOPASSWD: /sbin/poweroff
@@ -816,21 +881,20 @@ sed -i 's/#PairableTimeout = 0/PairableTimeout = 0/' /etc/bluetooth/main.conf
 sed -i 's/#Class = 0x000100/Class = 0x0c0420/' /etc/bluetooth/main.conf  # Audio device class
 
 # Ensure Bluetooth service starts with proper settings
-cat > /etc/systemd/system/bluetooth-audio-setup.service << EOF
+cat > /etc/systemd/system/bluetooth-audio-setup.service << 'EOF'
 [Unit]
 Description=Bluetooth Audio Setup
-After=bluetooth.service
+After=bluetooth.service dbus.service
 Requires=bluetooth.service
+Wants=dbus.service
 
 [Service]
 Type=oneshot
-ExecStartPre=/bin/sleep 2
-ExecStart=/usr/bin/bluetoothctl power on
-ExecStart=/usr/bin/bluetoothctl agent NoInputNoOutput
-ExecStart=/usr/bin/bluetoothctl default-agent
-ExecStart=/usr/bin/bluetoothctl discoverable on
-ExecStart=/usr/bin/bluetoothctl pairable on
+ExecStartPre=/bin/sleep 5
+ExecStart=/bin/bash -c 'timeout 2 bluetoothctl power on; timeout 2 bluetoothctl agent NoInputNoOutput; timeout 2 bluetoothctl default-agent; timeout 2 bluetoothctl discoverable on; timeout 2 bluetoothctl pairable on; exit 0'
 RemainAfterExit=yes
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
@@ -870,7 +934,7 @@ EOF
 chmod +x /usr/local/bin/spotify-kids-uninstall
 
 # Get the device IP address
-DEVICE_IP=$(hostname -I | awk '{print $1}')
+DEVICE_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
 CALLBACK_URL="https://${DEVICE_IP}/callback"
 
 echo -e "${GREEN}================================${NC}"

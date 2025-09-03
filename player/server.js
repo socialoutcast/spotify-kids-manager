@@ -199,6 +199,12 @@ async function updatePlaybackState() {
 
 // API Routes
 
+// Debug endpoint for browser console
+app.post('/api/debug', express.json(), (req, res) => {
+    console.log('[BROWSER]:', req.body.message);
+    res.json({ ok: true });
+});
+
 app.get('/api/token', async (req, res) => {
     if (!spotifyApi) {
         return res.status(503).json({ error: 'Spotify not connected' });
@@ -215,7 +221,11 @@ app.get('/api/token', async (req, res) => {
         res.json({ access_token: accessToken });
     } catch (error) {
         console.error('Error getting token:', error);
-        res.status(500).json({ error: 'Failed to get token' });
+        res.status(401).json({ 
+            error: 'Spotify not configured',
+            message: 'Please set up Spotify in the Admin Panel first',
+            setup_required: true 
+        });
     }
 });
 
@@ -770,6 +780,13 @@ app.post('/api/play-playlist', async (req, res) => {
     }
 });
 
+// Helper function to format duration
+function formatDuration(ms) {
+    const minutes = Math.floor(ms / 60000);
+    const seconds = Math.floor((ms % 60000) / 1000);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
 app.post('/api/search', async (req, res) => {
     if (!spotifyApi) {
         return res.status(503).json({ error: 'Spotify not connected' });
@@ -784,17 +801,14 @@ app.post('/api/search', async (req, res) => {
         // Format results
         if (data.body.tracks) {
             data.body.tracks.items.forEach(track => {
-                // Apply parental filters
-                if (parentalConfig.explicit_filter && track.explicit) return;
-                if (parentalConfig.blocked_songs.includes(track.id)) return;
-                if (track.artists.some(a => parentalConfig.blocked_artists.includes(a.id))) return;
-                
                 results.push({
                     type: 'track',
                     id: track.id,
                     uri: track.uri,
                     name: track.name,
                     artist: track.artists.map(a => a.name).join(', '),
+                    album: track.album.name,
+                    duration: formatDuration(track.duration_ms),
                     image: track.album.images[0]?.url
                 });
             });
@@ -815,8 +829,6 @@ app.post('/api/search', async (req, res) => {
         
         if (data.body.artists) {
             data.body.artists.items.forEach(artist => {
-                if (parentalConfig.blocked_artists.includes(artist.id)) return;
-                
                 results.push({
                     type: 'artist',
                     id: artist.id,
@@ -830,13 +842,16 @@ app.post('/api/search', async (req, res) => {
         
         if (data.body.playlists) {
             data.body.playlists.items.forEach(playlist => {
+                // Skip null playlists
+                if (!playlist) return;
+                
                 results.push({
                     type: 'playlist',
                     id: playlist.id,
                     uri: playlist.uri,
                     name: playlist.name,
-                    owner: playlist.owner.display_name,
-                    image: playlist.images[0]?.url
+                    owner: playlist.owner?.display_name || 'Unknown',
+                    image: playlist.images?.[0]?.url
                 });
             });
         }

@@ -970,14 +970,10 @@ async function checkSpotifyAuthStatus() {
         const result = await apiCall('/api/spotify/auth-status');
         console.log('Auth status result:', result);
         
-        const authSection = document.getElementById('spotifyAuthSection');
+        const authRequired = document.getElementById('spotifyAuthRequired');
+        const authConnected = document.getElementById('spotifyAuthConnected');
         const authLink = document.getElementById('spotifyAuthLink');
         const redirectUriDisplay = document.getElementById('redirectUriDisplay');
-        
-        if (!authSection) {
-            console.log('Auth section element not found');
-            return;
-        }
         
         // Display the redirect URI that needs to be added to Spotify app
         if (redirectUriDisplay) {
@@ -987,19 +983,22 @@ async function checkSpotifyAuthStatus() {
         }
         
         if (result.success && result.auth_url && !result.authenticated) {
-            // Show auth section with the link
+            // Show auth required section
             console.log('Showing auth link:', result.auth_url);
-            authSection.style.display = 'block';
+            if (authRequired) authRequired.style.display = 'block';
+            if (authConnected) authConnected.style.display = 'none';
             if (authLink) {
                 authLink.href = result.auth_url;
             }
         } else if (result.authenticated) {
-            // Hide auth section if authenticated
-            console.log('Player is authenticated, hiding auth section');
-            authSection.style.display = 'none';
+            // Show connected status
+            console.log('Player is authenticated, showing connected status');
+            if (authRequired) authRequired.style.display = 'none';
+            if (authConnected) authConnected.style.display = 'block';
         } else {
             console.log('Unknown auth state:', result);
-            authSection.style.display = 'none';
+            if (authRequired) authRequired.style.display = 'none';
+            if (authConnected) authConnected.style.display = 'none';
         }
     } catch (error) {
         console.error('Error checking auth status:', error);

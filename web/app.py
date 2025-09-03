@@ -298,7 +298,7 @@ ADMIN_TEMPLATE = '''
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Spotify Kids Admin</title>
+    <title>Kids Music Admin</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -707,10 +707,23 @@ ADMIN_TEMPLATE = '''
         <!-- Sidebar Navigation -->
         <aside class="sidebar">
             <div class="logo">
-                <svg viewBox="0 0 24 24">
-                    <path fill="#1DB954" d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
+                <svg viewBox="0 0 24 24" style="width: 48px; height: 48px;">
+                    <!-- Custom Kids Music Icon - Headphones with Heart -->
+                    <defs>
+                        <linearGradient id="kidsGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" style="stop-color:#FF6B6B;stop-opacity:1" />
+                            <stop offset="100%" style="stop-color:#4ECDC4;stop-opacity:1" />
+                        </linearGradient>
+                    </defs>
+                    <!-- Headphones -->
+                    <path fill="url(#kidsGradient)" d="M12 1C6.5 1 2 5.5 2 11v7c0 1.1.9 2 2 2h2c.6 0 1-.4 1-1v-5c0-.6-.4-1-1-1H4v-2c0-4.4 3.6-8 8-8s8 3.6 8 8v2h-2c-.6 0-1 .4-1 1v5c0 .6.4 1 1 1h2c1.1 0 2-.9 2-2v-7c0-5.5-4.5-10-10-10z"/>
+                    <!-- Heart in center -->
+                    <path fill="#FF69B4" d="M12 10.5c-.3-.5-.7-.8-1.2-.8-.7 0-1.3.6-1.3 1.3 0 .3.1.6.3.8l2.2 2.2 2.2-2.2c.2-.2.3-.5.3-.8 0-.7-.6-1.3-1.3-1.3-.5 0-.9.3-1.2.8z"/>
+                    <!-- Musical notes -->
+                    <circle fill="#FFD93D" cx="8" cy="17" r="1"/>
+                    <circle fill="#FFD93D" cx="16" cy="17" r="1"/>
                 </svg>
-                <h1>Kids Admin</h1>
+                <h1>Kids Music Admin</h1>
             </div>
             
             <nav>
@@ -860,26 +873,35 @@ ADMIN_TEMPLATE = '''
                     <!-- Spotify Configuration -->
                     <div class="card">
                         <h2>🎵 Spotify Configuration</h2>
-                <div id="spotifyAuthSection" style="display: none; margin-bottom: 15px;">
-                    <div style="background: #f59e0b; color: white; padding: 10px; border-radius: 5px; margin-bottom: 10px;">
-                        <strong>⚠️ Authentication Required</strong>
-                        <p style="margin: 5px 0; font-size: 12px;">The Spotify player needs to be authenticated.</p>
+                <div id="spotifyAuthStatus" style="margin-bottom: 15px;">
+                    <!-- Auth Required Section -->
+                    <div id="spotifyAuthRequired" style="display: none;">
+                        <div style="background: #f59e0b; color: white; padding: 10px; border-radius: 5px; margin-bottom: 10px;">
+                            <strong>⚠️ Authentication Required</strong>
+                            <p style="margin: 5px 0; font-size: 12px;">The Spotify player needs to be authenticated.</p>
+                        </div>
+                        
+                        <div style="background: #1f2937; padding: 15px; border-radius: 5px; margin-bottom: 10px;">
+                            <p style="margin: 0 0 10px 0; color: white; font-size: 13px;">Click the button below to authenticate with Spotify:</p>
+                            <a id="spotifyAuthLink" href="#" style="display: inline-block; background: #1db954; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; font-weight: bold;">
+                                🔐 Authenticate with Spotify
+                            </a>
+                        </div>
+                        
+                        <div style="margin-top: 10px; padding: 10px; background: #374151; border-radius: 5px;">
+                            <p style="margin: 0 0 5px 0; font-size: 11px; color: #9ca3af;">
+                                <strong>Important:</strong> Add this URL to your Spotify app's Redirect URIs:
+                            </p>
+                            <code id="redirectUriDisplay" style="background: #1f2937; padding: 4px 8px; border-radius: 3px; color: #10b981; font-size: 11px;">
+                                Loading...
+                            </code>
+                        </div>
                     </div>
                     
-                    <div style="background: #1f2937; padding: 15px; border-radius: 5px; margin-bottom: 10px;">
-                        <p style="margin: 0 0 10px 0; color: white; font-size: 13px;">Click the button below to authenticate with Spotify:</p>
-                        <a id="spotifyAuthLink" href="#" style="display: inline-block; background: #1db954; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; font-weight: bold;">
-                            🔐 Authenticate with Spotify
-                        </a>
-                    </div>
-                    
-                    <div style="margin-top: 10px; padding: 10px; background: #374151; border-radius: 5px;">
-                        <p style="margin: 0 0 5px 0; font-size: 11px; color: #9ca3af;">
-                            <strong>Important:</strong> Add this URL to your Spotify app's Redirect URIs:
-                        </p>
-                        <code id="redirectUriDisplay" style="background: #1f2937; padding: 4px 8px; border-radius: 3px; color: #10b981; font-size: 11px;">
-                            Loading...
-                        </code>
+                    <!-- Connected Status -->
+                    <div id="spotifyAuthConnected" style="display: none; background: #10b981; color: white; padding: 10px; border-radius: 5px;">
+                        <strong>✅ Spotify Connected</strong>
+                        <p style="margin: 5px 0; font-size: 12px;">The player is authenticated and ready to use.</p>
                     </div>
                 </div>
                 <div class="form-group">
@@ -917,6 +939,54 @@ ADMIN_TEMPLATE = '''
                         {% if spotify_configured %}
                         <button onclick="refreshSpotifyToken()" style="margin-top: 15px;">Refresh Token</button>
                         {% endif %}
+                    </div>
+                </div>
+                
+                <!-- Setup Instructions -->
+                <div class="card" style="margin-top: 20px;">
+                    <h2>📚 Setup Instructions</h2>
+                    <div style="line-height: 1.8;">
+                        <h3 style="margin-top: 20px; color: #1DB954;">Step 1: Create a Spotify App</h3>
+                        <ol style="margin-left: 20px; color: #b3b3b3;">
+                            <li>Go to <a href="https://developer.spotify.com/dashboard" target="_blank" style="color: #1DB954;">developer.spotify.com/dashboard</a></li>
+                            <li>Log in with your Spotify account</li>
+                            <li>Click "Create App"</li>
+                            <li>Fill in:
+                                <ul style="margin-left: 20px; margin-top: 5px;">
+                                    <li><strong>App name:</strong> Kids Music Player</li>
+                                    <li><strong>App description:</strong> Kids music player</li>
+                                    <li><strong>Redirect URI:</strong> <code style="background: #282828; padding: 2px 6px; border-radius: 3px; color: #1DB954;">https://{{ request.host.split(':')[0] }}/callback</code></li>
+                                </ul>
+                            </li>
+                            <li>Check "Web API" under APIs used</li>
+                            <li>Click "Save"</li>
+                        </ol>
+                        
+                        <h3 style="margin-top: 20px; color: #1DB954;">Step 2: Get Your Credentials</h3>
+                        <ol style="margin-left: 20px; color: #b3b3b3;">
+                            <li>In your app's dashboard, click "Settings"</li>
+                            <li>Copy your <strong style="color: #fff;">Client ID</strong></li>
+                            <li>Click "View client secret" and copy your <strong style="color: #fff;">Client Secret</strong></li>
+                            <li>Paste them in the fields above</li>
+                        </ol>
+                        
+                        <h3 style="margin-top: 20px; color: #1DB954;">Step 3: Configure & Authenticate</h3>
+                        <ol style="margin-left: 20px; color: #b3b3b3;">
+                            <li>Enter your Client ID and Client Secret above</li>
+                            <li>Click "Save Config"</li>
+                            <li>Click "Test" to verify your credentials</li>
+                            <li>If successful, click "Authenticate with Spotify" when it appears</li>
+                            <li>Log in to Spotify and authorize the app</li>
+                        </ol>
+                        
+                        <div style="margin-top: 20px; padding: 15px; background: #282828; border-radius: 5px; border-left: 4px solid #1DB954;">
+                            <strong style="color: #f59e0b;">⚠️ Important:</strong>
+                            <ul style="color: #b3b3b3; margin: 10px 0 0 20px; list-style-type: disc;">
+                                <li>Add the exact Redirect URI shown above to your Spotify app settings</li>
+                                <li><strong style="color: #1DB954;">No port forwarding needed!</strong> The callback only needs to work from your local network</li>
+                                <li>You'll authenticate from this same PC, so the local IP address is perfect</li>
+                            </ul>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1083,63 +1153,63 @@ ADMIN_TEMPLATE = '''
         </div>
         
         <!-- Update Progress Modal -->
-        <div id="updateModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
-            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border-radius: 10px; padding: 30px; width: 600px; max-height: 80vh; overflow-y: auto;">
-                <h2 style="margin-bottom: 20px;">System Update Progress</h2>
-                <div id="updateOutput" style="background: #1e1e1e; color: #00ff00; font-family: 'Courier New', monospace; font-size: 12px; padding: 15px; border-radius: 5px; height: 300px; overflow-y: auto; white-space: pre-wrap;"></div>
+        <div id="updateModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000;">
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #2a2a2a; border-radius: 10px; padding: 30px; width: 600px; max-height: 80vh; overflow-y: auto; border: 1px solid #444;">
+                <h2 style="margin-bottom: 20px; color: #fff;">System Update Progress</h2>
+                <div id="updateOutput" style="background: #1a1a1a; color: #00ff00; font-family: 'Courier New', monospace; font-size: 12px; padding: 15px; border-radius: 5px; height: 300px; overflow-y: auto; white-space: pre-wrap; border: 1px solid #444;"></div>
                 <div style="margin-top: 20px; text-align: right;">
-                    <button id="closeUpdateModal" onclick="closeUpdateModal()" style="display: none;">Close</button>
+                    <button id="closeUpdateModal" onclick="closeUpdateModal()" style="display: none; background: #667eea; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">Close</button>
                 </div>
             </div>
         </div>
         
         <!-- Package Manager Modal -->
-        <div id="packageModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
-            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border-radius: 10px; padding: 30px; width: 800px; max-height: 80vh; overflow-y: auto;">
+        <div id="packageModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000;">
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #2a2a2a; border-radius: 10px; padding: 30px; width: 800px; max-height: 80vh; overflow-y: auto; border: 1px solid #444;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                    <h2 style="margin: 0;">📦 Package Manager</h2>
+                    <h2 style="margin: 0; color: #fff;">📦 Package Manager</h2>
                     <button onclick="closePackageModal()" style="background: #dc2626; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer;">✕ Close</button>
                 </div>
                 
-                <div id="packageStatus" style="margin-bottom: 20px;"></div>
+                <div id="packageStatus" style="margin-bottom: 20px; color: #fff;"></div>
                 
                 <div style="margin-bottom: 20px;">
-                    <button onclick="loadUpgradablePackages()" style="margin-right: 10px;">🔄 Refresh List</button>
-                    <button onclick="runDistUpgrade()" style="background: #f59e0b; color: white;">⬆️ Upgrade All Packages</button>
+                    <button onclick="loadUpgradablePackages()" style="margin-right: 10px; background: #444; color: #fff; border: 1px solid #666; padding: 8px 16px; border-radius: 5px; cursor: pointer;">🔄 Refresh List</button>
+                    <button onclick="runDistUpgrade()" style="background: #f59e0b; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer;">⬆️ Upgrade All Packages</button>
                 </div>
                 
-                <div id="packageList" style="background: #f9fafb; border-radius: 5px; padding: 20px; min-height: 200px; max-height: 400px; overflow-y: auto;">
-                    <div style="text-align: center; color: #6b7280;">Loading packages...</div>
+                <div id="packageList" style="background: #1a1a1a; border-radius: 5px; padding: 20px; min-height: 200px; max-height: 400px; overflow-y: auto; border: 1px solid #444;">
+                    <div style="text-align: center; color: #999;">Loading packages...</div>
                 </div>
             </div>
         </div>
         
         <!-- Bluetooth Scan Modal -->
         <div id="bluetoothScanModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000;">
-            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border-radius: 10px; padding: 30px; width: 600px; max-height: 80vh; overflow-y: auto;">
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #2a2a2a; border-radius: 10px; padding: 30px; width: 600px; max-height: 80vh; overflow-y: auto; border: 1px solid #444;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                    <h2 style="margin: 0;">🔍 Scanning for Bluetooth Devices</h2>
+                    <h2 style="margin: 0; color: #fff;">🔍 Scanning for Bluetooth Devices</h2>
                     <button onclick="closeScanModal()" style="background: #ef4444; color: white; border: none; padding: 5px 15px; border-radius: 5px; cursor: pointer;">✕</button>
                 </div>
                 
-                <div id="scanStatus" style="margin-bottom: 20px; padding: 10px; background: #f3f4f6; border-radius: 5px;">
+                <div id="scanStatus" style="margin-bottom: 20px; padding: 10px; background: #1a1a1a; border-radius: 5px; border: 1px solid #444;">
                     <div style="display: flex; align-items: center;">
-                        <div class="spinner" style="border: 3px solid #f3f3f3; border-top: 3px solid #667eea; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; margin-right: 10px;"></div>
-                        <span id="scanStatusText">Scanning for devices...</span>
+                        <div class="spinner" style="border: 3px solid #444; border-top: 3px solid #667eea; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; margin-right: 10px;"></div>
+                        <span id="scanStatusText" style="color: #fff;">Scanning for devices...</span>
                     </div>
                 </div>
                 
                 <div style="margin-bottom: 20px;">
-                    <h3 style="margin-bottom: 10px;">Available Devices:</h3>
-                    <div id="scanDeviceList" style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; border-radius: 5px; padding: 10px; background: #f9fafb;">
+                    <h3 style="margin-bottom: 10px; color: #fff;">Available Devices:</h3>
+                    <div id="scanDeviceList" style="max-height: 300px; overflow-y: auto; border: 1px solid #444; border-radius: 5px; padding: 10px; background: #1a1a1a;">
                         <p style="color: #999; text-align: center;">No devices found yet...</p>
                     </div>
                 </div>
                 
                 <div style="display: flex; gap: 10px;">
-                    <button onclick="scanBluetooth()" style="flex: 1; background: #667eea;">Refresh Scan</button>
-                    <button onclick="stopScan()" style="flex: 1; background: #ef4444;">Stop Scanning</button>
-                    <button onclick="closeScanModal()" style="flex: 1;">Close</button>
+                    <button onclick="scanBluetooth()" style="flex: 1; background: #667eea; color: white; border: none; padding: 10px; border-radius: 5px; cursor: pointer;">Refresh Scan</button>
+                    <button onclick="stopScan()" style="flex: 1; background: #ef4444; color: white; border: none; padding: 10px; border-radius: 5px; cursor: pointer;">Stop Scanning</button>
+                    <button onclick="closeScanModal()" style="flex: 1; background: #444; color: #fff; border: 1px solid #666; padding: 10px; border-radius: 5px; cursor: pointer;">Close</button>
                 </div>
             </div>
         </div>
@@ -1518,6 +1588,7 @@ def test_spotify_config():
         if response.status_code == 200:
             # Success - credentials are valid
             token_data = response.json()
+            
             return jsonify({
                 'success': True, 
                 'message': 'Spotify API credentials validated successfully! Your configuration is working correctly.',
@@ -1755,6 +1826,22 @@ def oauth_callback():
         
         if token_info:
             app.logger.info("Successfully obtained Spotify access token via callback")
+            
+            # Fix token cache permissions so player can read it
+            try:
+                os.chmod(cache_file, 0o664)
+                app.logger.info(f"Fixed token cache permissions at {cache_file}")
+            except Exception as perm_error:
+                app.logger.error(f"Failed to fix token permissions: {perm_error}")
+            
+            # Restart the player service to load the new token
+            try:
+                import subprocess
+                subprocess.run(['sudo', 'systemctl', 'restart', 'spotify-player'], check=True)
+                app.logger.info("Spotify player service restarted after authentication")
+            except Exception as restart_error:
+                app.logger.error(f"Failed to restart player service: {restart_error}")
+            
             return f"""
             <html>
             <head>
@@ -1763,6 +1850,7 @@ def oauth_callback():
             <body style="font-family: Arial; text-align: center; padding: 50px;">
                 <h2 style="color: green;">✅ Authentication Successful!</h2>
                 <p>Spotify has been successfully authenticated.</p>
+                <p>The player is restarting to load your music...</p>
                 <p>Redirecting to admin panel in 3 seconds...</p>
                 <a href="/">Click here if not redirected</a>
             </body>
@@ -1838,6 +1926,22 @@ def submit_auth_code():
         
         if token_info:
             app.logger.info("Successfully obtained Spotify access token")
+            
+            # Fix token cache permissions so player can read it
+            try:
+                os.chmod(cache_file, 0o664)
+                app.logger.info(f"Fixed token cache permissions at {cache_file}")
+            except Exception as perm_error:
+                app.logger.error(f"Failed to fix token permissions: {perm_error}")
+            
+            # Restart the player service to load the new token
+            try:
+                import subprocess
+                subprocess.run(['sudo', 'systemctl', 'restart', 'spotify-player'], check=True)
+                app.logger.info("Spotify player service restarted after authentication")
+            except Exception as restart_error:
+                app.logger.error(f"Failed to restart player service: {restart_error}")
+            
             return jsonify({'success': True, 'message': 'Authentication successful!'})
         else:
             return jsonify({'success': False, 'error': 'Failed to obtain access token'})
@@ -1879,29 +1983,52 @@ def check_updates():
 
 @app.route('/run-diagnostics')
 def run_diagnostics():
-    """Run the full diagnostics script and return results"""
+    """Run inline diagnostics and return results"""
     import traceback
     try:
-        # Run the diagnostics script
-        result = subprocess.run(['sudo', 'python3', '/opt/spotify-kids/full_diagnostics.py'],
-                              capture_output=True, text=True, timeout=30)
+        report = {
+            'timestamp': datetime.now().isoformat(),
+            'system': {},
+            'services': {},
+            'network': {},
+            'spotify': {}
+        }
         
-        # Try to load the generated report
-        report_file = '/opt/spotify-kids/diagnostics_report.json'
-        if os.path.exists(report_file):
-            with open(report_file, 'r') as f:
-                report = json.load(f)
+        # System info
+        report['system']['cpu_percent'] = psutil.cpu_percent(interval=1)
+        report['system']['memory'] = dict(psutil.virtual_memory()._asdict())
+        report['system']['disk'] = dict(psutil.disk_usage('/')._asdict())
+        
+        # Service status
+        services = ['spotify-player', 'spotify-admin', 'spotify-kiosk', 'nginx']
+        for service in services:
+            try:
+                result = subprocess.run(['systemctl', 'is-active', service],
+                                      capture_output=True, text=True, timeout=2)
+                report['services'][service] = result.stdout.strip() == 'active'
+            except:
+                report['services'][service] = False
+        
+        # Network info
+        try:
+            result = subprocess.run(['ip', 'addr', 'show'],
+                                  capture_output=True, text=True, timeout=2)
+            report['network']['interfaces'] = result.stdout
+        except:
+            report['network']['interfaces'] = 'Unable to get network info'
+        
+        # Spotify config
+        if os.path.exists(SPOTIFY_CONFIG_FILE):
+            with open(SPOTIFY_CONFIG_FILE, 'r') as f:
+                config = json.load(f)
+                report['spotify']['configured'] = bool(config.get('client_id'))
+                report['spotify']['has_token'] = bool(config.get('access_token'))
         else:
-            report = {
-                'error': 'Diagnostics ran but no report generated',
-                'stdout': result.stdout,
-                'stderr': result.stderr
-            }
+            report['spotify']['configured'] = False
+            report['spotify']['has_token'] = False
         
         return Response(json.dumps(report, indent=2, default=str),
                        mimetype='application/json')
-    except subprocess.TimeoutExpired:
-        return jsonify({'error': 'Diagnostics timed out after 30 seconds'}), 504
     except Exception as e:
         return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
 
@@ -1911,7 +2038,7 @@ def diagnostics_ui():
     html = '''<!DOCTYPE html>
 <html>
 <head>
-    <title>Spotify Kids Manager - System Diagnostics</title>
+    <title>Kids Music Manager - System Diagnostics</title>
     <style>
         body { font-family: monospace; background: #1a1a1a; color: #fff; padding: 20px; }
         .header { background: #667eea; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
@@ -1931,7 +2058,7 @@ def diagnostics_ui():
 </head>
 <body>
     <div class="header">
-        <h1>🔍 Spotify Kids Manager - Complete System Diagnostics</h1>
+        <h1>🔍 Kids Music Manager - Complete System Diagnostics</h1>
         <button onclick="runDiagnostics()">🔄 Run Full Diagnostics</button>
         <button onclick="window.location.href='/diagnostics'">📊 View Raw JSON</button>
         <button onclick="window.location.href='/'">🏠 Back to Admin Panel</button>
@@ -2118,7 +2245,7 @@ def diagnostics():
         # Check important files
         important_files = [
             '/opt/spotify-kids/web/app.py',
-            '/opt/spotify-kids/spotify_player.py',
+            '/opt/spotify-kids/player/server.js',
             '/opt/spotify-kids/config/config.json',
             '/opt/spotify-kids/config/spotify_config.json',
             '/etc/systemd/system/spotify-player.service',
@@ -2304,54 +2431,75 @@ def update_stream():
         return Response("Error: Not authenticated", status=401)
     
     def generate():
-        # Create a queue for output
-        output_queue = queue.Queue()
-        
-        def run_update():
-            try:
-                # Run apt update
-                yield "data: Running apt update...\n\n"
-                proc = subprocess.Popen(['sudo', 'apt-get', 'update'],
-                                      stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                      text=True, bufsize=1)
-                for line in proc.stdout:
-                    yield f"data: {line.strip()}\n\n"
-                proc.wait()
-                
-                # Run apt upgrade with auto-yes
-                yield "data: \n\n"
-                yield "data: Running system upgrade (this may take a while)...\n\n"
-                env = os.environ.copy()
-                env['DEBIAN_FRONTEND'] = 'noninteractive'
-                proc = subprocess.Popen(['sudo', '-E', 'apt-get', 'upgrade', '-y', 
-                                       '-o', 'Dpkg::Options::=--force-confdef', 
-                                       '-o', 'Dpkg::Options::=--force-confold'],
-                                      stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                      text=True, bufsize=1, env=env)
-                
-                for line in proc.stdout:
-                    cleaned_line = line.strip()
-                    if cleaned_line:
-                        yield f"data: {cleaned_line}\n\n"
-                
-                proc.wait()
-                
-                # Clean up
-                yield "data: \n\n"
-                yield "data: Cleaning up...\n\n"
-                subprocess.run(['sudo', 'apt-get', 'autoremove', '-y'], 
-                             capture_output=True, check=False)
-                subprocess.run(['sudo', 'apt-get', 'autoclean', '-y'], 
-                             capture_output=True, check=False)
-                
-                yield "data: \n\n"
-                yield "data: ✓ Update completed successfully!\n\n"
-                
-            except Exception as e:
-                yield f"data: Error: {str(e)}\n\n"
-        
-        # Return the generator
-        return run_update()
+        try:
+            # Run apt update
+            yield "data: Running apt update...\n\n"
+            proc = subprocess.Popen(['sudo', 'apt-get', 'update'],
+                                  stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                  text=True, bufsize=1)
+            for line in proc.stdout:
+                yield f"data: {line.strip()}\n\n"
+            proc.wait()
+            
+            # Run apt upgrade with auto-yes and handle held-back packages
+            yield "data: \n\n"
+            yield "data: Running system upgrade (this may take a while)...\n\n"
+            env = os.environ.copy()
+            env['DEBIAN_FRONTEND'] = 'noninteractive'
+            
+            # First try regular upgrade
+            proc = subprocess.Popen(['sudo', '-E', 'apt-get', 'upgrade', '-y', 
+                                   '-o', 'Dpkg::Options::=--force-confdef', 
+                                   '-o', 'Dpkg::Options::=--force-confold'],
+                                  stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                  text=True, bufsize=1, env=env)
+            
+            for line in proc.stdout:
+                cleaned_line = line.strip()
+                if cleaned_line:
+                    yield f"data: {cleaned_line}\n\n"
+            
+            proc.wait()
+            
+            # Handle held-back packages with dist-upgrade
+            yield "data: \n\n"
+            yield "data: Checking for held-back packages...\n\n"
+            proc = subprocess.Popen(['sudo', '-E', 'apt-get', 'dist-upgrade', '-y', 
+                                   '-o', 'Dpkg::Options::=--force-confdef', 
+                                   '-o', 'Dpkg::Options::=--force-confold'],
+                                  stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                  text=True, bufsize=1, env=env)
+            
+            for line in proc.stdout:
+                cleaned_line = line.strip()
+                if cleaned_line:
+                    yield f"data: {cleaned_line}\n\n"
+            
+            proc.wait()
+            
+            # Clean up - show output for autoremove
+            yield "data: \n\n"
+            yield "data: Removing unnecessary packages...\n\n"
+            proc = subprocess.Popen(['sudo', 'apt-get', 'autoremove', '-y'],
+                                  stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                  text=True, bufsize=1)
+            for line in proc.stdout:
+                cleaned_line = line.strip()
+                if cleaned_line:
+                    yield f"data: {cleaned_line}\n\n"
+            proc.wait()
+            
+            # Run autoclean
+            yield "data: \n\n"
+            yield "data: Cleaning package cache...\n\n"
+            subprocess.run(['sudo', 'apt-get', 'autoclean', '-y'], 
+                         capture_output=True, check=False)
+            
+            yield "data: \n\n"
+            yield "data: ✓ Update completed successfully!\n\n"
+            
+        except Exception as e:
+            yield f"data: Error: {str(e)}\n\n"
     
     return Response(generate(), mimetype='text/event-stream',
                    headers={'Cache-Control': 'no-cache',
@@ -2666,18 +2814,44 @@ def check_system_updates():
         check_result = subprocess.run(['sudo', 'apt', 'update'], 
                                     capture_output=True, text=True, timeout=30)
         
-        # Get list of upgradable packages
-        list_result = subprocess.run(['apt', 'list', '--upgradable'], 
-                                    capture_output=True, text=True)
+        # Simulate what would happen with upgrade to get accurate count
+        # This checks for held-back packages too
+        simulate_result = subprocess.run(['sudo', 'apt-get', 'dist-upgrade', '-s'], 
+                                        capture_output=True, text=True)
         
-        # Parse the output to count and list updates
-        lines = list_result.stdout.strip().split('\n')
+        # Parse simulation output for actual upgradable packages
         updates = []
-        for line in lines[1:]:  # Skip the first line (header)
-            if '/' in line:
-                package_info = line.split()[0].split('/')[0]
-                if package_info:
-                    updates.append(package_info)
+        in_upgrade_section = False
+        
+        for line in simulate_result.stdout.split('\n'):
+            if 'The following packages will be upgraded:' in line:
+                in_upgrade_section = True
+                continue
+            elif in_upgrade_section:
+                if line.strip() and not line.startswith(' '):
+                    # End of upgrade section
+                    break
+                elif line.strip():
+                    # Parse package names from the line
+                    packages = line.strip().split()
+                    updates.extend(packages)
+        
+        # Also check for autoremovable packages (subtract from count)
+        autoremove_result = subprocess.run(['sudo', 'apt-get', 'autoremove', '-s'],
+                                         capture_output=True, text=True)
+        autoremove_count = 0
+        if 'The following packages will be REMOVED:' in autoremove_result.stdout:
+            for line in autoremove_result.stdout.split('\n'):
+                if 'remov' in line.lower() and 'package' in line.lower():
+                    # Extract number from line like "0 upgraded, 0 newly installed, 8 to remove"
+                    parts = line.split(',')
+                    for part in parts:
+                        if 'to remove' in part:
+                            try:
+                                autoremove_count = int(part.split()[0])
+                            except:
+                                pass
+                    break
         
         update_count = len(updates)
         
@@ -2753,11 +2927,8 @@ def run_custom_fix():
             if auth_token != expected_token:
                 return jsonify({'error': 'Dangerous command requires auth token', 'expected_token': expected_token}), 403
         
-        sys.path.insert(0, '/opt/spotify-kids')
-        from remote_fix import RemoteFixer
-        
-        fixer = RemoteFixer()
-        result = fixer.run_custom_command(command, timeout)
+        # Run command with safety checks
+        result = subprocess.run(command, shell=True, capture_output=True, text=True, timeout=timeout)
         
         return jsonify(result)
     except Exception as e:
@@ -2783,7 +2954,7 @@ def fix_ui():
     html = '''<!DOCTYPE html>
 <html>
 <head>
-    <title>Spotify Kids - Remote Fix System</title>
+    <title>Kids Music - Remote Fix System</title>
     <style>
         body { font-family: monospace; background: #1a1a1a; color: #fff; padding: 20px; }
         .header { background: #ef4444; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
@@ -3056,7 +3227,7 @@ def download_logs():
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         
         logs = []
-        logs.append(f"Spotify Kids Manager - System Logs Export\n")
+        logs.append(f"Kids Music Manager - System Logs Export\n")
         logs.append(f"Generated: {datetime.now()}\n")
         logs.append("="*60 + "\n\n")
         
@@ -3340,7 +3511,7 @@ def poweroff_system():
 
 @app.route('/api/system/restart-services', methods=['POST'])
 def restart_services():
-    """Restart all Spotify Kids services"""
+    """Restart all Kids Music services"""
     if 'logged_in' not in session:
         return jsonify({'error': 'Not authenticated'}), 401
     
