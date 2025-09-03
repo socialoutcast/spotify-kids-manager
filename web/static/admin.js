@@ -1,4 +1,10 @@
-// Admin Panel JavaScript - Clean and Simple
+/*
+ * Spotify Kids Manager - Admin Panel JavaScript
+ * Copyright (c) 2025 Bill Krause. All rights reserved.
+ * 
+ * This is proprietary software. Unauthorized copying, modification, distribution,
+ * or reverse engineering is strictly prohibited. See LICENSE file for details.
+ */
 
 // API Functions
 async function apiCall(url, method = 'GET', data = null) {

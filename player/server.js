@@ -1,3 +1,11 @@
+/*
+ * Spotify Kids Manager - Player Server
+ * Copyright (c) 2025 Bill Krause. All rights reserved.
+ * 
+ * This is proprietary software. Unauthorized copying, modification, distribution,
+ * or reverse engineering is strictly prohibited. See LICENSE file for details.
+ */
+
 const express = require('express');
 const cors = require('cors');
 const path = require('path');

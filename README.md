@@ -418,19 +418,37 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
-## 📄 License
+## 📄 License & Commercial Use
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+**PROPRIETARY SOFTWARE** - This is proprietary, copyrighted software owned by Bill Krause.
 
-## 🙏 Acknowledgments
+### Personal Use
+- ✅ Install and use on your own devices for personal/family use
+- ✅ Access through provided installation methods
 
-- Spotify Web API and Web Playback SDK
-- Raspberry Pi Foundation
-- The open source community
+### Prohibited
+- ❌ **NO redistribution, modification, or commercial use without permission**
+- ❌ **NO reverse engineering or code extraction**
+- ❌ **NO selling or incorporating into commercial products**
+- ❌ **NO creating derivative works or competing products**
 
-## ⚠️ Disclaimer
+### Commercial Licensing
+Interested in:
+- **Selling devices with this software pre-installed?**
+- **Using in a business environment?**
+- **Creating products based on this system?**
 
-This project is not affiliated with Spotify AB. Spotify is a registered trademark of Spotify AB. This is an independent project that uses the official Spotify Web API.
+**Contact for commercial licensing:** [Your Email Here]
+
+See the [LICENSE](LICENSE) file for complete terms and conditions.
+
+## ⚠️ Important Disclaimers
+
+- This project is **NOT affiliated with Spotify AB**
+- Spotify is a registered trademark of Spotify AB  
+- This is an independent project using official Spotify Web API
+- **Requires Spotify Premium subscription**
+- User assumes all responsibility for compliance with Spotify Terms of Service
 
 ## 📧 Support
 

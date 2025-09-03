@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+"""
+Spotify Kids Manager - Admin Panel
+Copyright (c) 2025 Bill Krause. All rights reserved.
+
+This is proprietary software. Unauthorized copying, modification, distribution,
+or reverse engineering is strictly prohibited. See LICENSE file for details.
+"""
 
 from flask import Flask, request, jsonify, session, redirect, url_for, render_template_string, Response
 from flask_cors import CORS
