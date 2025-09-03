@@ -1140,63 +1140,63 @@ ADMIN_TEMPLATE = '''
         </div>
         
         <!-- Update Progress Modal -->
-        <div id="updateModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
-            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border-radius: 10px; padding: 30px; width: 600px; max-height: 80vh; overflow-y: auto;">
-                <h2 style="margin-bottom: 20px;">System Update Progress</h2>
-                <div id="updateOutput" style="background: #1e1e1e; color: #00ff00; font-family: 'Courier New', monospace; font-size: 12px; padding: 15px; border-radius: 5px; height: 300px; overflow-y: auto; white-space: pre-wrap;"></div>
+        <div id="updateModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000;">
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #2a2a2a; border-radius: 10px; padding: 30px; width: 600px; max-height: 80vh; overflow-y: auto; border: 1px solid #444;">
+                <h2 style="margin-bottom: 20px; color: #fff;">System Update Progress</h2>
+                <div id="updateOutput" style="background: #1a1a1a; color: #00ff00; font-family: 'Courier New', monospace; font-size: 12px; padding: 15px; border-radius: 5px; height: 300px; overflow-y: auto; white-space: pre-wrap; border: 1px solid #444;"></div>
                 <div style="margin-top: 20px; text-align: right;">
-                    <button id="closeUpdateModal" onclick="closeUpdateModal()" style="display: none;">Close</button>
+                    <button id="closeUpdateModal" onclick="closeUpdateModal()" style="display: none; background: #667eea; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">Close</button>
                 </div>
             </div>
         </div>
         
         <!-- Package Manager Modal -->
-        <div id="packageModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
-            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border-radius: 10px; padding: 30px; width: 800px; max-height: 80vh; overflow-y: auto;">
+        <div id="packageModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000;">
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #2a2a2a; border-radius: 10px; padding: 30px; width: 800px; max-height: 80vh; overflow-y: auto; border: 1px solid #444;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                    <h2 style="margin: 0;">📦 Package Manager</h2>
+                    <h2 style="margin: 0; color: #fff;">📦 Package Manager</h2>
                     <button onclick="closePackageModal()" style="background: #dc2626; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer;">✕ Close</button>
                 </div>
                 
-                <div id="packageStatus" style="margin-bottom: 20px;"></div>
+                <div id="packageStatus" style="margin-bottom: 20px; color: #fff;"></div>
                 
                 <div style="margin-bottom: 20px;">
-                    <button onclick="loadUpgradablePackages()" style="margin-right: 10px;">🔄 Refresh List</button>
-                    <button onclick="runDistUpgrade()" style="background: #f59e0b; color: white;">⬆️ Upgrade All Packages</button>
+                    <button onclick="loadUpgradablePackages()" style="margin-right: 10px; background: #444; color: #fff; border: 1px solid #666; padding: 8px 16px; border-radius: 5px; cursor: pointer;">🔄 Refresh List</button>
+                    <button onclick="runDistUpgrade()" style="background: #f59e0b; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer;">⬆️ Upgrade All Packages</button>
                 </div>
                 
-                <div id="packageList" style="background: #f9fafb; border-radius: 5px; padding: 20px; min-height: 200px; max-height: 400px; overflow-y: auto;">
-                    <div style="text-align: center; color: #6b7280;">Loading packages...</div>
+                <div id="packageList" style="background: #1a1a1a; border-radius: 5px; padding: 20px; min-height: 200px; max-height: 400px; overflow-y: auto; border: 1px solid #444;">
+                    <div style="text-align: center; color: #999;">Loading packages...</div>
                 </div>
             </div>
         </div>
         
         <!-- Bluetooth Scan Modal -->
         <div id="bluetoothScanModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000;">
-            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border-radius: 10px; padding: 30px; width: 600px; max-height: 80vh; overflow-y: auto;">
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #2a2a2a; border-radius: 10px; padding: 30px; width: 600px; max-height: 80vh; overflow-y: auto; border: 1px solid #444;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                    <h2 style="margin: 0;">🔍 Scanning for Bluetooth Devices</h2>
+                    <h2 style="margin: 0; color: #fff;">🔍 Scanning for Bluetooth Devices</h2>
                     <button onclick="closeScanModal()" style="background: #ef4444; color: white; border: none; padding: 5px 15px; border-radius: 5px; cursor: pointer;">✕</button>
                 </div>
                 
-                <div id="scanStatus" style="margin-bottom: 20px; padding: 10px; background: #f3f4f6; border-radius: 5px;">
+                <div id="scanStatus" style="margin-bottom: 20px; padding: 10px; background: #1a1a1a; border-radius: 5px; border: 1px solid #444;">
                     <div style="display: flex; align-items: center;">
-                        <div class="spinner" style="border: 3px solid #f3f3f3; border-top: 3px solid #667eea; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; margin-right: 10px;"></div>
-                        <span id="scanStatusText">Scanning for devices...</span>
+                        <div class="spinner" style="border: 3px solid #444; border-top: 3px solid #667eea; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; margin-right: 10px;"></div>
+                        <span id="scanStatusText" style="color: #fff;">Scanning for devices...</span>
                     </div>
                 </div>
                 
                 <div style="margin-bottom: 20px;">
-                    <h3 style="margin-bottom: 10px;">Available Devices:</h3>
-                    <div id="scanDeviceList" style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; border-radius: 5px; padding: 10px; background: #f9fafb;">
+                    <h3 style="margin-bottom: 10px; color: #fff;">Available Devices:</h3>
+                    <div id="scanDeviceList" style="max-height: 300px; overflow-y: auto; border: 1px solid #444; border-radius: 5px; padding: 10px; background: #1a1a1a;">
                         <p style="color: #999; text-align: center;">No devices found yet...</p>
                     </div>
                 </div>
                 
                 <div style="display: flex; gap: 10px;">
-                    <button onclick="scanBluetooth()" style="flex: 1; background: #667eea;">Refresh Scan</button>
-                    <button onclick="stopScan()" style="flex: 1; background: #ef4444;">Stop Scanning</button>
-                    <button onclick="closeScanModal()" style="flex: 1;">Close</button>
+                    <button onclick="scanBluetooth()" style="flex: 1; background: #667eea; color: white; border: none; padding: 10px; border-radius: 5px; cursor: pointer;">Refresh Scan</button>
+                    <button onclick="stopScan()" style="flex: 1; background: #ef4444; color: white; border: none; padding: 10px; border-radius: 5px; cursor: pointer;">Stop Scanning</button>
+                    <button onclick="closeScanModal()" style="flex: 1; background: #444; color: #fff; border: 1px solid #666; padding: 10px; border-radius: 5px; cursor: pointer;">Close</button>
                 </div>
             </div>
         </div>

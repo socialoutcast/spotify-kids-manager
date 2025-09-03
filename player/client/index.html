@@ -84,17 +84,36 @@
             grid-area: main;
             background: linear-gradient(to bottom, #1e3264 0%, #121212 300px);
             overflow-y: auto;
-            overflow-x: hidden;
-            padding: 60px 32px 32px;
-            max-width: 100%;
+            padding: 40px 16px 16px;
         }
 
         .content-section {
-            margin-bottom: 40px;
+            margin-bottom: 24px;
+        }
+        
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 12px;
+        }
+        
+        .see-all {
+            color: #b3b3b3;
+            text-decoration: none;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            transition: color 0.2s;
+        }
+        
+        .see-all:hover {
+            color: #fff;
         }
 
         .section-title {
-            font-size: 32px;
+            font-size: 24px;
             font-weight: 700;
             margin-bottom: 24px;
         }
@@ -102,16 +121,48 @@
         /* Cards Grid */
         .cards-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-            gap: 24px;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+        
+        .cards-row {
+            display: flex;
+            gap: 12px;
+            overflow-x: auto;
+            padding-bottom: 4px;
+            scrollbar-width: thin;
+            scrollbar-color: #535353 transparent;
+        }
+        
+        .cards-row::-webkit-scrollbar {
+            height: 6px;
+        }
+        
+        .cards-row::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        
+        .cards-row::-webkit-scrollbar-thumb {
+            background: #535353;
+            border-radius: 3px;
+        }
+        
+        .cards-row::-webkit-scrollbar-thumb:hover {
+            background: #b3b3b3;
         }
 
         .card {
-            background: rgba(255,255,255,0.08);
-            border-radius: 8px;
-            padding: 16px;
+            background: #181818;
+            border-radius: 4px;
+            padding: 10px;
             transition: background 0.3s;
             cursor: pointer;
+            min-width: 120px;
+        }
+        
+        .cards-row .card {
+            flex: 0 0 140px;
         }
 
         .card:hover {
@@ -120,7 +171,7 @@
 
         .card-image {
             position: relative;
-            margin-bottom: 16px;
+            margin-bottom: 8px;
             border-radius: 4px;
             overflow: hidden;
             aspect-ratio: 1;
@@ -134,10 +185,10 @@
 
         .play-button {
             position: absolute;
-            bottom: 8px;
-            right: 8px;
-            width: 48px;
-            height: 48px;
+            bottom: 4px;
+            right: 4px;
+            width: 32px;
+            height: 32px;
             background: #1db954;
             border: none;
             border-radius: 50%;
@@ -165,17 +216,19 @@
         }
 
         .card-title {
-            font-size: 18px;  /* Increased from 14px */
+            font-size: 13px;
             font-weight: 600;
-            margin-bottom: 4px;
+            margin-bottom: 2px;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+            line-height: 1.2;
         }
 
         .card-subtitle {
-            font-size: 12px;
+            font-size: 11px;
             color: #b3b3b3;
+            line-height: 1.2;
         }
 
         /* Playlist View */
@@ -268,13 +321,11 @@
         /* Track List */
         .track-list {
             margin-top: 24px;
-            max-width: 100%;
-            overflow-x: hidden;
         }
 
         .track-row {
             display: grid;
-            grid-template-columns: 40px 1fr minmax(100px, 200px) 80px;
+            grid-template-columns: 30px 1fr 200px 100px;
             gap: 16px;
             padding: 12px 16px;  /* Increased padding */
             border-radius: 4px;
@@ -282,8 +333,6 @@
             color: #b3b3b3;
             transition: background 0.2s;
             cursor: pointer;
-            max-width: 100%;
-            overflow: hidden;
         }
 
         .track-row:hover {
@@ -349,19 +398,6 @@
             text-overflow: ellipsis;
             white-space: nowrap;
         }
-        
-        .track-album {
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            font-size: 14px;
-        }
-        
-        .track-duration {
-            text-align: right;
-            font-size: 14px;
-            min-width: 50px;
-        }
 
         /* Now Playing Bar */
         .now-playing-bar {
@@ -370,16 +406,33 @@
             border-top: 1px solid #282828;
             padding: 0 16px;
             display: grid;
-            grid-template-columns: 1fr 2fr 1fr;
+            grid-template-columns: minmax(180px, 30%) 40% minmax(180px, 30%);
             align-items: center;
+            height: 90px;
         }
 
         .now-playing-left {
             display: flex;
             align-items: center;
-            gap: 16px;
-            max-width: 400px;
+            gap: 12px;
             min-width: 0;
+        }
+        
+        .now-playing-actions {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        .now-playing-actions .control-button {
+            width: 32px;
+            height: 32px;
+            padding: 6px;
+        }
+        
+        .now-playing-actions .control-button svg {
+            width: 16px;
+            height: 16px;
         }
 
         .now-playing-cover {
@@ -481,9 +534,9 @@
         .playback-bar {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
             width: 100%;
-            max-width: 600px;
+            max-width: 400px;
         }
 
         .progress-time {
@@ -525,51 +578,60 @@
         }
 
         .volume-control {
+            position: relative;
             display: flex;
             align-items: center;
-            gap: 8px;
-            min-width: 125px;
         }
 
-        .volume-icon {
+        .volume-button {
             color: #b3b3b3;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 4px;
+            padding: 8px;
+            background: none;
+            border: none;
             transition: color 0.2s;
+            width: 40px;
+            height: 40px;
         }
 
-        .volume-icon:hover {
+        .volume-button:hover {
             color: #fff;
         }
 
-        .volume-icon svg {
+        .volume-button svg {
             width: 20px;
             height: 20px;
         }
-
-        .volume-slider {
-            width: 100px;
-            height: 4px;
-            background: #535353;
-            border-radius: 2px;
-            position: relative;
+        
+        /* Vertical Volume Popup */
+        .volume-popup {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            margin-bottom: 8px;
+            background: #282828;
+            border-radius: 8px;
+            padding: 12px 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.2s, visibility 0.2s;
+            z-index: 1000;
+        }
+        
+        /* Style for vertical slider */
+        #volumeRange {
+            writing-mode: bt-lr; /* IE */
+            -webkit-appearance: slider-vertical; /* WebKit */
+            width: 30px;
+            height: 100px;
+            background: transparent;
+            outline: none;
             cursor: pointer;
-        }
-
-        .volume-slider-fill {
-            height: 100%;
-            background: #fff;
-            border-radius: 2px;
-            position: relative;
-            pointer-events: none;
-            width: 50%;
-        }
-
-        .volume-slider:hover .volume-slider-fill {
-            background: #1db954;
         }
 
         /* Playlists Section */
@@ -679,9 +741,43 @@
     
     <!-- Main Content Area -->
     <main class="main-content" id="mainContent">
-        <div class="content-section">
-            <h2 class="section-title" id="greeting">Good evening</h2>
-            <div class="cards-grid" id="homeCards"></div>
+        <div class="home-view" id="homeView">
+            <div class="content-section">
+                <h2 class="section-title" id="greeting">Good evening</h2>
+                <div class="cards-grid" id="homeCards"></div>
+            </div>
+            
+            <div class="content-section">
+                <div class="section-header">
+                    <h2 class="section-title">Recently played</h2>
+                    <a href="#" class="see-all">Show all</a>
+                </div>
+                <div class="cards-row" id="recentlyPlayed"></div>
+            </div>
+            
+            <div class="content-section">
+                <div class="section-header">
+                    <h2 class="section-title">Jump back in</h2>
+                    <a href="#" class="see-all">Show all</a>
+                </div>
+                <div class="cards-row" id="jumpBackIn"></div>
+            </div>
+            
+            <div class="content-section">
+                <div class="section-header">
+                    <h2 class="section-title">Made for you</h2>
+                    <a href="#" class="see-all">Show all</a>
+                </div>
+                <div class="cards-row" id="madeForYou"></div>
+            </div>
+            
+            <div class="content-section">
+                <div class="section-header">
+                    <h2 class="section-title">Your playlists</h2>
+                    <a href="#" class="see-all">Show all</a>
+                </div>
+                <div class="cards-row" id="yourPlaylists"></div>
+            </div>
         </div>
     </main>
     
@@ -693,15 +789,17 @@
                 <div class="now-playing-name" id="nowPlayingName">-</div>
                 <div class="now-playing-artist" id="nowPlayingArtist">-</div>
             </div>
+            <div class="now-playing-actions">
+                <button class="control-button" id="likeBtn" title="Save to Your Library">
+                    <svg viewBox="0 0 16 16">
+                        <path fill="currentColor" d="M1.69 2A4.582 4.582 0 018 2.023 4.583 4.583 0 0111.88.817h.002a4.618 4.618 0 013.782 3.65v.003a4.543 4.543 0 01-1.011 3.84L9.35 14.629a1.765 1.765 0 01-2.093.464 1.762 1.762 0 01-.605-.463L1.348 8.309A4.582 4.582 0 011.689 2zm3.158.252A3.082 3.082 0 002.49 7.337l.005.005L7.8 13.664a.264.264 0 00.311.069.262.262 0 00.09-.069l5.312-6.33a3.043 3.043 0 00.68-2.573 3.118 3.118 0 00-2.551-2.463 3.079 3.079 0 00-2.612.816l-.007.007a1.501 1.501 0 01-2.045 0l-.009-.008a3.082 3.082 0 00-2.121-.861z"/>
+                    </svg>
+                </button>
+            </div>
         </div>
         
         <div class="player-controls">
             <div class="control-buttons">
-                <button class="control-button" id="shuffleBtn">
-                    <svg viewBox="0 0 16 16">
-                        <path fill="currentColor" d="M13.151.922a.75.75 0 10-1.06 1.06L13.109 3H11.16a3.75 3.75 0 00-2.873 1.34l-6.173 7.356A2.25 2.25 0 01.39 12.5H0V14h.391a3.75 3.75 0 002.873-1.34l6.173-7.356a2.25 2.25 0 011.724-.804h1.947l-1.017 1.018a.75.75 0 001.06 1.06L15.98 3.75 13.15.922zM.391 3.5H0V2h.391c1.109 0 2.16.49 2.873 1.34L4.89 5.277l-.979 1.167-1.796-2.14A2.25 2.25 0 00.39 3.5z"/>
-                    </svg>
-                </button>
                 <button class="control-button" id="prevBtn">
                     <svg viewBox="0 0 16 16">
                         <path fill="currentColor" d="M3.3 1a.7.7 0 01.7.7v5.15l9.95-5.744a.7.7 0 011.05.606v12.575a.7.7 0 01-1.05.607L4 9.149V14.3a.7.7 0 01-.7.7H1.7a.7.7 0 01-.7-.7V1.7a.7.7 0 01.7-.7h1.6z"/>
@@ -717,11 +815,6 @@
                         <path fill="currentColor" d="M12.7 1a.7.7 0 00-.7.7v5.15L2.05 1.107A.7.7 0 001 1.712v12.575a.7.7 0 001.05.607L12 9.149V14.3a.7.7 0 00.7.7h1.6a.7.7 0 00.7-.7V1.7a.7.7 0 00-.7-.7h-1.6z"/>
                     </svg>
                 </button>
-                <button class="control-button" id="repeatBtn">
-                    <svg viewBox="0 0 16 16">
-                        <path fill="currentColor" d="M0 4.75A3.75 3.75 0 013.75 1h8.5A3.75 3.75 0 0116 4.75v5a3.75 3.75 0 01-3.75 3.75H9.81l1.018 1.018a.75.75 0 11-1.06 1.06L6.939 12.75l2.829-2.828a.75.75 0 111.06 1.06L9.811 12h2.439a2.25 2.25 0 002.25-2.25v-5a2.25 2.25 0 00-2.25-2.25h-8.5A2.25 2.25 0 001.5 4.75v5A2.25 2.25 0 003.75 12H5v1.5H3.75A3.75 3.75 0 010 9.75v-5z"/>
-                    </svg>
-                </button>
             </div>
             
             <div class="playback-bar">
@@ -735,14 +828,16 @@
         
         <div class="now-playing-right">
             <div class="volume-control">
-                <div class="volume-icon" id="volumeIcon">
+                <button class="volume-button" id="volumeIcon" onclick="toggleVolumePopup(event)">
                     <svg viewBox="0 0 16 16">
                         <path fill="currentColor" d="M9.741.85a.75.75 0 01.375.65v13a.75.75 0 01-1.125.65l-6.925-4a3.642 3.642 0 01-1.33-4.967 3.639 3.639 0 011.33-.983l6.925-4a.75.75 0 01.75 0zm-6.924 5.3a2.139 2.139 0 000 3.7l5.8 3.35V2.8l-5.8 3.35zm8.683 4.29V5.56a2.75 2.75 0 010 4.88z"/>
                         <path fill="currentColor" d="M11.5 13.614a5.752 5.752 0 000-11.228v1.55a4.252 4.252 0 010 8.127v1.55z"/>
                     </svg>
-                </div>
-                <div class="volume-slider" id="volumeSlider">
-                    <div class="volume-slider-fill" id="volumeSliderFill"></div>
+                </button>
+                <div class="volume-popup" id="volumePopup" style="display: none;">
+                    <input type="range" id="volumeRange" min="0" max="100" value="50" 
+                           style="writing-mode: bt-lr; -webkit-appearance: slider-vertical; width: 30px; height: 100px;"
+                           oninput="setVolumeFromSlider(this.value)">
                 </div>
             </div>
         </div>
@@ -756,6 +851,44 @@
         let accessToken;
         let currentPlaylistId;
         let currentTrackUri;
+        let currentVolume = 0.5;
+
+        // Volume popup functions
+        function toggleVolumePopup(event) {
+            event.stopPropagation();
+            const popup = document.getElementById('volumePopup');
+            if (popup.style.display === 'none' || popup.style.display === '') {
+                popup.style.display = 'block';
+                // Update slider value to current volume
+                const slider = document.getElementById('volumeRange');
+                if (slider && player) {
+                    player.getVolume().then(volume => {
+                        slider.value = volume * 100;
+                    });
+                }
+                // Hide when clicking elsewhere
+                setTimeout(() => {
+                    document.addEventListener('click', hideVolumePopup);
+                }, 100);
+            } else {
+                popup.style.display = 'none';
+                document.removeEventListener('click', hideVolumePopup);
+            }
+        }
+        
+        function hideVolumePopup() {
+            document.getElementById('volumePopup').style.display = 'none';
+            document.removeEventListener('click', hideVolumePopup);
+        }
+        
+        function setVolumeFromSlider(value) {
+            const volume = value / 100;
+            if (player) {
+                player.setVolume(volume);
+                updateVolumeIcon(volume);
+                currentVolume = volume;
+            }
+        }
 
         // State
         const AppState = {
@@ -783,15 +916,21 @@
                 return null;
             }
         }
+        
+        function updateGreeting() {
+            const hour = new Date().getHours();
+            let greeting = 'Good evening';
+            if (hour < 12) greeting = 'Good morning';
+            else if (hour < 18) greeting = 'Good afternoon';
+            const greetingEl = document.getElementById('greeting');
+            if (greetingEl) greetingEl.textContent = greeting;
+        }
 
         async function initializePlayer() {
             const token = await getToken();
             if (!token) {
                 // Hide loading overlay and show error in the main content area
                 document.getElementById('loading').classList.add('hidden');
-                
-                // Update greeting
-                updateGreeting();
                 
                 // Show setup message in the cards area
                 const hostname = window.location.hostname;
@@ -826,11 +965,15 @@
                 document.getElementById('loading').classList.add('hidden');
                 document.getElementById('statusBadge').classList.remove('hidden');
                 
-                // Initialize volume slider
+                // Initialize volume
                 player.getVolume().then(volume => {
                     currentVolume = volume;
-                    document.getElementById('volumeSliderFill').style.width = (volume * 100) + '%';
                     updateVolumeIcon(volume);
+                    // Update range slider if exists
+                    const slider = document.getElementById('volumeRange');
+                    if (slider) {
+                        slider.value = volume * 100;
+                    }
                 });
                 
                 // Transfer playback
@@ -904,9 +1047,11 @@
             try {
                 const res = await fetch('/api/playlists');
                 const data = await res.json();
-                AppState.playlists = data.playlists;
+                // Filter out DJ playlist
+                AppState.playlists = data.playlists.filter(p => p.id !== 'spotify-dj');
                 renderPlaylists();
                 renderHomeCards();
+                await loadSpotifyHomeContent();
             } catch (error) {
                 console.error('Failed to load playlists:', error);
             }
@@ -915,10 +1060,510 @@
         function renderPlaylists() {
             const container = document.getElementById('playlists');
             container.innerHTML = AppState.playlists.map(p => `
-                <div class="playlist-item" data-id="${p.id}" style="cursor: pointer;">${p.name}</div>
+                <div class="playlist-item" data-id="${p.id}">${p.name}</div>
             `).join('');
         }
 
+        async function loadSpotifyHomeContent() {
+            try {
+                // Create all API calls in parallel for better performance
+                const promises = [
+                    // Recently played tracks
+                    fetch('https://api.spotify.com/v1/me/player/recently-played?limit=50', {
+                        headers: { 'Authorization': `Bearer ${accessToken}` }
+                    }),
+                    // User's top tracks (short term)
+                    fetch('https://api.spotify.com/v1/me/top/tracks?limit=50&time_range=short_term', {
+                        headers: { 'Authorization': `Bearer ${accessToken}` }
+                    }),
+                    // User's top artists
+                    fetch('https://api.spotify.com/v1/me/top/artists?limit=50&time_range=medium_term', {
+                        headers: { 'Authorization': `Bearer ${accessToken}` }
+                    }),
+                    // Featured playlists
+                    fetch('https://api.spotify.com/v1/browse/featured-playlists?limit=50', {
+                        headers: { 'Authorization': `Bearer ${accessToken}` }
+                    }),
+                    // New releases
+                    fetch('https://api.spotify.com/v1/browse/new-releases?limit=50', {
+                        headers: { 'Authorization': `Bearer ${accessToken}` }
+                    }),
+                    // Browse categories
+                    fetch('https://api.spotify.com/v1/browse/categories?limit=50', {
+                        headers: { 'Authorization': `Bearer ${accessToken}` }
+                    }),
+                    // User's saved albums
+                    fetch('https://api.spotify.com/v1/me/albums?limit=50', {
+                        headers: { 'Authorization': `Bearer ${accessToken}` }
+                    }),
+                    // User's saved tracks (for liked songs count)
+                    fetch('https://api.spotify.com/v1/me/tracks?limit=1', {
+                        headers: { 'Authorization': `Bearer ${accessToken}` }
+                    }),
+                    // User's followed artists
+                    fetch('https://api.spotify.com/v1/me/following?type=artist&limit=50', {
+                        headers: { 'Authorization': `Bearer ${accessToken}` }
+                    }),
+                ];
+
+                const responses = await Promise.all(promises);
+                const [
+                    recentlyPlayed,
+                    topTracks,
+                    topArtists,
+                    featured,
+                    newReleases,
+                    categories,
+                    savedAlbums,
+                    likedSongsInfo,
+                    followedArtists
+                ] = await Promise.all(responses.map(r => r.json()));
+
+                // Get recommendations based on top tracks and artists
+                const seedTracks = (topTracks.items && topTracks.items.slice(0, 2).map(t => t.id).join(',')) || '';
+                const seedArtists = (topArtists.items && topArtists.items.slice(0, 2).map(a => a.id).join(',')) || '';
+                let recommendations = { tracks: [] };
+                
+                if (seedTracks || seedArtists) {
+                    const recRes = await fetch(`https://api.spotify.com/v1/recommendations?seed_tracks=${seedTracks}&seed_artists=${seedArtists}&limit=20`, {
+                        headers: { 'Authorization': `Bearer ${accessToken}` }
+                    });
+                    recommendations = await recRes.json();
+                }
+
+                // Get category playlists for some categories
+                let categoryPlaylists = [];
+                if (categories.categories && categories.categories.items && categories.categories.items.length > 0) {
+                    const categoryPromises = categories.categories.items.slice(0, 5).map(cat =>
+                        fetch(`https://api.spotify.com/v1/browse/categories/${cat.id}/playlists?limit=10`, {
+                            headers: { 'Authorization': `Bearer ${accessToken}` }
+                        })
+                    );
+                    const categoryResponses = await Promise.all(categoryPromises);
+                    const categoryData = await Promise.all(categoryResponses.map(r => r.json()));
+                    categoryPlaylists = categoryData.flatMap(d => (d.playlists && d.playlists.items) || []);
+                }
+
+                // Render comprehensive home sections
+                renderComprehensiveHomeSections({
+                    recentlyPlayed: recentlyPlayed.items || [],
+                    topTracks: topTracks.items || [],
+                    topArtists: topArtists.items || [],
+                    featured: (featured.playlists && featured.playlists.items) || [],
+                    newReleases: (newReleases.albums && newReleases.albums.items) || [],
+                    categories: (categories.categories && categories.categories.items) || [],
+                    savedAlbums: savedAlbums.items || [],
+                    likedSongsTotal: likedSongsInfo.total || 0,
+                    followedArtists: (followedArtists.artists && followedArtists.artists.items) || [],
+                    recommendations: recommendations.tracks || [],
+                    categoryPlaylists: categoryPlaylists,
+                    userPlaylists: AppState.playlists || []
+                });
+            } catch (error) {
+                console.error('Failed to load Spotify home content:', error);
+                // Fall back to showing user playlists
+                renderHomeSections();
+            }
+        }
+
+        function renderComprehensiveHomeSections(data) {
+            // Update main content with multiple sections
+            const mainContent = document.getElementById('mainContent');
+            
+            // Create HTML for all sections
+            let sectionsHTML = '';
+            
+            // Good evening section with quick access items
+            sectionsHTML += `
+                <div class="home-section">
+                    <h2 class="section-title" id="greeting">${getGreeting()}</h2>
+                    <div class="cards-grid" id="homeCards">
+                        ${renderQuickAccessCards(data)}
+                    </div>
+                </div>
+            `;
+            
+            // Recently played - unique content from recent history
+            if (data.recentlyPlayed.length > 0) {
+                const recentItems = getUniqueRecentItems(data.recentlyPlayed);
+                sectionsHTML += `
+                    <div class="home-section">
+                        <div class="section-header">
+                            <h2 class="section-title">Recently played</h2>
+                            <a class="show-all">Show all</a>
+                        </div>
+                        <div class="cards-row">
+                            ${recentItems.map(item => createSpotifyCard(item)).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Your top mixes - based on user's taste
+            if (data.recommendations.length > 0) {
+                sectionsHTML += `
+                    <div class="home-section">
+                        <div class="section-header">
+                            <h2 class="section-title">Recommended for you</h2>
+                            <a class="show-all">Show all</a>
+                        </div>
+                        <div class="cards-row">
+                            ${data.recommendations.slice(0, 10).map(track => createSpotifyCard({
+                                id: track.album.id,
+                                name: track.album.name,
+                                image: track.album.images[0] ? images[0].url : null,
+                                uri: track.album.uri,
+                                description: `Album • ${track.artists[0].name}`,
+                                type: 'album'
+                            })).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Your favorite artists
+            if (data.topArtists.length > 0) {
+                sectionsHTML += `
+                    <div class="home-section">
+                        <div class="section-header">
+                            <h2 class="section-title">Your favorite artists</h2>
+                            <a class="show-all">Show all</a>
+                        </div>
+                        <div class="cards-row">
+                            ${data.topArtists.slice(0, 10).map(artist => createSpotifyCard({
+                                id: artist.id,
+                                name: artist.name,
+                                image: artist.images[0] ? images[0].url : null,
+                                uri: artist.uri,
+                                description: `${artist.followers && followers.total ? followers.total.toLocaleString() : '0' || '0'} followers`,
+                                type: 'artist'
+                            })).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Jump back in - mix content
+            const jumpBackItems = getMixedContent(data);
+            if (jumpBackItems.length > 0) {
+                sectionsHTML += `
+                    <div class="home-section">
+                        <div class="section-header">
+                            <h2 class="section-title">Jump back in</h2>
+                            <a class="show-all">Show all</a>
+                        </div>
+                        <div class="cards-row">
+                            ${jumpBackItems.map(item => createSpotifyCard(item)).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Featured playlists
+            if (data.featured.length > 0) {
+                sectionsHTML += `
+                    <div class="home-section">
+                        <div class="section-header">
+                            <h2 class="section-title">${(data.featured[0] && data.featured[0].message) || 'Featured playlists'}</h2>
+                            <a class="show-all">Show all</a>
+                        </div>
+                        <div class="cards-row">
+                            ${data.featured.slice(0, 10).map(playlist => createSpotifyCard({
+                                id: playlist.id,
+                                name: playlist.name,
+                                image: playlist.images[0] ? images[0].url : null,
+                                uri: playlist.uri,
+                                description: playlist.description || 'Playlist',
+                                type: 'playlist'
+                            })).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // New releases
+            if (data.newReleases.length > 0) {
+                sectionsHTML += `
+                    <div class="home-section">
+                        <div class="section-header">
+                            <h2 class="section-title">New releases</h2>
+                            <a class="show-all">Show all</a>
+                        </div>
+                        <div class="cards-row">
+                            ${data.newReleases.slice(0, 10).map(album => createSpotifyCard({
+                                id: album.id,
+                                name: album.name,
+                                image: album.images[0] ? images[0].url : null,
+                                uri: album.uri,
+                                description: `${album.album_type} • ${album.artists[0].name}`,
+                                type: 'album'
+                            })).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Category playlists
+            if (data.categoryPlaylists.length > 0) {
+                sectionsHTML += `
+                    <div class="home-section">
+                        <div class="section-header">
+                            <h2 class="section-title">Browse all</h2>
+                            <a class="show-all">Show all</a>
+                        </div>
+                        <div class="cards-row">
+                            ${data.categoryPlaylists.slice(0, 10).map(playlist => createSpotifyCard({
+                                id: playlist.id,
+                                name: playlist.name,
+                                image: playlist.images[0] ? images[0].url : null,
+                                uri: playlist.uri,
+                                description: playlist.description || 'Playlist',
+                                type: 'playlist'
+                            })).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            mainContent.innerHTML = sectionsHTML;
+        }
+        
+        function getUniqueRecentItems(recentlyPlayed) {
+            const seen = new Set();
+            const uniqueItems = [];
+            
+            recentlyPlayed.forEach(item => {
+                const track = item.track;
+                const albumId = track.album.id;
+                if (!seen.has(albumId)) {
+                    seen.add(albumId);
+                    uniqueItems.push({
+                        id: albumId,
+                        name: track.album.name,
+                        image: track.album.images[0] ? images[0].url : null,
+                        uri: track.album.uri,
+                        description: `Album • ${track.album.artists[0].name}`,
+                        type: 'album'
+                    });
+                }
+            });
+            
+            return uniqueItems.slice(0, 10);
+        }
+        
+        function getMixedContent(data) {
+            const mixed = [];
+            
+            // Add some saved albums
+            if (data.savedAlbums.length > 0) {
+                data.savedAlbums.slice(0, 3).forEach(item => {
+                    mixed.push({
+                        id: item.album.id,
+                        name: item.album.name,
+                        image: item.album.images[0] ? images[0].url : null,
+                        uri: item.album.uri,
+                        description: `Album • ${item.album.artists[0].name}`,
+                        type: 'album'
+                    });
+                });
+            }
+            
+            // Add some user playlists
+            data.userPlaylists.slice(0, 3).forEach(p => {
+                mixed.push({
+                    ...p,
+                    type: 'playlist',
+                    description: 'Playlist'
+                });
+            });
+            
+            // Add some artists
+            if (data.followedArtists.length > 0) {
+                data.followedArtists.slice(0, 4).forEach(artist => {
+                    mixed.push({
+                        id: artist.id,
+                        name: artist.name,
+                        image: artist.images[0] ? images[0].url : null,
+                        uri: artist.uri,
+                        description: 'Artist',
+                        type: 'artist'
+                    });
+                });
+            }
+            
+            return mixed;
+        }
+        
+        function renderQuickAccessCards(data) {
+            const quickItems = [];
+            
+            // Add liked songs if any
+            if (data.likedSongsTotal > 0) {
+                quickItems.push(`
+                    <div class="card" data-id="liked-songs" onclick="loadPlaylistView('liked-songs')">
+                        <div class="card-image">
+                            <div style="background: linear-gradient(135deg, #450af5, #c4efd9); width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
+                                <svg viewBox="0 0 24 24" width="32" height="32">
+                                    <path fill="#fff" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                                </svg>
+                            </div>
+                            <button class="play-button" onclick="event.stopPropagation(); playPlaylist('spotify:playlist:liked-songs')">
+                                <svg viewBox="0 0 24 24">
+                                    <path fill="currentColor" d="M7.05 3.606l13.49 7.788a.7.7 0 010 1.212L7.05 20.394A.7.7 0 016 19.788V4.212a.7.7 0 011.05-.606z"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="card-title">Liked Songs</div>
+                        <div class="card-subtitle">${data.likedSongsTotal} songs</div>
+                    </div>
+                `);
+            }
+            
+            // Add recent playlists
+            data.userPlaylists.slice(0, 5).forEach(p => {
+                quickItems.push(`
+                    <div class="card" data-id="${p.id}" onclick="loadPlaylistView('${p.id}')">
+                        <div class="card-image">
+                            ${p.images && p.images[0] && p.images[0].url ? `<img src="${p.images[0].url}" alt="">` : '<div style="background: #282828; width: 100%; height: 100%;"></div>'}
+                            <button class="play-button" onclick="event.stopPropagation(); playPlaylist('${p.uri}')">
+                                <svg viewBox="0 0 24 24">
+                                    <path fill="currentColor" d="M7.05 3.606l13.49 7.788a.7.7 0 010 1.212L7.05 20.394A.7.7 0 016 19.788V4.212a.7.7 0 011.05-.606z"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="card-title">${p.name}</div>
+                        <div class="card-subtitle">Playlist</div>
+                    </div>
+                `);
+            });
+            
+            return quickItems.join('');
+        }
+        
+        function getGreeting() {
+            const hour = new Date().getHours();
+            if (hour < 12) return 'Good morning';
+            if (hour < 18) return 'Good afternoon';
+            return 'Good evening';
+        }
+        
+        function createSpotifyCard(item) {
+            let imageHtml;
+            let cardStyle = '';
+            
+            // Handle different image types
+            if (item.image) {
+                if (item.type === 'artist') {
+                    // Artists have circular images
+                    imageHtml = `<img src="${item.image}" alt="${item.name}" loading="lazy" style="border-radius: 50%;">`;
+                } else {
+                    imageHtml = `<img src="${item.image}" alt="${item.name}" loading="lazy">`;
+                }
+            } else {
+                // Default placeholder
+                imageHtml = `<div style="background: #282828; width: 100%; height: 100%; ${item.type === 'artist' ? 'border-radius: 50%;' : ''}"></div>`;
+            }
+            
+            // Determine play action based on type
+            let playAction = '';
+            let viewAction = '';
+            
+            switch(item.type) {
+                case 'album':
+                    playAction = `playAlbum('${item.uri}')`;
+                    viewAction = `loadAlbumView('${item.id}')`;
+                    break;
+                case 'artist':
+                    playAction = `playArtist('${item.id}')`;
+                    viewAction = `loadArtistView('${item.id}')`;
+                    break;
+                case 'playlist':
+                default:
+                    playAction = `playPlaylist('${item.uri}')`;
+                    viewAction = `loadPlaylistView('${item.id}')`;
+                    break;
+            }
+            
+            return `
+                <div class="card" data-id="${item.id}" data-type="${item.type}" onclick="${viewAction}">
+                    <div class="card-image" ${item.type === 'artist' ? 'style="border-radius: 50%; overflow: hidden;"' : ''}>
+                        ${imageHtml}
+                        <button class="play-button" onclick="event.stopPropagation(); ${playAction}">
+                            <svg viewBox="0 0 24 24">
+                                <path fill="currentColor" d="M7.05 3.606l13.49 7.788a.7.7 0 010 1.212L7.05 20.394A.7.7 0 016 19.788V4.212a.7.7 0 011.05-.606z"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="card-title">${item.name}</div>
+                    <div class="card-subtitle">${item.description || item.type}</div>
+                </div>
+            `;
+        }
+
+        function renderHomeSections() {
+            // Recently played - show last 5-6 playlists
+            const recentContainer = document.getElementById('recentlyPlayed');
+            if (recentContainer) {
+                const recentPlaylists = AppState.playlists.slice(0, 6);
+                recentContainer.innerHTML = recentPlaylists.map(p => createCard(p)).join('');
+            }
+            
+            // Jump back in - show some playlists
+            const jumpContainer = document.getElementById('jumpBackIn');
+            if (jumpContainer) {
+                const jumpPlaylists = AppState.playlists.slice(2, 8);
+                jumpContainer.innerHTML = jumpPlaylists.map(p => createCard(p)).join('');
+            }
+            
+            // Made for you - show personalized playlists
+            const madeContainer = document.getElementById('madeForYou');
+            if (madeContainer) {
+                const madePlaylists = AppState.playlists.slice(4, 10);
+                madeContainer.innerHTML = madePlaylists.map(p => createCard(p)).join('');
+            }
+            
+            // Your playlists - show user's playlists
+            const yourContainer = document.getElementById('yourPlaylists');
+            if (yourContainer) {
+                const yourPlaylists = AppState.playlists.slice(0, 10);
+                yourContainer.innerHTML = yourPlaylists.map(p => createCard(p)).join('');
+            }
+        }
+        
+        function createCard(playlist) {
+            const isLikedSongs = playlist.id === 'liked-songs';
+            let imageHtml;
+            
+            if (isLikedSongs) {
+                imageHtml = `
+                    <div style="background: linear-gradient(135deg, #450af5, #c4efd9); width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
+                        <svg viewBox="0 0 24 24" width="64" height="64">
+                            <path fill="#fff" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                        </svg>
+                    </div>
+                `;
+            } else if (playlist.image) {
+                imageHtml = `<img src="${playlist.image}" alt="${playlist.name}" loading="lazy">`;
+            } else {
+                imageHtml = `<div style="background: #282828; width: 100%; height: 100%;"></div>`;
+            }
+            
+            return `
+                <div class="card" data-id="${playlist.id}" onclick="loadPlaylistView('${playlist.id}')">
+                    <div class="card-image">
+                        ${imageHtml}
+                        <button class="play-button" onclick="event.stopPropagation(); playPlaylist('${playlist.uri || 'spotify:playlist:' + playlist.id}')">
+                            <svg viewBox="0 0 24 24">
+                                <path fill="currentColor" d="M7.05 3.606l13.49 7.788a.7.7 0 010 1.212L7.05 20.394A.7.7 0 016 19.788V4.212a.7.7 0 011.05-.606z"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="card-title">${playlist.name}</div>
+                    <div class="card-subtitle">${playlist.description || 'Playlist'}</div>
+                </div>
+            `;
+        }
+        
         function renderHomeCards() {
             const container = document.getElementById('homeCards');
             container.innerHTML = AppState.playlists.slice(0, 6).map(p => {
@@ -935,7 +1580,7 @@
                             </svg>
                         </div>
                     `;
-                } else if (p.images?.[0]?.url) {
+                } else if (p.images && p.images[0] && p.images[0].url) {
                     imageHtml = `<img src="${p.images[0].url}" alt="">`;
                 } else {
                     imageHtml = '<div style="background: #282828; width: 100%; height: 100%;"></div>';
@@ -958,110 +1603,15 @@
             }).join('');
         }
 
-        async function loadDJView() {
-            // Start playing DJ immediately
-            const djUri = 'spotify:playlist:37i9dQZF1EYkqdzj48dyYq';
-            
-            // Show DJ interface
-            document.getElementById('mainContent').innerHTML = `
-                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: calc(100vh - 200px); text-align: center;">
-                    <div style="width: 200px; height: 200px; margin-bottom: 30px; position: relative;">
-                        <div style="width: 100%; height: 100%; background: linear-gradient(135deg, #8B5CF6, #EC4899); border-radius: 20px; display: flex; align-items: center; justify-content: center; animation: pulse 2s infinite;">
-                            <svg viewBox="0 0 24 24" width="100" height="100">
-                                <path fill="white" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                                <circle cx="12" cy="12" r="3" fill="white"/>
-                                <path fill="white" d="M12 3v6m0 6v6m-9-9h6m6 0h6" stroke="white" stroke-width="0.5" opacity="0.3"/>
-                            </svg>
-                        </div>
-                        <div style="position: absolute; bottom: -10px; right: -10px; background: #1DB954; border-radius: 50%; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
-                            <span style="font-size: 24px;">🎵</span>
-                        </div>
-                    </div>
-                    
-                    <h1 style="font-size: 48px; font-weight: 700; margin-bottom: 10px;">DJ</h1>
-                    <p style="font-size: 20px; color: #b3b3b3; margin-bottom: 30px;">Your AI DJ is picking the perfect music for you</p>
-                    
-                    <div id="djStatus" style="font-size: 18px; color: #1DB954; margin-bottom: 40px;">
-                        <span style="animation: fadeInOut 2s infinite;">● Starting your mix...</span>
-                    </div>
-                    
-                    <div style="display: flex; gap: 20px;">
-                        <button onclick="playPlaylist('${djUri}')" style="padding: 15px 40px; background: #1DB954; color: black; border: none; border-radius: 30px; font-size: 18px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 10px;">
-                            <svg viewBox="0 0 16 16" width="20" height="20">
-                                <path fill="currentColor" d="M3 1.713a.7.7 0 011.05-.607l10.89 6.288a.7.7 0 010 1.212L4.05 14.894A.7.7 0 013 14.288V1.713z"/>
-                            </svg>
-                            Start DJ
-                        </button>
-                        <button onclick="skipDJSet()" style="padding: 15px 30px; background: transparent; color: white; border: 1px solid white; border-radius: 30px; font-size: 18px; font-weight: 700; cursor: pointer;">
-                            Change
-                        </button>
-                    </div>
-                    
-                    <div style="margin-top: 60px; padding: 20px; background: rgba(255,255,255,0.05); border-radius: 10px; max-width: 500px;">
-                        <p style="font-size: 16px; line-height: 1.6;">DJ learns from your listening habits and creates a personalized radio experience just for you. Hit "Change" anytime to switch up the vibe!</p>
-                    </div>
-                </div>
-                
-                <style>
-                    @keyframes pulse {
-                        0% { transform: scale(1); }
-                        50% { transform: scale(1.05); }
-                        100% { transform: scale(1); }
-                    }
-                    @keyframes fadeInOut {
-                        0%, 100% { opacity: 0.5; }
-                        50% { opacity: 1; }
-                    }
-                </style>
-            `;
-            
-            // Update sidebar to show DJ as active
-            document.querySelectorAll('.playlist-item').forEach(item => {
-                item.classList.toggle('active', item.dataset.id === 'spotify-dj');
-            });
-            
-            // Start playing automatically
-            setTimeout(() => {
-                playPlaylist(djUri);
-                document.getElementById('djStatus').innerHTML = '<span style="color: #1DB954;">● Now playing your personalized mix</span>';
-            }, 1000);
-        }
-        
-        async function skipDJSet() {
-            // Skip to next track (simulating changing the DJ set)
-            if (player) {
-                await player.nextTrack();
-                document.getElementById('djStatus').innerHTML = '<span style="color: #1DB954;">● Switching things up...</span>';
-                setTimeout(() => {
-                    document.getElementById('djStatus').innerHTML = '<span style="color: #1DB954;">● Now playing your new mix</span>';
-                }, 2000);
-            }
-        }
-
         async function loadPlaylistView(playlistId) {
-            // Special handling for DJ
-            if (playlistId === 'spotify-dj') {
-                loadDJView();
-                return;
-            }
-            
-            // Show loading state
-            document.getElementById('mainContent').innerHTML = `
-                <div style="padding: 50px; text-align: center;">
-                    <h2>Loading playlist...</h2>
-                </div>
-            `;
-            
+            console.log('Loading playlist:', playlistId);
             try {
                 const res = await fetch(`/api/playlist/${playlistId}`);
-                if (!res.ok) {
-                    throw new Error(`Failed to load playlist: ${res.status}`);
-                }
                 const data = await res.json();
+                console.log('Playlist data:', data);
                 
-                // Special handling for liked songs and DJ playlist
+                // Special handling for liked songs cover
                 const isLikedSongs = playlistId === 'liked-songs';
-                const isDJ = playlistId === 'spotify-dj';
                 let coverHtml;
                 
                 if (isLikedSongs) {
@@ -1086,7 +1636,7 @@
                         <div class="playlist-info">
                             <div style="font-size: 12px; font-weight: 700; text-transform: uppercase;">Playlist</div>
                             <h1>${data.name}</h1>
-                            <div class="playlist-meta">${data.tracks?.length || 0} songs</div>
+                            <div class="playlist-meta">${data.tracks ? data.tracks.length : 0 || 0} songs</div>
                             <div class="playlist-actions">
                                 <button class="play-button" style="width: auto; padding: 12px 32px; background: #1db954; color: #000; border-radius: 500px; font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px;" onclick="playPlaylist('${data.uri || 'spotify:playlist:' + playlistId}')">
                                     <svg viewBox="0 0 24 24" width="24" height="24">
@@ -1094,7 +1644,7 @@
                                     </svg>
                                     Play
                                 </button>
-                                ${!isDJ && !isLikedSongs ? `
+                                ${!isLikedSongs ? `
                                 <button class="download-btn" id="downloadBtn" data-playlist-id="${playlistId}" onclick="downloadPlaylist('${playlistId}')">
                                     <svg viewBox="0 0 24 24">
                                         <path fill="currentColor" d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
@@ -1106,7 +1656,7 @@
                         </div>
                     </div>
                     <div class="track-list">
-                        ${data.tracks?.map((track, i) => `
+                        ${data.tracks && data.tracks.map((track, i) => `
                             <div class="track-row" data-uri="${track.uri}" data-playlist="${playlistId}" data-offset="${i}">
                                 <div class="track-number">${i + 1}</div>
                                 <div class="track-info">
@@ -1134,15 +1684,6 @@
                 });
             } catch (error) {
                 console.error('Failed to load playlist:', error);
-                document.getElementById('mainContent').innerHTML = `
-                    <div style="padding: 50px; text-align: center; color: #ff4444;">
-                        <h2>Error loading playlist</h2>
-                        <p>${error.message}</p>
-                        <button onclick="location.reload()" style="margin-top: 20px; padding: 10px 20px; background: #1db954; color: white; border: none; border-radius: 20px; cursor: pointer;">
-                            Go Back
-                        </button>
-                    </div>
-                `;
             }
         }
 
@@ -1162,6 +1703,159 @@
                 });
             } catch (error) {
                 console.error('Failed to play:', error);
+            }
+        }
+
+        async function playAlbum(uri) {
+            if (!deviceId) return;
+            
+            try {
+                await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${deviceId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        context_uri: uri
+                    })
+                });
+            } catch (error) {
+                console.error('Failed to play album:', error);
+            }
+        }
+
+        async function playArtist(artistId) {
+            if (!deviceId) return;
+            
+            try {
+                // Play artist's top tracks
+                await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${deviceId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        context_uri: `spotify:artist:${artistId}`
+                    })
+                });
+            } catch (error) {
+                console.error('Failed to play artist:', error);
+            }
+        }
+
+        async function loadArtistView(artistId) {
+            console.log('Loading artist:', artistId);
+            try {
+                // Fetch artist details and top tracks
+                const [artistRes, topTracksRes] = await Promise.all([
+                    fetch(`https://api.spotify.com/v1/artists/${artistId}`, {
+                        headers: { 'Authorization': `Bearer ${accessToken}` }
+                    }),
+                    fetch(`https://api.spotify.com/v1/artists/${artistId}/top-tracks?market=US`, {
+                        headers: { 'Authorization': `Bearer ${accessToken}` }
+                    })
+                ]);
+                
+                const artist = await artistRes.json();
+                const topTracks = await topTracksRes.json();
+                
+                document.getElementById('mainContent').innerHTML = `
+                    <div class="playlist-header">
+                        <div class="playlist-cover" style="border-radius: 50%; overflow: hidden;">
+                            ${artist.images[0] ? `<img src="${artist.images[0].url}" alt="">` : ''}
+                        </div>
+                        <div class="playlist-info">
+                            <div style="font-size: 12px; font-weight: 700; text-transform: uppercase;">Artist</div>
+                            <h1>${artist.name}</h1>
+                            <div class="playlist-meta">${artist.followers && followers.total ? followers.total.toLocaleString() : '0' || '0'} followers</div>
+                            <div class="playlist-actions">
+                                <button class="play-button" style="width: auto; padding: 12px 32px; background: #1db954; color: #000; border-radius: 500px; font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px;" onclick="playArtist('${artistId}')">
+                                    <svg viewBox="0 0 24 24" width="24" height="24">
+                                        <path fill="currentColor" d="M7.05 3.606l13.49 7.788a.7.7 0 010 1.212L7.05 20.394A.7.7 0 016 19.788V4.212a.7.7 0 011.05-.606z"/>
+                                    </svg>
+                                    Play
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="track-list">
+                        <h2 style="margin: 20px 0; font-size: 20px;">Popular tracks</h2>
+                        ${topTracks.tracks && topTracks.tracks.map((track, i) => `
+                            <div class="track-row" data-uri="${track.uri}">
+                                <div class="track-number">${i + 1}</div>
+                                <div class="track-info">
+                                    <div class="track-cover">
+                                        ${track.album.images[0] ? 
+                                            `<img src="${track.album.images[0].url}" alt="">` : 
+                                            ''
+                                        }
+                                    </div>
+                                    <div class="track-details">
+                                        <div class="track-name">${track.name}</div>
+                                        <div class="track-artist">${track.artists.map(a => a.name).join(', ')}</div>
+                                    </div>
+                                </div>
+                                <div class="track-album">${track.album.name || ''}</div>
+                                <div class="track-duration">${formatDuration(track.duration_ms)}</div>
+                            </div>
+                        `).join('') || '<div style="padding: 20px;">No tracks</div>'}
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Failed to load artist:', error);
+            }
+        }
+
+        async function loadAlbumView(albumId) {
+            console.log('Loading album:', albumId);
+            try {
+                // Fetch album details from Spotify
+                const res = await fetch(`https://api.spotify.com/v1/albums/${albumId}`, {
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                });
+                const album = await res.json();
+                
+                document.getElementById('mainContent').innerHTML = `
+                    <div class="playlist-header">
+                        <div class="playlist-cover">
+                            ${album.images[0] ? `<img src="${album.images[0].url}" alt="">` : ''}
+                        </div>
+                        <div class="playlist-info">
+                            <div style="font-size: 12px; font-weight: 700; text-transform: uppercase;">Album</div>
+                            <h1>${album.name}</h1>
+                            <div class="playlist-meta">
+                                ${album.artists.map(a => a.name).join(', ')} • ${album.release_date ? album.release_date.substr(0, 4)} • ${album.tracks.total} songs
+                            </div>
+                            <div class="playlist-actions">
+                                <button class="play-button" style="width: auto; padding: 12px 32px; background: #1db954; color: #000; border-radius: 500px; font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px;" onclick="playAlbum('${album.uri}')">
+                                    <svg viewBox="0 0 24 24" width="24" height="24">
+                                        <path fill="currentColor" d="M7.05 3.606l13.49 7.788a.7.7 0 010 1.212L7.05 20.394A.7.7 0 016 19.788V4.212a.7.7 0 011.05-.606z"/>
+                                    </svg>
+                                    Play
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="track-list">
+                        ${album.tracks.items.map((track, i) => `
+                            <div class="track-row" data-uri="${track.uri}" data-album="${albumId}" data-offset="${i}">
+                                <div class="track-number">${i + 1}</div>
+                                <div class="track-info">
+                                    <div class="track-details" style="margin-left: 0;">
+                                        <div class="track-name">${track.name}</div>
+                                        <div class="track-artist">${track.artists.map(a => a.name).join(', ')}</div>
+                                    </div>
+                                </div>
+                                <div class="track-album"></div>
+                                <div class="track-duration">${formatDuration(track.duration_ms)}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Failed to load album:', error);
             }
         }
 
@@ -1304,25 +1998,14 @@
             }
         }
 
-        function updateGreeting() {
-            const hour = new Date().getHours();
-            let greeting = 'Good evening';
-            if (hour < 12) greeting = 'Good morning';
-            else if (hour < 18) greeting = 'Good afternoon';
-            document.getElementById('greeting').textContent = greeting;
-        }
 
         // Event handlers
         document.addEventListener('click', (e) => {
             // Playlist selection
             if (e.target.closest('.playlist-item')) {
-                e.stopPropagation();
-                e.preventDefault();
                 const playlistItem = e.target.closest('.playlist-item');
-                const playlistId = playlistItem.dataset.id;
-                if (playlistId) {
-                    loadPlaylistView(playlistId);
-                }
+                console.log('Playlist clicked:', playlistItem.dataset.id);
+                loadPlaylistView(playlistItem.dataset.id);
             }
             
             // Play button on card
@@ -1382,6 +2065,14 @@
             }
         };
 
+        // Like button
+        document.getElementById('likeBtn').onclick = async () => {
+            if (!currentTrackUri) return;
+            const btn = document.getElementById('likeBtn');
+            btn.classList.toggle('active');
+            // Here you would add the API call to like/unlike the track
+        };
+        
         document.getElementById('repeatBtn').onclick = async () => {
             if (!accessToken) return;
             
@@ -1440,42 +2131,87 @@
         // Volume control
         let currentVolume = 0.5; // Default 50%
         let isDraggingVolume = false;
+        let previousVolume = 0.5; // Store previous volume for mute/unmute
         
-        const volumeSlider = document.getElementById('volumeSlider');
+        // Set up volume button click handler immediately
+        document.addEventListener('click', (e) => {
+            const volumeButton = e.target.closest('#volumeIcon');
+            const volumePopup = document.getElementById('volumePopup');
+            
+            if (volumeButton) {
+                e.stopPropagation();
+                e.preventDefault();
+                if (volumePopup) {
+                    volumePopup.classList.toggle('active');
+                    console.log('Volume button clicked, popup active:', volumePopup.classList.contains('active'));
+                }
+            } else if (!e.target.closest('.volume-control')) {
+                // Close popup when clicking outside
+                if (volumePopup) {
+                    volumePopup.classList.remove('active');
+                }
+            }
+        });
+        
+        // Volume control functions
+        function updateVolumeDisplay(percent) {
+            const fill = document.getElementById('volumeSliderFill');
+            const handle = document.getElementById('volumeHandle');
+            if (fill && handle) {
+                fill.style.height = (percent * 100) + '%';
+                handle.style.bottom = (percent * 100) + '%';
+            }
+        }
         
         function updateVolume(e) {
             if (!player) return;
+            const volumeSlider = document.getElementById('volumeSlider');
+            if (!volumeSlider) return;
             const rect = volumeSlider.getBoundingClientRect();
-            const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+            const percent = Math.max(0, Math.min(1, 1 - (e.clientY - rect.top) / rect.height));
             currentVolume = percent;
+            if (percent > 0) previousVolume = percent;
             player.setVolume(percent).then(() => {
-                document.getElementById('volumeSliderFill').style.width = (percent * 100) + '%';
+                updateVolumeDisplay(percent);
                 updateVolumeIcon(percent);
             });
         }
         
-        volumeSlider.onmousedown = (e) => {
-            isDraggingVolume = true;
-            updateVolume(e);
-            e.preventDefault();
-        };
+        // Make functions available globally
+        window.updateVolumeDisplay = updateVolumeDisplay;
+        window.updateVolume = updateVolume;
         
-        // Touch support for mobile/touchscreen
-        volumeSlider.ontouchstart = (e) => {
-            isDraggingVolume = true;
-            const touch = e.touches[0];
-            const mockEvent = { clientX: touch.clientX };
-            updateVolume(mockEvent);
-            e.preventDefault();
-        };
+        // Initialize volume slider drag functionality after DOM loads
+        window.addEventListener('load', () => {
+            const volumeSlider = document.getElementById('volumeSlider');
+            
+            if (volumeSlider) {
+                volumeSlider.onmousedown = (e) => {
+                    isDraggingVolume = true;
+                    updateVolume(e);
+                    e.preventDefault();
+                    e.stopPropagation();
+                };
+                
+                // Touch support for mobile/touchscreen
+                volumeSlider.ontouchstart = (e) => {
+                    isDraggingVolume = true;
+                    const touch = e.touches[0];
+                    const mockEvent = { clientY: touch.clientY };
+                    updateVolume(mockEvent);
+                    e.preventDefault();
+                    e.stopPropagation();
+                };
+            }
+        });
         
         // Consolidated mouse/touch event listeners
         document.addEventListener('mousemove', (e) => {
             if (isDraggingProgress) {
                 updateSeek(e);
             }
-            if (isDraggingVolume) {
-                updateVolume(e);
+            if (isDraggingVolume && window.updateVolume) {
+                window.updateVolume(e);
             }
         });
         
@@ -1486,12 +2222,13 @@
         
         document.addEventListener('touchmove', (e) => {
             const touch = e.touches[0];
-            const mockEvent = { clientX: touch.clientX };
             if (isDraggingProgress) {
+                const mockEvent = { clientX: touch.clientX };
                 updateSeek(mockEvent);
             }
-            if (isDraggingVolume) {
-                updateVolume(mockEvent);
+            if (isDraggingVolume && window.updateVolume) {
+                const mockEvent = { clientY: touch.clientY };
+                window.updateVolume(mockEvent);
             }
         });
         
@@ -1499,25 +2236,6 @@
             isDraggingProgress = false;
             isDraggingVolume = false;
         });
-
-        document.getElementById('volumeIcon').onclick = () => {
-            if (!player) return;
-            if (currentVolume > 0) {
-                // Mute
-                player.setVolume(0).then(() => {
-                    document.getElementById('volumeSliderFill').style.width = '0%';
-                    updateVolumeIcon(0);
-                });
-            } else {
-                // Unmute to previous volume or 50%
-                const newVolume = 0.5;
-                player.setVolume(newVolume).then(() => {
-                    currentVolume = newVolume;
-                    document.getElementById('volumeSliderFill').style.width = (newVolume * 100) + '%';
-                    updateVolumeIcon(newVolume);
-                });
-            }
-        };
 
         function updateVolumeIcon(volume) {
             const icon = document.getElementById('volumeIcon');
