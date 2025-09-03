@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # Spotify Kids Manager - Installation Script
-# Copyright (c) 2025 Bill Krause. All rights reserved.
+# Copyright (c) 2025 SavageIndustries. All rights reserved.
 #
 # This is proprietary software. Unauthorized copying, modification, distribution,
 # or reverse engineering is strictly prohibited. See LICENSE file for details.

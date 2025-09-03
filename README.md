@@ -420,7 +420,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## 📄 License & Commercial Use
 
-**PROPRIETARY SOFTWARE** - This is proprietary, copyrighted software owned by Bill Krause.
+**PROPRIETARY SOFTWARE** - This is proprietary, copyrighted software owned by SavageIndustries.
 
 ### Personal Use
 - ✅ Install and use on your own devices for personal/family use

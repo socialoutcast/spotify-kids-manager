@@ -2,7 +2,7 @@
 
 ## Overview
 
-Spotify Kids Manager is proprietary software owned by Bill Krause. While personal use is permitted under our standard license, commercial use requires a separate commercial license agreement.
+Spotify Kids Manager is proprietary software owned by SavageIndustries. While personal use is permitted under our standard license, commercial use requires a separate commercial license agreement.
 
 ## Commercial Use Cases
 
