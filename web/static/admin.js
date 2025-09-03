@@ -307,12 +307,17 @@ async function openLogModal(type) {
         // Create modal if it doesn't exist
         logModal = document.createElement('div');
         logModal.id = 'logModal';
-        logModal.style.cssText = 'display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:1000;';
+        logModal.className = 'modal';
+        logModal.style.cssText = 'display:none;position:fixed;top:0;left:0;width:100%;height:100%;z-index:1000;';
         logModal.innerHTML = `
-            <div style="background:white;margin:50px auto;padding:20px;width:80%;max-width:800px;max-height:80vh;overflow:auto;">
-                <h3>Log Viewer</h3>
-                <pre id="logContent" style="background:#f4f4f4;padding:10px;overflow:auto;max-height:400px;"></pre>
-                <button onclick="closeLogModal()">Close</button>
+            <div class="modal-content" style="margin:50px auto;padding:20px;width:80%;max-width:800px;max-height:80vh;overflow:auto;border-radius:8px;">
+                <div class="modal-header" style="padding:16px 0;margin-bottom:16px;">
+                    <h3>Log Viewer</h3>
+                </div>
+                <div class="modal-body">
+                    <pre id="logContent" class="log-viewer" style="max-height:400px;overflow:auto;"></pre>
+                    <button onclick="closeLogModal()" style="margin-top:16px;">Close</button>
+                </div>
             </div>
         `;
         document.body.appendChild(logModal);
@@ -411,15 +416,15 @@ async function startBluetoothScan() {
                 const isPaired = device.paired || false;
                 
                 html += `
-                    <div class="device-item" style="padding: 10px; margin: 5px 0; background: #f5f5f5; border-radius: 5px; display: flex; justify-content: space-between; align-items: center;">
+                    <div class="device-item">
                         <div>
                             <strong>${name}</strong><br>
-                            <small style="color: #666;">${address}</small>
-                            ${isPaired ? '<span style="color: green; margin-left: 10px;">✓ Paired</span>' : ''}
+                            <small>${address}</small>
+                            ${isPaired ? '<span class="success-message" style="margin-left: 10px;">✓ Paired</span>' : ''}
                         </div>
                         <div>
-                            ${!isPaired ? `<button onclick="pairBluetoothDevice('${address}')" style="padding: 5px 10px; background: #4CAF50; color: white; border: none; border-radius: 3px; cursor: pointer;">Pair</button>` : 
-                              `<button onclick="connectBluetooth('${address}')" style="padding: 5px 10px; background: #2196F3; color: white; border: none; border-radius: 3px; cursor: pointer;">Connect</button>`}
+                            ${!isPaired ? `<button onclick="pairBluetoothDevice('${address}')" class="small">Pair</button>` : 
+                              `<button onclick="connectBluetooth('${address}')" class="small secondary">Connect</button>`}
                         </div>
                     </div>`;
             }
@@ -428,12 +433,12 @@ async function startBluetoothScan() {
             if (deviceList) deviceList.innerHTML = html;
         } else {
             if (scanStatus) scanStatus.textContent = 'No devices found';
-            if (deviceList) deviceList.innerHTML = '<p style="text-align: center; color: #666;">No Bluetooth devices found. Make sure devices are in pairing mode.</p>';
+            if (deviceList) deviceList.innerHTML = '<p style="text-align: center;" class="scan-status">No Bluetooth devices found. Make sure devices are in pairing mode.</p>';
         }
     } catch (error) {
         if (scanSpinner) scanSpinner.style.display = 'none';
         if (scanStatus) scanStatus.textContent = 'Scan failed';
-        if (deviceList) deviceList.innerHTML = `<p style="color: red;">Error: ${error.message || 'Failed to scan for devices'}</p>`;
+        if (deviceList) deviceList.innerHTML = `<p class="error-message">Error: ${error.message || 'Failed to scan for devices'}</p>`;
     }
 }
 
@@ -454,8 +459,9 @@ async function pairBluetoothDevice(address) {
     
     if (result.success) {
         alert('Device paired successfully!');
-        // Refresh the scan to show updated status
+        // Refresh both the scan and paired devices list
         startBluetoothScan();
+        loadPairedDevices();
     } else {
         alert('Pairing failed: ' + (result.error || 'Unknown error'));
     }
@@ -466,7 +472,7 @@ async function connectBluetooth(address) {
     
     if (result.success) {
         alert('Connected successfully');
-        location.reload();
+        loadPairedDevices();
     } else {
         alert('Connection failed: ' + (result.error || 'Unknown error'));
     }
@@ -477,7 +483,7 @@ async function disconnectBluetooth(address) {
     
     if (result.success) {
         alert('Disconnected');
-        location.reload();
+        loadPairedDevices();
     } else {
         alert('Disconnect failed: ' + (result.error || 'Unknown error'));
     }
@@ -490,9 +496,50 @@ async function removeBluetooth(address) {
     
     if (result.success) {
         alert('Device removed');
-        location.reload();
+        loadPairedDevices();
     } else {
         alert('Remove failed: ' + (result.error || 'Unknown error'));
+    }
+}
+
+async function loadPairedDevices() {
+    const pairedList = document.getElementById('pairedList');
+    if (!pairedList) return;
+    
+    try {
+        pairedList.innerHTML = '<p class="scan-status" style="text-align: center;">Loading paired devices...</p>';
+        
+        const result = await apiCall('/api/bluetooth/paired-devices');
+        
+        if (result.success && result.devices && result.devices.length > 0) {
+            let html = '';
+            for (const device of result.devices) {
+                const name = device.name || 'Unknown Device';
+                const address = device.address || '';
+                const isConnected = device.connected || false;
+                
+                html += `
+                    <div class="device-item" onclick="connectBluetooth('${address}')" style="cursor: pointer;">
+                        <div>
+                            <strong>${name}</strong><br>
+                            <small>${address}</small>
+                            ${isConnected ? '<span class="success-message" style="margin-left: 10px;">✓ Connected</span>' : '<span class="scan-status" style="margin-left: 10px;">Disconnected</span>'}
+                        </div>
+                        <div onclick="event.stopPropagation();">
+                            ${isConnected ? 
+                                `<button onclick="disconnectBluetooth('${address}')" class="small">Disconnect</button>` : 
+                                `<button onclick="connectBluetooth('${address}')" class="small">Connect</button>`
+                            }
+                            <button onclick="removeBluetooth('${address}')" class="danger small" style="margin-left: 5px;">Remove</button>
+                        </div>
+                    </div>`;
+            }
+            pairedList.innerHTML = html;
+        } else {
+            pairedList.innerHTML = '<p class="scan-status" style="text-align: center;">No paired devices</p>';
+        }
+    } catch (error) {
+        pairedList.innerHTML = `<p class="error-message" style="text-align: center;">Error loading paired devices: ${error.message}</p>`;
     }
 }
 
@@ -533,6 +580,7 @@ async function disableBluetooth() {
 
 async function checkBluetoothStatus() {
     await updateBluetoothStatus();
+    await loadPairedDevices();
 }
 
 async function updateBluetoothStatus() {

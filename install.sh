@@ -535,6 +535,7 @@ WorkingDirectory=$APP_DIR/player
 Environment="NODE_ENV=production"
 Environment="PORT=5000"
 Environment="SPOTIFY_CONFIG_DIR=$CONFIG_DIR"
+Environment="PULSE_SERVER=unix:/tmp/pulse-socket"
 ExecStartPre=/bin/bash -c 'if [ ! -d "node_modules" ]; then npm install --omit=dev; fi'
 ExecStart=/usr/bin/node server.js
 Restart=always
@@ -900,35 +901,55 @@ fi
 # Configure Bluetooth and audio
 echo -e "${YELLOW}Configuring Bluetooth and audio...${NC}"
 
+# Stop conflicting services
+systemctl stop pipewire pipewire-pulse 2>/dev/null || true
+systemctl disable pipewire pipewire-pulse 2>/dev/null || true
+
 # Enable Bluetooth service
 systemctl enable bluetooth.service
 systemctl start bluetooth.service
 
-# Configure PulseAudio for Bluetooth
-if ! grep -q "load-module module-bluetooth-policy" /etc/pulse/default.pa 2>/dev/null; then
-    echo "load-module module-bluetooth-policy" >> /etc/pulse/default.pa
-fi
-if ! grep -q "load-module module-bluetooth-discover" /etc/pulse/default.pa 2>/dev/null; then
-    echo "load-module module-bluetooth-discover" >> /etc/pulse/default.pa
-fi
+# Configure PulseAudio System Mode
+echo -e "${BLUE}Setting up PulseAudio in system mode...${NC}"
+cat > /etc/pulse/system.pa << 'EOF'
+#!/usr/bin/pulseaudio -nF
+
+# Load audio drivers
+load-module module-device-restore
+load-module module-stream-restore  
+load-module module-card-restore
+
+# Load ALSA modules
+load-module module-alsa-sink device=hw:0,0
+load-module module-alsa-source device=hw:0,0
+
+# Bluetooth support
+load-module module-bluetooth-policy
+load-module module-bluetooth-discover
+
+# Network access for applications
+load-module module-native-protocol-unix auth-anonymous=1 socket=/tmp/pulse-socket
+load-module module-native-protocol-tcp auth-anonymous=1 port=4713
+
+# Set default sink (will be overridden when Bluetooth connects)
+set-default-sink alsa_output.hw_0_0
+set-default-source alsa_input.hw_0_0
+EOF
 
 # Add spotify-kids user to audio and bluetooth groups
 usermod -aG bluetooth,audio,pulse-access "$APP_USER"
 
-# Create runtime directory for spotify-kids user
-mkdir -p /run/user/1001
-chown $APP_USER:$APP_USER /run/user/1001
-chmod 700 /run/user/1001
-
-# Configure PulseAudio for spotify-kids user
+# Configure PulseAudio client for spotify-kids user
 mkdir -p /home/$APP_USER/.config/pulse
-cat > /home/$APP_USER/.config/pulse/default.pa << 'EOF'
-.include /etc/pulse/default.pa
-load-module module-bluetooth-policy
-load-module module-bluetooth-discover
-load-module module-switch-on-connect
+cat > /home/$APP_USER/.config/pulse/client.conf << 'EOF'
+default-server = unix:/tmp/pulse-socket
+autospawn = no
 EOF
+
+# Set PULSE_SERVER environment variable
+echo 'export PULSE_SERVER=unix:/tmp/pulse-socket' >> /home/$APP_USER/.bashrc
 chown -R $APP_USER:$APP_USER /home/$APP_USER/.config
+chown $APP_USER:$APP_USER /home/$APP_USER/.bashrc
 
 # Create Bluetooth config directory
 mkdir -p /home/$APP_USER/.config/bluetooth
@@ -974,6 +995,10 @@ WantedBy=multi-user.target
 EOF
 
 systemctl enable bluetooth-audio-setup.service
+
+# Start PulseAudio in system mode
+echo -e "${BLUE}Starting PulseAudio in system mode...${NC}"
+pulseaudio --system --daemonize --disallow-exit --verbose
 
 # Disable unnecessary services
 echo -e "${YELLOW}Optimizing system...${NC}"

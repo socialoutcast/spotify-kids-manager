@@ -699,6 +699,107 @@ ADMIN_TEMPLATE = '''
             margin-bottom: 24px;
             text-align: center;
         }
+        
+        /* Device Lists and Log Viewers */
+        .device-list {
+            background: var(--spotify-dark);
+            border-radius: 4px;
+            padding: 8px;
+        }
+        
+        .device-item {
+            padding: 12px;
+            margin: 8px 0;
+            background: var(--card-bg) !important;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.2s;
+            color: var(--text-primary) !important;
+        }
+        
+        .device-item:hover {
+            background: var(--hover-bg) !important;
+        }
+        
+        .device-item strong {
+            color: var(--text-primary) !important;
+        }
+        
+        .device-item small {
+            color: var(--text-secondary) !important;
+        }
+        
+        /* Log viewer */
+        pre, .log-viewer {
+            background: var(--card-bg) !important;
+            color: var(--text-primary) !important;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 16px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 12px;
+            line-height: 1.5;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        
+        /* Modal overlays */
+        .modal {
+            background: rgba(0, 0, 0, 0.8) !important;
+        }
+        
+        .modal-content {
+            background: var(--card-bg) !important;
+            color: var(--text-primary) !important;
+            border: 1px solid var(--border-color);
+        }
+        
+        .modal-header {
+            background: var(--spotify-dark) !important;
+            color: var(--text-primary) !important;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .modal-body {
+            background: var(--card-bg) !important;
+            color: var(--text-primary) !important;
+        }
+        
+        /* Status messages */
+        .scan-status {
+            color: var(--text-secondary) !important;
+        }
+        
+        .error-message {
+            color: #ef4444 !important;
+        }
+        
+        .success-message {
+            color: var(--spotify-green) !important;
+        }
+        
+        /* Ensure all text in cards is visible */
+        .card p {
+            color: var(--text-secondary);
+        }
+        
+        .card strong {
+            color: var(--text-primary);
+        }
+        
+        /* Animations */
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .spinner {
+            animation: spin 1s linear infinite;
+        }
     </style>
 </head>
 <body>
@@ -1013,22 +1114,8 @@ ADMIN_TEMPLATE = '''
                 </div>
                 <div id="pairedDevices" style="margin-bottom: 15px;">
                     <label style="font-size: 14px; margin-bottom: 10px; display: block;">Paired Devices:</label>
-                    <div id="pairedList" style="max-height: 150px; overflow-y: auto; border: 1px solid #ddd; border-radius: 5px; padding: 10px;">
-                        {% for device in paired_devices %}
-                        <div class="device-item" style="padding: 8px; background: #f3f4f6; border-radius: 3px; margin-bottom: 5px; display: flex; justify-content: space-between; align-items: center;">
-                            <span>{{ device.name|e }} ({{ device.address|e }})</span>
-                            <div>
-                                {% if device.connected %}
-                                <button onclick="disconnectBluetooth('{{ device.address|e }}')" class="small">Disconnect</button>
-                                {% else %}
-                                <button onclick="connectBluetooth('{{ device.address|e }}')" class="small">Connect</button>
-                                {% endif %}
-                                <button onclick="removeBluetooth('{{ device.address|e }}')" class="danger small" style="margin-left: 5px;">Remove</button>
-                            </div>
-                        </div>
-                        {% else %}
-                        <p style="color: #999; font-size: 12px;">No paired devices</p>
-                        {% endfor %}
+                    <div id="pairedList" class="device-list" style="max-height: 150px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 5px; padding: 10px;">
+                        <p class="scan-status" style="text-align: center;">Loading paired devices...</p>
                     </div>
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 10px;">
@@ -1185,31 +1272,31 @@ ADMIN_TEMPLATE = '''
         </div>
         
         <!-- Bluetooth Scan Modal -->
-        <div id="bluetoothScanModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000;">
-            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #2a2a2a; border-radius: 10px; padding: 30px; width: 600px; max-height: 80vh; overflow-y: auto; border: 1px solid #444;">
+        <div id="bluetoothScanModal" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1000;">
+            <div class="modal-content" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); border-radius: 10px; padding: 30px; width: 600px; max-height: 80vh; overflow-y: auto;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                    <h2 style="margin: 0; color: #fff;">🔍 Scanning for Bluetooth Devices</h2>
-                    <button onclick="closeScanModal()" style="background: #ef4444; color: white; border: none; padding: 5px 15px; border-radius: 5px; cursor: pointer;">✕</button>
+                    <h2 style="margin: 0;">🔍 Scanning for Bluetooth Devices</h2>
+                    <button onclick="closeScanModal()" class="danger small">✕</button>
                 </div>
                 
-                <div id="scanStatus" style="margin-bottom: 20px; padding: 10px; background: #1a1a1a; border-radius: 5px; border: 1px solid #444;">
+                <div id="scanStatus" class="card" style="margin-bottom: 20px; padding: 10px;">
                     <div style="display: flex; align-items: center;">
-                        <div class="spinner" style="border: 3px solid #444; border-top: 3px solid #667eea; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; margin-right: 10px;"></div>
-                        <span id="scanStatusText" style="color: #fff;">Scanning for devices...</span>
+                        <div class="spinner" style="border: 3px solid var(--border-color); border-top: 3px solid var(--spotify-green); border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; margin-right: 10px;"></div>
+                        <span id="scanStatusText" class="scan-status">Scanning for devices...</span>
                     </div>
                 </div>
                 
                 <div style="margin-bottom: 20px;">
-                    <h3 style="margin-bottom: 10px; color: #fff;">Available Devices:</h3>
-                    <div id="scanDeviceList" style="max-height: 300px; overflow-y: auto; border: 1px solid #444; border-radius: 5px; padding: 10px; background: #1a1a1a;">
-                        <p style="color: #999; text-align: center;">No devices found yet...</p>
+                    <h3 style="margin-bottom: 10px;">Available Devices:</h3>
+                    <div id="scanDeviceList" class="device-list" style="max-height: 300px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 5px; padding: 10px;">
+                        <p class="scan-status" style="text-align: center;">No devices found yet...</p>
                     </div>
                 </div>
                 
                 <div style="display: flex; gap: 10px;">
-                    <button onclick="scanBluetooth()" style="flex: 1; background: #667eea; color: white; border: none; padding: 10px; border-radius: 5px; cursor: pointer;">Refresh Scan</button>
-                    <button onclick="stopScan()" style="flex: 1; background: #ef4444; color: white; border: none; padding: 10px; border-radius: 5px; cursor: pointer;">Stop Scanning</button>
-                    <button onclick="closeScanModal()" style="flex: 1; background: #444; color: #fff; border: 1px solid #666; padding: 10px; border-radius: 5px; cursor: pointer;">Close</button>
+                    <button onclick="scanBluetooth()" style="flex: 1;">Refresh Scan</button>
+                    <button onclick="stopScan()" class="danger" style="flex: 1;">Stop Scanning</button>
+                    <button onclick="closeScanModal()" class="secondary" style="flex: 1;">Close</button>
                 </div>
             </div>
         </div>
@@ -1320,12 +1407,25 @@ ADMIN_TEMPLATE = '''
             
             // Mark nav item as active
             event.target.closest('.nav-item').classList.add('active');
+            
+            // Load paired devices when bluetooth section is shown
+            if (sectionId === 'bluetooth') {
+                loadPairedDevices();
+            }
         }
         
         function logout() {
             fetch('/api/logout', { method: 'POST' })
                 .then(() => location.reload());
         }
+        
+        // Initialize paired devices on page load if on bluetooth section
+        document.addEventListener('DOMContentLoaded', function() {
+            const bluetoothSection = document.getElementById('bluetooth');
+            if (bluetoothSection && bluetoothSection.classList.contains('active')) {
+                loadPairedDevices();
+            }
+        });
     </script>
     <script src="/static/admin.js"></script>
     {% else %}
@@ -1366,7 +1466,7 @@ def get_bluetooth_status():
         
         # Get paired devices
         paired_devices = []
-        result = subprocess.run(['sudo', 'bluetoothctl', 'paired-devices'], 
+        result = subprocess.run(['sudo', 'bluetoothctl', 'devices', 'Paired'], 
                               capture_output=True, text=True, timeout=5)
         
         for line in result.stdout.split('\n'):
@@ -2545,7 +2645,7 @@ def bluetooth_scan():
         paired_addresses = set()
         
         # Get already paired devices to exclude them
-        paired_result = subprocess.run(['sudo', 'bluetoothctl', 'paired-devices'],
+        paired_result = subprocess.run(['sudo', 'bluetoothctl', 'devices', 'Paired'],
                                       capture_output=True, text=True, timeout=5)
         for line in paired_result.stdout.split('\n'):
             if 'Device' in line:
@@ -2799,6 +2899,43 @@ def bluetooth_status():
             'enabled': enabled,
             'service_active': is_active,
             'rfkill_unblocked': is_unblocked
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/bluetooth/paired-devices')
+def bluetooth_paired_devices():
+    """Get list of paired Bluetooth devices"""
+    if 'logged_in' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    try:
+        # Get paired devices
+        paired_devices = []
+        result = subprocess.run(['sudo', 'bluetoothctl', 'devices', 'Paired'], 
+                              capture_output=True, text=True, timeout=10)
+        
+        for line in result.stdout.strip().split('\n'):
+            if line.startswith('Device '):
+                parts = line.split(' ', 2)
+                if len(parts) >= 3:
+                    address = parts[1]
+                    name = parts[2]
+                    
+                    # Check if device is connected
+                    info_result = subprocess.run(['sudo', 'bluetoothctl', 'info', address], 
+                                               capture_output=True, text=True, timeout=5)
+                    connected = 'Connected: yes' in info_result.stdout
+                    
+                    paired_devices.append({
+                        'name': name,
+                        'address': address,
+                        'connected': connected
+                    })
+        
+        return jsonify({
+            'success': True,
+            'devices': paired_devices
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
