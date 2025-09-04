@@ -382,15 +382,23 @@ sudo systemctl restart spotify-player spotify-admin
 
 ## 🆘 Reset/Reinstall
 
-If you need to start fresh:
+If you need to start fresh or completely remove the system:
 
 ```bash
-# Complete uninstall and reinstall
-sudo spotify-kids-uninstall
+# Complete uninstall - removes ALL components and configurations
+curl -fsSL https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/main/setup.sh | sudo bash -s -- --reset
 
-# Then reinstall
+# Then reinstall if desired
 curl -fsSL https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/main/setup.sh | sudo bash
 ```
+
+The reset option will:
+- Stop and remove all services
+- Delete all application files and configurations
+- Remove system users and groups
+- Clean up Nginx, PulseAudio, and Bluetooth configurations
+- Restore display manager to default settings
+- Remove all SSL certificates and credentials
 
 ## 📝 Environment Variables
 
