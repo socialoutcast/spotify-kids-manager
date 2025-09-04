@@ -2,15 +2,19 @@
 
 **Transform any Raspberry Pi into a powerful, parent-controlled Spotify music player designed specifically for children.**
 
-A premium parental control system that creates a safe, managed music experience for kids while giving parents complete control over content, screen time, and listening habits. Built for families who want to share their love of music without compromising on safety or age-appropriate content.
-
-### 🏆 The Ultimate Child-Safe Music Solution
-Turn your Raspberry Pi into a dedicated kids' music station with enterprise-grade parental controls, beautiful touch interface, and seamless Spotify integration. Perfect for bedrooms, playrooms, or anywhere kids need their own safe music space.
+A secure, managed music experience for kids with comprehensive parental controls. Perfect for bedrooms, playrooms, or anywhere kids need their own safe music space.
 
 ![Spotify Kids Manager](https://img.shields.io/badge/Spotify-Kids%20Manager-1DB954?style=for-the-badge&logo=spotify&logoColor=white)
-![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)
-![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
-![Raspberry Pi](https://img.shields.io/badge/Raspberry%20Pi-A22846?style=for-the-badge&logo=raspberry-pi&logoColor=white)
+![License](https://img.shields.io/badge/License-Proprietary-red?style=for-the-badge)
+![Release](https://img.shields.io/github/v/release/socialoutcast/spotify-kids-manager?style=for-the-badge)
+
+## 🚀 Quick Installation
+
+Install with a single command:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/main/install.sh | sudo bash
+```
 
 ## 🌟 Why Choose Spotify Kids Manager?
 

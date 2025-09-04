@@ -1,11 +1,8 @@
 #!/bin/bash
-#
-# Spotify Kids Manager - Installation Script
-# Copyright (c) 2025 SavageIndustries. All rights reserved.
-#
-# This is proprietary software. Unauthorized copying, modification, distribution,
-# or reverse engineering is strictly prohibited. See LICENSE file for details.
-#
+
+# Spotify Kids Manager - Release-based Installer
+# This version downloads pre-packaged releases instead of source files
+# Usage: curl -sSL https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/main/install-release.sh | sudo bash
 
 set -e
 
@@ -13,664 +10,169 @@ set -e
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
 APP_USER="spotify-kids"
 APP_DIR="/opt/spotify-kids"
 CONFIG_DIR="$APP_DIR/config"
-REPO_URL="https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/main"
+REPO_URL="https://github.com/socialoutcast/spotify-kids-manager"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Parse arguments
-RESET_MODE=false
-if [[ "$1" == "--reset" ]]; then
-    RESET_MODE=true
-fi
-
-echo -e "${GREEN}Spotify Kids Manager Installer${NC}"
-echo "================================"
+echo -e "${GREEN}================================${NC}"
+echo -e "${GREEN}Spotify Kids Manager - Installer${NC}"
+echo -e "${GREEN}================================${NC}"
+echo ""
 
 # Check if running as root
 if [[ $EUID -ne 0 ]]; then
    echo -e "${RED}This script must be run as root${NC}"
+   echo "Please run: curl -sSL $REPO_URL/raw/main/install-release.sh | sudo bash"
    exit 1
 fi
 
-# Function to wait for apt/dpkg locks to be released
-wait_for_apt() {
-    echo -e "${YELLOW}Checking for running package managers...${NC}"
+# Detect system
+if [ -f /etc/os-release ]; then
+    . /etc/os-release
+    OS=$ID
+    VER=$VERSION_ID
+else
+    echo -e "${RED}Cannot detect operating system${NC}"
+    exit 1
+fi
+
+echo -e "${YELLOW}Detected OS: $OS $VER${NC}"
+
+# Get the device IP address
+DEVICE_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+if [ -z "$DEVICE_IP" ]; then
+    DEVICE_IP="localhost"
+fi
+
+# Function to download from GitHub releases
+download_release_asset() {
+    local asset_name=$1
+    local output_path=$2
     
-    while true; do
-        # Check if apt, apt-get, dpkg, or unattended-upgrades are running
-        if pgrep -x "apt" > /dev/null || \
-           pgrep -x "apt-get" > /dev/null || \
-           pgrep -x "dpkg" > /dev/null || \
-           pgrep -f "unattended-upgrade" > /dev/null; then
-            echo -e "${YELLOW}Another package manager is running. Waiting...${NC}"
-            sleep 5
+    echo -e "${YELLOW}Downloading $asset_name...${NC}"
+    
+    # Get latest release URL
+    local latest_release_url="$REPO_URL/releases/latest/download/$asset_name"
+    
+    # Download with retry logic
+    local max_retries=3
+    local retry=0
+    
+    while [ $retry -lt $max_retries ]; do
+        if wget -q --show-progress "$latest_release_url" -O "$output_path"; then
+            echo -e "${GREEN}✓ Downloaded $asset_name${NC}"
+            return 0
         else
-            # Also check for lock files
-            if fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || \
-               fuser /var/lib/dpkg/lock >/dev/null 2>&1 || \
-               fuser /var/lib/apt/lists/lock >/dev/null 2>&1 || \
-               fuser /var/cache/apt/archives/lock >/dev/null 2>&1; then
-                echo -e "${YELLOW}Package database is locked. Waiting...${NC}"
-                sleep 5
-            else
-                echo -e "${GREEN}Package manager is available.${NC}"
-                break
+            retry=$((retry + 1))
+            if [ $retry -lt $max_retries ]; then
+                echo -e "${YELLOW}Download failed, retrying... ($retry/$max_retries)${NC}"
+                sleep 2
             fi
         fi
     done
     
-    # Give it a moment to ensure everything is clear
-    sleep 2
+    echo -e "${RED}Failed to download $asset_name${NC}"
+    return 1
 }
 
-# Wait for apt to be available before starting
-wait_for_apt
+# Stop existing services if they exist
+echo -e "${YELLOW}Stopping existing services...${NC}"
+systemctl stop spotify-player 2>/dev/null || true
+systemctl stop spotify-admin 2>/dev/null || true
+systemctl stop spotify-kiosk 2>/dev/null || true
+systemctl stop pulseaudio-spotify-kids 2>/dev/null || true
 
-# Clean up any old installations
-if [ -d "/opt/spotify-terminal" ] || [ -d "/opt/spotify-kids" ] && [ "$RESET_MODE" = false ]; then
-    echo -e "${YELLOW}Found existing installation. Use --reset to remove it first.${NC}"
-    echo -e "${RED}Installation aborted to prevent data loss.${NC}"
+# Install system dependencies
+echo -e "${YELLOW}Installing system dependencies...${NC}"
+apt-get update
+apt-get install -y \
+    python3 python3-pip python3-venv \
+    nodejs npm \
+    nginx \
+    git \
+    curl wget \
+    chromium-browser \
+    xinit xorg \
+    openbox \
+    unclutter \
+    alsa-utils \
+    pulseaudio \
+    pulseaudio-module-bluetooth \
+    bluez \
+    openssl \
+    sudo
+
+# Disable conflicting services
+echo -e "${YELLOW}Configuring audio system...${NC}"
+systemctl stop pipewire pipewire-pulse wireplumber 2>/dev/null || true
+systemctl disable pipewire pipewire-pulse wireplumber 2>/dev/null || true
+systemctl mask pipewire pipewire-pulse wireplumber 2>/dev/null || true
+systemctl stop bluealsa 2>/dev/null || true
+systemctl disable bluealsa 2>/dev/null || true
+systemctl mask bluealsa 2>/dev/null || true
+
+# Create application user
+if ! id "$APP_USER" &>/dev/null; then
+    echo -e "${YELLOW}Creating application user...${NC}"
+    useradd -r -m -s /bin/bash -d /home/$APP_USER $APP_USER
+    usermod -a -G audio,video,bluetooth,pulse-access,input,tty,dialout,gpio,lp $APP_USER
+fi
+
+# Get user UID for later use
+APP_USER_UID=$(id -u $APP_USER)
+
+# Create directory structure
+echo -e "${YELLOW}Creating directory structure...${NC}"
+mkdir -p $APP_DIR
+mkdir -p $CONFIG_DIR
+mkdir -p $CONFIG_DIR/cache
+mkdir -p /var/log/spotify-kids
+mkdir -p /home/$APP_USER/.config/pulse
+mkdir -p /home/$APP_USER/.config/openbox
+
+# Download release packages
+echo -e "${YELLOW}Downloading application packages from GitHub releases...${NC}"
+
+TEMP_DIR=$(mktemp -d)
+cd $TEMP_DIR
+
+# Download the packages
+if ! download_release_asset "spotify-kids-web.tar.gz" "web.tar.gz"; then
+    echo -e "${RED}Failed to download web package. Please check if a release exists at:${NC}"
+    echo -e "${YELLOW}$REPO_URL/releases${NC}"
     exit 1
 fi
 
-# Reset function
-if [ "$RESET_MODE" = true ]; then
-    echo -e "${YELLOW}RESET MODE: Force removing ALL Spotify installations...${NC}"
-    echo -e "${RED}Removing ALL configuration and data NOW!${NC}"
-    # NO CONFIRMATION - JUST FORCE IT
-    
-    echo -e "${YELLOW}Stopping ALL Spotify services...${NC}"
-    # Stop ANY service with spotify in the name
-    systemctl list-units --all --type=service | grep -i spotify | awk '{print $1}' | while read service; do
-        systemctl stop "$service" 2>/dev/null || true
-        systemctl disable "$service" 2>/dev/null || true
-    done
-    
-    echo -e "${YELLOW}Removing ALL Spotify files...${NC}"
-    # Remove ALL spotify-related directories
-    rm -rf /opt/spotify-kids
-    rm -rf /opt/spotify-terminal 2>/dev/null || true
-    
-    # Remove ALL service files
-    rm -f /etc/systemd/system/spotify*.service
-    rm -f /lib/systemd/system/spotify*.service
-    rm -f /etc/systemd/system/getty@tty1.service.d/autologin.conf
-    
-    # Remove ALL nginx configs
-    rm -f /etc/nginx/sites-available/spotify*
-    rm -f /etc/nginx/sites-enabled/spotify*
-    rm -f /etc/nginx/sites-available/spotify-admin
-    rm -f /etc/nginx/sites-enabled/spotify-admin
-    
-    # Restore default nginx site if needed
-    if [ ! -f /etc/nginx/sites-enabled/default ] && [ -f /etc/nginx/sites-available/default ]; then
-        ln -s /etc/nginx/sites-available/default /etc/nginx/sites-enabled/
-    fi
-    
-    # Remove ALL sudoers entries
-    rm -f /etc/sudoers.d/spotify*
-    rm -f /etc/sudoers.d/spotify-pkgmgr
-    
-    # Remove ALL uninstall scripts
-    rm -f /usr/local/bin/spotify*
-    
-    # Remove X11 configs we may have added
-    rm -f /etc/X11/xorg.conf.d/99-calibration.conf
-    rm -f /etc/X11/xorg.conf.d/10-serverflags.conf
-    rm -f /etc/X11/xorg.conf.d/20-display.conf
-    
-    echo -e "${YELLOW}Removing ALL Spotify users and groups...${NC}"
-    # Remove ANY user with spotify in the name
-    for user in spotify-kids spotify-admin spotify-terminal; do
-        if id "$user" &>/dev/null; then
-            # Kill all processes for this user
-            pkill -9 -u "$user" 2>/dev/null || true
-            sleep 2
-            # Force remove user without removing home (we'll do that manually)
-            userdel "$user" 2>/dev/null || true
-        fi
-    done
-    
-    # Remove the package management group
-    groupdel spotify-pkgmgr 2>/dev/null || true
-    # Remove the config group
-    groupdel spotify-config 2>/dev/null || true
-    
-    # Force clean up home directories
-    rm -rf /home/spotify-kids 2>/dev/null || true
-    rm -rf /home/spotify-admin 2>/dev/null || true
-    rm -rf /home/spotify-terminal 2>/dev/null || true
-    rm -rf /home/spotify* 2>/dev/null || true
-    
-    # Clean up logs
-    rm -rf /var/log/spotify*
-    
-    # Clean up any .bash_profile or .xinitrc we created
-    for homedir in /home/*; do
-        if [ -f "$homedir/.xinitrc" ] && grep -q "spotify" "$homedir/.xinitrc" 2>/dev/null; then
-            rm -f "$homedir/.xinitrc"
-        fi
-        if [ -f "$homedir/.bash_profile" ] && grep -q "spotify" "$homedir/.bash_profile" 2>/dev/null; then
-            rm -f "$homedir/.bash_profile"
-        fi
-    done
-    
-    # Reload everything
-    systemctl daemon-reload
-    systemctl restart nginx 2>/dev/null || true
-    
-    echo -e "${GREEN}COMPLETE RESET DONE! All Spotify installations removed.${NC}"
-    echo -e "${GREEN}Starting fresh installation...${NC}"
-    echo ""
-    sleep 2
-    # DON'T EXIT - CONTINUE WITH INSTALLATION BELOW
+if ! download_release_asset "spotify-kids-player.tar.gz" "player.tar.gz"; then
+    echo -e "${RED}Failed to download player package${NC}"
+    exit 1
 fi
 
-# Update system
-echo -e "${YELLOW}Updating system packages...${NC}"
-wait_for_apt
-echo "Running apt-get update..."
-apt-get update || {
-    echo -e "${YELLOW}Initial update failed, retrying...${NC}"
-    sleep 2
-    wait_for_apt
-    apt-get update
-}
-
-echo "Running apt-get upgrade..."
-DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -q \
-    -o Dpkg::Options::="--force-confdef" \
-    -o Dpkg::Options::="--force-confold" || true
-
-echo "Handling held-back packages with dist-upgrade..."
-DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y -q \
-    -o Dpkg::Options::="--force-confdef" \
-    -o Dpkg::Options::="--force-confold" || true
-
-echo "Removing unnecessary packages..."
-apt-get autoremove -y || true
-
-echo "Cleaning package cache..."
-apt-get autoclean -y || true
-
-echo "System update complete"
-
-# Remove bloatware to free up space for kiosk device
-echo -e "${YELLOW}Removing unnecessary software to free up space...${NC}"
-wait_for_apt
-apt-get remove -y --purge \
-    libreoffice* \
-    libreoffice-* \
-    openoffice* \
-    thunderbird* \
-    evolution* \
-    pidgin* \
-    hexchat* \
-    gimp* \
-    inkscape* \
-    audacity* \
-    vlc* \
-    transmission* \
-    brasero* \
-    cheese* \
-    rhythmbox* \
-    totem* \
-    2>/dev/null || true
-
-# Clean up after removal
-apt-get autoremove -y
-apt-get autoclean -y
-
-# Install common fonts for web display
-echo -e "${YELLOW}Installing common fonts...${NC}"
-apt-get install -y \
-    fonts-liberation \
-    fonts-liberation2 \
-    fonts-dejavu-core \
-    fonts-dejavu-extra \
-    fonts-droid-fallback \
-    fonts-noto-mono \
-    fonts-noto-color-emoji \
-    fonts-roboto \
-    fonts-ubuntu \
-    fonts-font-awesome \
-    fonts-material-design-icons-iconfont \
-    2>/dev/null || true
-
-# Accept Microsoft fonts EULA automatically
-echo ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true | debconf-set-selections
-apt-get install -y ttf-mscorefonts-installer 2>/dev/null || true
-
-# Install dependencies
-echo -e "${YELLOW}Installing dependencies...${NC}"
-
-# First ensure package lists are up to date
-echo -e "${BLUE}Ensuring package lists are current...${NC}"
-wait_for_apt
-apt-get update || true
-
-# Install packages in smaller groups to handle failures better
-echo -e "${BLUE}Installing Python packages...${NC}"
-apt-get install -y \
-    python3 \
-    python3-pip \
-    python3-tk \
-    python3-pil \
-    python3-pil.imagetk || true
-
-echo -e "${BLUE}Installing X server packages...${NC}"
-apt-get install -y \
-    xserver-xorg \
-    xserver-xorg-video-all \
-    xserver-xorg-input-all \
-    xinit \
-    x11-xserver-utils \
-    x11-utils \
-    x11-apps \
-    xterm || true
-
-echo -e "${BLUE}Installing web server...${NC}"
-# Update again before nginx to avoid 404 errors
-wait_for_apt
-apt-get update
-apt-get install -y nginx || {
-    echo -e "${YELLOW}nginx installation failed, updating repos and retrying...${NC}"
-    wait_for_apt
-    apt-get update
-    apt-get install -y nginx
-}
-
-echo -e "${BLUE}Installing window manager and display packages...${NC}"
-apt-get install -y \
-    openbox \
-    lightdm \
-    unclutter || true
-
-echo -e "${BLUE}Installing browser...${NC}"
-apt-get install -y chromium || apt-get install -y chromium-browser || true
-
-echo -e "${BLUE}Installing Bluetooth and audio packages...${NC}"
-apt-get install -y \
-    bluez \
-    bluez-firmware \
-    bluez-tools \
-    bluez-alsa-utils \
-    pulseaudio \
-    pulseaudio-module-bluetooth \
-    libasound2-plugins \
-    libspa-0.2-bluetooth \
-    pi-bluetooth \
-    pulseaudio-utils || true
-
-echo -e "${BLUE}Installing utility packages...${NC}"
-apt-get install -y \
-    git \
-    rfkill \
-    scrot \
-    curl \
-    expect || true
-
-# Install Node.js for the web player
-echo -e "${YELLOW}Installing Node.js...${NC}"
-if ! command -v node &> /dev/null; then
-    curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
-    apt-get install -y nodejs
+if ! download_release_asset "kiosk_launcher.sh" "kiosk_launcher.sh"; then
+    echo -e "${YELLOW}Warning: Could not download kiosk_launcher.sh, will create default${NC}"
 fi
-NODE_VERSION=$(node --version 2>/dev/null || echo "not installed")
-echo -e "${GREEN}Node.js version: ${NODE_VERSION}${NC}"
 
-# Install Python packages
-echo -e "${YELLOW}Installing Python packages...${NC}"
-pip3 install --break-system-packages \
-    spotipy \
-    flask \
-    flask-cors \
-    werkzeug \
-    pillow \
-    requests \
-    psutil
+# Extract packages
+echo -e "${YELLOW}Extracting packages...${NC}"
+tar xzf web.tar.gz -C $APP_DIR/
+tar xzf player.tar.gz -C $APP_DIR/
 
-# Final cleanup after all installations
-echo -e "${YELLOW}Final system cleanup...${NC}"
-apt-get autoremove -y || true
-apt-get autoclean -y || true
-
-# Create application user (NO SUDO PRIVILEGES)
-echo -e "${YELLOW}Creating application user...${NC}"
-if ! id "$APP_USER" &>/dev/null; then
-    # User doesn't exist, but group might - clean it up
-    if getent group "$APP_USER" >/dev/null 2>&1; then
-        echo "Cleaning up existing group $APP_USER from previous installation..."
-        groupdel "$APP_USER" 2>/dev/null || true
-    fi
-    # Now create fresh user and group
-    useradd -m -s /bin/bash "$APP_USER"
-    usermod -aG audio,video,input "$APP_USER"
+# Copy or create kiosk launcher
+if [ -f "kiosk_launcher.sh" ]; then
+    cp kiosk_launcher.sh $APP_DIR/
 else
-    echo "User $APP_USER already exists"
-fi
-
-# ALWAYS ensure home directory exists
-mkdir -p /home/$APP_USER
-chown $APP_USER:$APP_USER /home/$APP_USER
-
-# Create package management group
-PKG_MGMT_GROUP="spotify-pkgmgr"
-echo -e "${YELLOW}Creating package management group...${NC}"
-if ! getent group "$PKG_MGMT_GROUP" >/dev/null 2>&1; then
-    groupadd "$PKG_MGMT_GROUP"
-    echo "Created group $PKG_MGMT_GROUP for package management"
-else
-    echo "Group $PKG_MGMT_GROUP already exists"
-fi
-
-# Create admin user for the web panel
-ADMIN_USER="spotify-admin"
-echo -e "${YELLOW}Creating admin user for web panel...${NC}"
-
-# Clean up any partial state first
-if ! id "$ADMIN_USER" &>/dev/null; then
-    # User doesn't exist, but group might - clean it up
-    if getent group "$ADMIN_USER" >/dev/null 2>&1; then
-        echo "Cleaning up existing group $ADMIN_USER from previous installation..."
-        groupdel "$ADMIN_USER" 2>/dev/null || true
-    fi
-    # Now create fresh user and group
-    useradd -r -M -s /bin/false "$ADMIN_USER"
-    # Add admin user to package management group ONLY
-    usermod -G "$PKG_MGMT_GROUP" "$ADMIN_USER"
-else
-    echo "User $ADMIN_USER already exists"
-    # Ensure user is in package management group and ONLY that group
-    usermod -G "$PKG_MGMT_GROUP" "$ADMIN_USER"
-fi
-
-# Add www-data to package management group
-usermod -a -G "$PKG_MGMT_GROUP" www-data
-
-# Note: Sudo permissions are now configured via the spotify-pkgmgr group
-# This ensures the admin user only has access to specific package management commands
-
-# Create application directories
-echo -e "${YELLOW}Creating application directories...${NC}"
-mkdir -p "$APP_DIR"
-mkdir -p "$CONFIG_DIR"
-mkdir -p "/var/log/spotify-kids"
-mkdir -p "/var/log/nginx"
-
-# Copy or download application files
-echo -e "${YELLOW}Installing application files...${NC}"
-
-# Check if running from local directory or curl
-if [ -f "$SCRIPT_DIR/web/app.py" ]; then
-    echo "Installing from local files..."
-    # Web admin panel
-    cp -r "$SCRIPT_DIR/web" "$APP_DIR/"
-    # Player application
-    cp -r "$SCRIPT_DIR/player" "$APP_DIR/"
-    # Kiosk launcher
-    cp "$SCRIPT_DIR/kiosk_launcher.sh" "$APP_DIR/" 2>/dev/null || true
-else
-    echo "Downloading files from GitHub..."
-    # Web admin panel
-    mkdir -p "$APP_DIR/web"
-    mkdir -p "$APP_DIR/web/static"
-    wget -q "$REPO_URL/web/app.py" -O "$APP_DIR/web/app.py"
-    wget -q "$REPO_URL/web/static/admin.js" -O "$APP_DIR/web/static/admin.js"
-    
-    # Player application
-    mkdir -p "$APP_DIR/player"
-    mkdir -p "$APP_DIR/player/client"
-    wget -q "$REPO_URL/player/package.json" -O "$APP_DIR/player/package.json"
-    wget -q "$REPO_URL/player/server.js" -O "$APP_DIR/player/server.js"
-    # Service file is created by installer, not downloaded
-    wget -q "$REPO_URL/player/client/index.html" -O "$APP_DIR/player/client/index.html"
-    
-    # Kiosk launcher
-    wget -q "$REPO_URL/kiosk_launcher.sh" -O "$APP_DIR/kiosk_launcher.sh" || echo "kiosk_launcher.sh not found"
-fi
-
-# Create a shared group for config access
-CONFIG_GROUP="spotify-config"
-if ! getent group "$CONFIG_GROUP" >/dev/null 2>&1; then
-    groupadd "$CONFIG_GROUP"
-fi
-
-# Add both users to the config group
-usermod -a -G "$CONFIG_GROUP" "$APP_USER"
-usermod -a -G "$CONFIG_GROUP" "$ADMIN_USER"
-
-# Set permissions
-chown -R "$APP_USER:$APP_USER" "$APP_DIR"
-chown -R "$ADMIN_USER:$ADMIN_USER" "$APP_DIR/web"
-
-# Make config dir accessible to both users via shared group
-chown -R "$APP_USER:$CONFIG_GROUP" "$CONFIG_DIR"
-chmod 775 "$CONFIG_DIR"
-# Set group sticky bit so new files inherit the group
-chmod g+s "$CONFIG_DIR"
-
-# Create cache directory for player
-mkdir -p "$CONFIG_DIR/.cache"
-chown "$APP_USER:$CONFIG_GROUP" "$CONFIG_DIR/.cache"
-chmod 775 "$CONFIG_DIR/.cache"
-
-# Prevent other users from auto-spawning PulseAudio
-echo -e "${BLUE}Configuring system-wide PulseAudio settings...${NC}"
-cat > /etc/pulse/client.conf << 'EOF'
-# Prevent other users from auto-spawning PulseAudio
-autospawn = no
-EOF
-
-# Both users need access to logs
-chown -R "$APP_USER:$APP_USER" "/var/log/spotify-kids"
-chmod 775 "/var/log/spotify-kids"
-
-# Set default permissions for config files
-chmod 664 "$CONFIG_DIR"/*.json 2>/dev/null || true
-
-# Configure display manager for auto-login (using LightDM, not getty)
-echo -e "${YELLOW}Configuring display manager...${NC}"
-
-# Disable getty on tty1 to prevent conflicts
-systemctl disable getty@tty1 2>/dev/null || true
-systemctl stop getty@tty1 2>/dev/null || true
-rm -rf /etc/systemd/system/getty@tty1.service.d 2>/dev/null || true
-
-# Create openbox autostart file
-mkdir -p /home/$APP_USER/.config/openbox
-cat > /home/$APP_USER/.config/openbox/autostart << 'EOF'
-# Disable screen saver and power management
-xset s off
-xset -dpms
-xset s noblank
-
-# Hide mouse cursor
-unclutter -idle 0.1 &
-
-# Start the kiosk launcher
-/opt/spotify-kids/kiosk_launcher.sh &
-EOF
-chown -R $APP_USER:$APP_USER /home/$APP_USER/.config
-chmod 755 /home/$APP_USER/.config/openbox/autostart
-
-# Configure LightDM for auto-login with openbox
-echo -e "${YELLOW}Configuring LightDM...${NC}"
-cat > /etc/lightdm/lightdm.conf << EOF
-[Seat:*]
-autologin-user=$APP_USER
-autologin-user-timeout=0
-user-session=openbox
-greeter-hide-users=true
-greeter-show-manual-login=false
-allow-guest=false
-xserver-command=X -nocursor
-EOF
-
-# Set openbox as default X session manager
-update-alternatives --set x-session-manager /usr/bin/openbox-session 2>/dev/null || true
-
-# Install Node.js dependencies for player
-echo -e "${YELLOW}Installing player dependencies...${NC}"
-cd "$APP_DIR/player"
-sudo -u $APP_USER npm install --omit=dev
-
-# Create cache directory
-mkdir -p "$CONFIG_DIR/cache"
-chown $APP_USER:$CONFIG_GROUP "$CONFIG_DIR/cache"
-chmod 775 "$CONFIG_DIR/cache"
-
-# Get the UID for spotify-kids user for runtime paths
-APP_USER_UID=$(id -u $APP_USER)
-
-# Create systemd service for the player
-echo -e "${YELLOW}Creating systemd service for player...${NC}"
-cat > /etc/systemd/system/spotify-player.service << EOF
-[Unit]
-Description=Spotify Kids Web Player
-After=network.target bluetooth.service pulseaudio-spotify-kids.service
-Wants=network-online.target bluetooth.service pulseaudio-spotify-kids.service
-
-[Service]
-Type=simple
-User=$APP_USER
-Group=$APP_USER
-WorkingDirectory=$APP_DIR/player
-Environment="NODE_ENV=production"
-Environment="PORT=5000"
-Environment="SPOTIFY_CONFIG_DIR=$CONFIG_DIR"
-Environment="PULSE_RUNTIME_PATH=/run/user/$APP_USER_UID"
-Environment="XDG_RUNTIME_DIR=/run/user/$APP_USER_UID"
-Environment="PULSE_SERVER=/run/user/$APP_USER_UID/pulse/native"
-Environment="HOME=/home/$APP_USER"
-ExecStartPre=/bin/bash -c 'if [ ! -d "node_modules" ]; then npm install --omit=dev; fi'
-ExecStart=/usr/bin/node server.js
-Restart=always
-RestartSec=10
-StartLimitInterval=60
-StartLimitBurst=3
-StandardOutput=journal
-StandardError=journal
-SyslogIdentifier=spotify-player
-NoNewPrivileges=true
-PrivateTmp=true
-ProtectSystem=strict
-ProtectHome=yes
-ReadWritePaths=$CONFIG_DIR
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-# Create systemd service for admin panel
-echo -e "${YELLOW}Creating systemd service for admin panel...${NC}"
-cat > /etc/systemd/system/spotify-admin.service << EOF
-[Unit]
-Description=Spotify Kids Admin Panel
-After=network.target
-
-[Service]
-Type=simple
-User=$ADMIN_USER
-Group=$ADMIN_USER
-Environment="SPOTIFY_CONFIG_DIR=$CONFIG_DIR"
-WorkingDirectory=$APP_DIR/web
-ExecStart=/usr/bin/python3 $APP_DIR/web/app.py
-Restart=always
-RestartSec=10
-# Admin user needs to run commands
-PrivateDevices=no
-ProtectSystem=no
-ProtectHome=no
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-# Generate SSL certificate for HTTPS (required for Spotify OAuth)
-echo -e "${YELLOW}Generating SSL certificate for HTTPS...${NC}"
-SSL_DIR="$APP_DIR/ssl"
-mkdir -p $SSL_DIR
-IP_ADDRESS=$(hostname -I 2>/dev/null | awk '{print $1}')
-
-# Generate self-signed certificate
-openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-    -keyout $SSL_DIR/server.key \
-    -out $SSL_DIR/server.crt \
-    -subj "/C=US/ST=State/L=City/O=SpotifyKids/CN=$IP_ADDRESS" \
-    -addext "subjectAltName=IP:$IP_ADDRESS,DNS:localhost" 2>/dev/null
-
-# Set proper permissions
-chown -R $APP_USER:$APP_USER $SSL_DIR
-chmod 600 $SSL_DIR/server.key
-chmod 644 $SSL_DIR/server.crt
-
-# Configure nginx with HTTPS
-echo -e "${YELLOW}Configuring nginx with HTTPS support...${NC}"
-cat > /etc/nginx/sites-available/spotify-admin << EOF
-# HTTPS server - main configuration
-server {
-    listen 443 ssl default_server;
-    listen [::]:443 ssl default_server;
-    server_name $IP_ADDRESS;
-
-    ssl_certificate $SSL_DIR/server.crt;
-    ssl_certificate_key $SSL_DIR/server.key;
-    
-    # SSL configuration
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers HIGH:!aNULL:!MD5;
-    ssl_prefer_server_ciphers on;
-
-    location / {
-        proxy_pass http://127.0.0.1:5001;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto https;
-        proxy_cache_bypass \$http_upgrade;
-        proxy_read_timeout 86400;
-    }
-}
-
-# HTTP server - redirect to HTTPS
-server {
-    listen 80 default_server;
-    listen [::]:80 default_server;
-    server_name $IP_ADDRESS;
-    return 301 https://\$server_name\$request_uri;
-}
-
-# Port 8080 - redirect to HTTPS for backward compatibility
-server {
-    listen 8080;
-    listen [::]:8080;
-    server_name $IP_ADDRESS;
-    return 301 https://$IP_ADDRESS\$request_uri;
-}
-EOF
-
-ln -sf /etc/nginx/sites-available/spotify-admin /etc/nginx/sites-enabled/
-rm -f /etc/nginx/sites-enabled/default
-
-# Create kiosk launcher script
-echo -e "${YELLOW}Creating kiosk launcher...${NC}"
-cat > "$APP_DIR/kiosk_launcher.sh" << 'EOF'
+    # Create default kiosk launcher if download failed
+    cat > "$APP_DIR/kiosk_launcher.sh" << 'EOF'
 #!/bin/bash
 
 # Spotify Kids Player Kiosk Mode Launcher
-# This script launches Chromium in kiosk mode displaying the web player
-
 # Set PulseAudio environment FIRST (before any exec redirects)
+APP_USER_UID=$(id -u spotify-kids)
 export PULSE_RUNTIME_PATH=/run/user/$APP_USER_UID
 export XDG_RUNTIME_DIR=/run/user/$APP_USER_UID
 export PULSE_SERVER=/run/user/$APP_USER_UID/pulse/native
@@ -687,7 +189,6 @@ sleep 10
 
 # Auto-detect the display
 if [ -z "$DISPLAY" ]; then
-    # Find the active X display
     for display in 0 1 2; do
         if [ -S /tmp/.X11-unix/X${display} ]; then
             export DISPLAY=:${display}
@@ -741,248 +242,105 @@ exec chromium-browser \
     --user-data-dir=/home/spotify-kids/.config/chromium-kiosk \
     "http://localhost:5000"
 EOF
+fi
 
 chmod +x "$APP_DIR/kiosk_launcher.sh"
 chown $APP_USER:$APP_USER "$APP_DIR/kiosk_launcher.sh"
 
-# Create systemd service for kiosk mode
-echo -e "${YELLOW}Creating kiosk service...${NC}"
-cat > /etc/systemd/system/spotify-kiosk.service << EOF
-[Unit]
-Description=Spotify Kids Player Kiosk Mode
-After=graphical.target spotify-player.service
-Wants=graphical.target
-Requires=spotify-player.service
+# Cleanup temp directory
+cd /
+rm -rf $TEMP_DIR
 
-[Service]
-Type=simple
-User=$APP_USER
-Group=$APP_USER
-Environment="DISPLAY=:0"
-Environment="XAUTHORITY=/home/$APP_USER/.Xauthority"
-Environment="HOME=/home/$APP_USER"
-Environment="PULSE_RUNTIME_PATH=/run/user/$APP_USER_UID"
-Environment="XDG_RUNTIME_DIR=/run/user/$APP_USER_UID"
-Environment="PULSE_SERVER=/run/user/$APP_USER_UID/pulse/native"
+# Create a shared group for config access
+groupadd -f spotify-config
+usermod -a -G spotify-config $APP_USER
+usermod -a -G spotify-config spotify-admin 2>/dev/null || true
 
-# Wait for X11 to be ready
-ExecStartPre=/bin/bash -c 'until [ -S /tmp/.X11-unix/X0 ]; do sleep 2; done'
-ExecStartPre=/bin/sleep 5
+# Create package manager privilege group
+groupadd -f spotify-pkgmgr
+usermod -a -G spotify-pkgmgr $APP_USER
 
-# Start kiosk
-ExecStart=$APP_DIR/kiosk_launcher.sh
-
-# Restart if crashes
-Restart=always
-RestartSec=10
-
-# Logging
-StandardOutput=journal
-StandardError=journal
-
-[Install]
-WantedBy=graphical.target
+# Add sudoers entry for package management
+cat > /etc/sudoers.d/90-spotify-pkgmgr << 'EOF'
+# Allow spotify-pkgmgr group to run package management commands
+%spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/apt-get update
+%spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/apt-get install *
+%spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/dpkg *
 EOF
 
-chown -R $APP_USER:$APP_USER /home/$APP_USER
+chmod 440 /etc/sudoers.d/90-spotify-pkgmgr
 
-# Configure sudo permissions for package management group
-echo -e "${YELLOW}Configuring sudo permissions for package management...${NC}"
-cat > /etc/sudoers.d/spotify-pkgmgr << 'EOF'
-# Allow package management group to run package updates without password
-%spotify-pkgmgr ALL=(ALL) NOPASSWD:SETENV: /usr/bin/apt-get update
-%spotify-pkgmgr ALL=(ALL) NOPASSWD:SETENV: /usr/bin/apt-get upgrade*
-%spotify-pkgmgr ALL=(ALL) NOPASSWD:SETENV: /usr/bin/apt-get dist-upgrade*
-%spotify-pkgmgr ALL=(ALL) NOPASSWD:SETENV: /usr/bin/apt-get autoremove*
-%spotify-pkgmgr ALL=(ALL) NOPASSWD:SETENV: /usr/bin/apt-get autoclean*
-%spotify-pkgmgr ALL=(ALL) NOPASSWD:SETENV: /usr/bin/apt-get clean
-%spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/apt list*
-%spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/apt update
-%spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/dpkg -l
-%spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart spotify-player
-%spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop spotify-player
-%spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/systemctl start spotify-player
-%spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/systemctl status spotify-player
-%spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/systemctl is-active spotify-player
-%spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart spotify-admin
-%spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart nginx
-%spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/systemctl start bluetooth
-%spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop bluetooth
-%spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/systemctl is-active bluetooth
-%spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/bluetoothctl*
-%spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/sbin/rfkill*
-%spotify-pkgmgr ALL=(spotify-kids) NOPASSWD: /usr/bin/bluetoothctl*
-%spotify-pkgmgr ALL=(spotify-kids) NOPASSWD: /usr/bin/expect*
-%spotify-pkgmgr ALL=(spotify-kids) NOPASSWD: /usr/bin/pactl*
-%spotify-pkgmgr ALL=(spotify-kids) NOPASSWD: /usr/bin/pacmd*
-%spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/journalctl*
-%spotify-pkgmgr ALL=(ALL) NOPASSWD: /bin/journalctl*
-%spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/tail*
-%spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/head*
-%spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/cat /var/log/*
-%spotify-pkgmgr ALL=(ALL) NOPASSWD: /bin/cat /var/log/*
-%spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/truncate*
-%spotify-pkgmgr ALL=(ALL) NOPASSWD: /usr/bin/dmesg*
-%spotify-pkgmgr ALL=(ALL) NOPASSWD: /bin/dmesg*
-%spotify-pkgmgr ALL=(ALL) NOPASSWD: /sbin/reboot
-%spotify-pkgmgr ALL=(ALL) NOPASSWD: /sbin/shutdown*
-%spotify-pkgmgr ALL=(ALL) NOPASSWD: /sbin/poweroff
-EOF
-chmod 0440 /etc/sudoers.d/spotify-pkgmgr
+# Install Python dependencies for web admin
+echo -e "${YELLOW}Installing Python dependencies...${NC}"
+cd $APP_DIR/web
+python3 -m venv venv
+source venv/bin/activate
+pip install --upgrade pip
+pip install flask flask-cors flask-login spotipy requests python-dotenv
 
-# Disable Plymouth splash screen to prevent flashing
-echo -e "${YELLOW}Disabling splash screens...${NC}"
-systemctl disable plymouth-quit-wait 2>/dev/null || true
-systemctl disable plymouth-start 2>/dev/null || true
+# Create default admin user
+python3 -c "
+import sys
+sys.path.insert(0, '$APP_DIR')
+from web.app import db, User
+import os
+db_path = '$CONFIG_DIR/admin.db'
+os.makedirs(os.path.dirname(db_path), exist_ok=True)
+from werkzeug.security import generate_password_hash
 
-# Update boot parameters to hide boot messages
-echo -e "${YELLOW}Updating boot parameters...${NC}"
-if [ -f /boot/cmdline.txt ]; then
-    # Raspberry Pi boot config
-    cp /boot/cmdline.txt /boot/cmdline.txt.backup
-    # Remove any existing splash/quiet parameters and add our own
-    sed -i 's/ splash//g; s/ quiet//g; s/ plymouth.ignore-serial-consoles//g; s/ logo.nologo//g; s/ vt.global_cursor_default=0//g; s/ consoleblank=0//g; s/ loglevel=[0-9]//g' /boot/cmdline.txt
-    # Add parameters to hide boot messages
-    sed -i 's/$/ quiet loglevel=0 logo.nologo vt.global_cursor_default=0 consoleblank=0/' /boot/cmdline.txt
-elif [ -f /etc/default/grub ]; then
-    # GRUB systems
-    cp /etc/default/grub /etc/default/grub.backup
-    sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="quiet loglevel=0 logo.nologo vt.global_cursor_default=0 consoleblank=0"/' /etc/default/grub
-    update-grub 2>/dev/null || true
-fi
+# Create database
+import sqlite3
+conn = sqlite3.connect(db_path)
+c = conn.cursor()
+c.execute('''CREATE TABLE IF NOT EXISTS users
+             (id INTEGER PRIMARY KEY, username TEXT UNIQUE, password TEXT, 
+              is_active INTEGER DEFAULT 1, last_login TEXT)''')
 
-# Set graphical target as default
-systemctl set-default graphical.target
-
-# Enable services
-echo -e "${YELLOW}Enabling services...${NC}"
-# Reload systemd to recognize all new service files
-systemctl daemon-reload
-# Enable display manager
-systemctl enable lightdm
-systemctl enable spotify-player.service
-systemctl enable spotify-admin.service
-systemctl enable spotify-kiosk.service
-systemctl enable nginx
-systemctl start spotify-player.service
-systemctl start spotify-admin.service
-systemctl restart nginx
-
-# Configure X11
-echo -e "${YELLOW}Configuring X11 display server...${NC}"
-mkdir -p /etc/X11/xorg.conf.d/
-
-# Create basic X11 configuration
-cat > /etc/X11/xorg.conf.d/10-serverflags.conf << EOF
-Section "ServerFlags"
-    Option "BlankTime" "0"
-    Option "StandbyTime" "0"
-    Option "SuspendTime" "0"
-    Option "OffTime" "0"
-    Option "DontZap" "false"
-    Option "AllowMouseOpenFail" "true"
-EndSection
-EOF
-
-# Configure display
-cat > /etc/X11/xorg.conf.d/20-display.conf << EOF
-Section "Monitor"
-    Identifier "Monitor0"
-    Option "DPMS" "false"
-EndSection
-
-Section "Screen"
-    Identifier "Screen0"
-    Monitor "Monitor0"
-    DefaultDepth 24
-    SubSection "Display"
-        Depth 24
-        Modes "1920x1080" "1280x720" "1024x768" "800x600"
-    EndSubSection
-EndSection
-
-Section "ServerLayout"
-    Identifier "Layout0"
-    Screen "Screen0"
-EndSection
-EOF
-
-# Configure touchscreen if available
-if [ -e "/dev/input/touchscreen0" ] || [ -e "/dev/input/event0" ]; then
-    echo -e "${YELLOW}Configuring touchscreen...${NC}"
+# Add default admin user
+try:
+    password_hash = generate_password_hash('changeme')
+    c.execute('INSERT INTO users (username, password) VALUES (?, ?)', 
+              ('admin', password_hash))
+    print('Created default admin user')
+except:
+    print('Admin user already exists')
     
-    # Create calibration file
-    cat > /etc/X11/xorg.conf.d/99-calibration.conf << EOF
-Section "InputClass"
-    Identifier "calibration"
-    MatchProduct "touchscreen"
-    Option "Calibration" "0 800 0 480"
-    Option "SwapAxes" "0"
-EndSection
-EOF
-fi
+conn.commit()
+conn.close()
+" 2>/dev/null || echo "Admin user setup completed"
 
-# Configure Bluetooth and audio
-echo -e "${YELLOW}Configuring Bluetooth and audio...${NC}"
+deactivate
 
-# Stop and mask conflicting services (PipeWire)
-echo -e "${BLUE}Disabling PipeWire to use PulseAudio...${NC}"
-systemctl stop pipewire pipewire-pulse wireplumber 2>/dev/null || true
-systemctl disable pipewire pipewire-pulse wireplumber 2>/dev/null || true
-systemctl mask pipewire pipewire-pulse wireplumber 2>/dev/null || true
-killall -9 pipewire pipewire-pulse wireplumber 2>/dev/null || true
+# Set up PulseAudio
+echo -e "${YELLOW}Configuring PulseAudio...${NC}"
 
-# CRITICAL: Disable bluealsa which conflicts with PulseAudio
-echo -e "${BLUE}Disabling bluealsa to prevent conflicts with PulseAudio...${NC}"
-systemctl stop bluealsa 2>/dev/null || true
-systemctl disable bluealsa 2>/dev/null || true
-systemctl mask bluealsa 2>/dev/null || true
-killall -9 bluealsa bluealsa-aplay 2>/dev/null || true
-
-# Configure Bluetooth for A2DP only (HiFi audio, no hands-free)
-echo -e "${BLUE}Configuring Bluetooth for HiFi audio only...${NC}"
+# Configure Bluetooth
 cat > /etc/bluetooth/main.conf << 'EOF'
 [General]
-Name = raspberrypi
-Class = 0x00041C
+Enable=Source,Sink,Media,Socket
 DiscoverableTimeout = 0
-PairableTimeout = 0
+AlwaysPairable = true
 FastConnectable = true
 
 [Policy]
 AutoEnable=true
 EOF
 
-# Disable HFP/HSP profiles, keep only A2DP
-cat > /etc/bluetooth/audio.conf << 'EOF'
-[General]
-Enable=Source,Sink,Media,Socket
-Disable=Headset,Gateway
-AutoConnect=true
+# Create Bluetooth override to add -E flag
+mkdir -p /etc/systemd/system/bluetooth.service.d
+cat > /etc/systemd/system/bluetooth.service.d/override.conf << 'EOF'
+[Service]
+ExecStart=
+ExecStart=/usr/lib/bluetooth/bluetoothd -E
 EOF
 
-# Enable Bluetooth service
-systemctl enable bluetooth.service
-systemctl restart bluetooth.service
-sleep 3
-
-# Configure PulseAudio for spotify-kids user
-echo -e "${BLUE}Setting up PulseAudio for high-quality audio...${NC}"
-
-# Add spotify-kids user to required groups (including lp for DBus)
-usermod -aG bluetooth,audio,pulse-access,lp "$APP_USER"
-
-# Create PulseAudio user config directory
-mkdir -p /home/$APP_USER/.config/pulse
-
-# Audio settings optimized for Bluetooth compatibility
+# Create PulseAudio config for spotify-kids user
 cat > /home/$APP_USER/.config/pulse/daemon.conf << 'EOF'
-# Standard quality settings for Bluetooth
 default-sample-format = s16le
 default-sample-rate = 44100
 alternate-sample-rate = 48000
-resample-method = trivial
-avoid-resampling = yes
+resample-method = speex-float-1
+enable-lfe-remixing = no
 high-priority = yes
 nice-level = -11
 realtime-scheduling = yes
@@ -991,130 +349,255 @@ default-fragments = 4
 default-fragment-size-msec = 25
 EOF
 
-# Create default.pa to load Bluetooth modules
+# Create PulseAudio default.pa configuration
 cat > /home/$APP_USER/.config/pulse/default.pa << 'EOF'
 .include /etc/pulse/default.pa
-# Automatically switch to A2DP profile and make new devices default
+
+# Bluetooth support with auto-switching
+.ifexists module-bluetooth-policy.so
 load-module module-bluetooth-policy auto_switch=2
+.endif
+
+.ifexists module-bluetooth-discover.so
 load-module module-bluetooth-discover
+.endif
+
+# Automatically switch to new devices when they appear
 load-module module-switch-on-connect
 EOF
 
-# Client config for spotify-kids
-cat > /home/$APP_USER/.config/pulse/client.conf << 'EOF'
-autospawn = yes
-daemon-binary = /usr/bin/pulseaudio
-extra-arguments = --log-target=syslog
+# Create system-wide PulseAudio client config to prevent conflicts
+cat > /etc/pulse/client.conf << 'EOF'
+autospawn = no
 EOF
 
-chown -R $APP_USER:$APP_USER /home/$APP_USER/.config
-chown $APP_USER:$APP_USER /home/$APP_USER/.bashrc
-
-# Create Bluetooth config directory
-mkdir -p /home/$APP_USER/.config/bluetooth
-chown -R $APP_USER:$APP_USER /home/$APP_USER/.config/bluetooth
-
-# Bluetooth will be configured when devices are paired through the admin interface
-
-# Create dedicated PulseAudio service with DBus session for Bluetooth
-cat > /etc/systemd/system/pulseaudio-spotify-kids.service << 'EOF'
+# Create systemd service for PulseAudio
+cat > /etc/systemd/system/pulseaudio-spotify-kids.service << EOF
 [Unit]
 Description=PulseAudio for Spotify Kids
-After=bluetooth.service sound.target
-Wants=bluetooth.service
+After=bluetooth.target sound.target
+Wants=bluetooth.target
 
 [Service]
 Type=forking
-User=spotify-kids
+User=$APP_USER
 Group=audio
 SupplementaryGroups=bluetooth pulse-access lp
-
-# Environment
-Environment="HOME=/home/spotify-kids"
+Environment="HOME=/home/$APP_USER"
 Environment="XDG_RUNTIME_DIR=/run/user/$APP_USER_UID"
-
-# Start PulseAudio in background (Type=forking works properly)
 ExecStart=/usr/bin/pulseaudio --start --log-target=syslog
 ExecStop=/usr/bin/pulseaudio --kill
-
-# Restart policy
 Restart=always
 RestartSec=5
-
-# Permissions
-PrivateDevices=no
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-# Configure DBus permissions for Bluetooth access
-cat > /etc/dbus-1/system.d/spotify-bluetooth.conf << 'EOF'
-<!DOCTYPE busconfig PUBLIC "-//freedesktop//DTD D-BUS Bus Configuration 1.0//EN"
- "http://www.freedesktop.org/standards/dbus/1.0/busconfig.dtd">
-<busconfig>
-  <policy user="spotify-kids">
-    <allow own="org.bluez"/>
-    <allow send_destination="org.bluez"/>
-    <allow send_interface="org.bluez.*"/>
-    <allow send_interface="org.freedesktop.DBus.Properties"/>
-    <allow send_interface="org.freedesktop.DBus.ObjectManager"/>
-  </policy>
-  <policy user="spotify-admin">
-    <allow send_destination="org.bluez"/>
-    <allow send_interface="org.bluez.*"/>
-    <allow send_interface="org.freedesktop.DBus.Properties"/>
-    <allow send_interface="org.freedesktop.DBus.ObjectManager"/>
-  </policy>
-  <policy group="spotify-pkgmgr">
-    <allow send_destination="org.bluez"/>
-    <allow send_interface="org.bluez.*"/>
-  </policy>
-</busconfig>
+# Generate SSL certificate for HTTPS (required for Spotify OAuth)
+echo -e "${YELLOW}Generating SSL certificate for HTTPS...${NC}"
+SSL_DIR="$APP_DIR/ssl"
+mkdir -p $SSL_DIR
+
+# Generate self-signed certificate
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+    -keyout $SSL_DIR/server.key \
+    -out $SSL_DIR/server.crt \
+    -subj "/C=US/ST=State/L=City/O=SpotifyKids/CN=$DEVICE_IP" \
+    2>/dev/null
+
+# Set proper permissions
+chown -R $APP_USER:$APP_USER $SSL_DIR
+chmod 600 $SSL_DIR/server.key
+chmod 644 $SSL_DIR/server.crt
+
+# Configure nginx
+echo -e "${YELLOW}Configuring nginx...${NC}"
+cat > /etc/nginx/sites-available/spotify-admin << EOF
+# HTTPS server - main configuration
+server {
+    listen 443 ssl default_server;
+    listen [::]:443 ssl default_server;
+    server_name $DEVICE_IP;
+
+    ssl_certificate $SSL_DIR/server.crt;
+    ssl_certificate_key $SSL_DIR/server.key;
+    
+    # SSL configuration
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+
+    location / {
+        proxy_pass http://127.0.0.1:5001;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_cache_bypass \$http_upgrade;
+        proxy_read_timeout 86400;
+    }
+}
+
+# HTTP server - redirect to HTTPS
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name $DEVICE_IP;
+    return 301 https://\$server_name\$request_uri;
+}
+
+# Port 8080 - redirect to HTTPS for backward compatibility
+server {
+    listen 8080;
+    listen [::]:8080;
+    server_name $DEVICE_IP;
+    return 301 https://$DEVICE_IP\$request_uri;
+}
 EOF
 
-# Reload DBus configuration
-systemctl reload dbus 2>/dev/null || true
+# Remove default nginx site and enable admin panel
+rm -f /etc/nginx/sites-enabled/default
+ln -sf /etc/nginx/sites-available/spotify-admin /etc/nginx/sites-enabled/
 
-# Enable Bluetooth experimental features for better PulseAudio integration
-mkdir -p /etc/systemd/system/bluetooth.service.d
-cat > /etc/systemd/system/bluetooth.service.d/override.conf << 'EOF'
+# Create systemd services
+echo -e "${YELLOW}Creating systemd services...${NC}"
+
+# Spotify Player Service
+cat > /etc/systemd/system/spotify-player.service << EOF
+[Unit]
+Description=Spotify Kids Web Player
+After=network.target bluetooth.service pulseaudio-spotify-kids.service
+Wants=network-online.target bluetooth.service pulseaudio-spotify-kids.service
+
 [Service]
-ExecStart=
-ExecStart=/usr/libexec/bluetooth/bluetoothd -E
+Type=simple
+User=$APP_USER
+Group=$APP_USER
+WorkingDirectory=$APP_DIR/player
+Environment="NODE_ENV=production"
+Environment="PORT=5000"
+Environment="SPOTIFY_CONFIG_DIR=$CONFIG_DIR"
+Environment="PULSE_RUNTIME_PATH=/run/user/$APP_USER_UID"
+Environment="XDG_RUNTIME_DIR=/run/user/$APP_USER_UID"
+Environment="PULSE_SERVER=/run/user/$APP_USER_UID/pulse/native"
+Environment="HOME=/home/$APP_USER"
+ExecStartPre=/bin/bash -c 'if [ ! -d "node_modules" ]; then npm install --omit=dev; fi'
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=10
+StartLimitInterval=60
+StartLimitBurst=3
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=spotify-player
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=$CONFIG_DIR
+
+[Install]
+WantedBy=multi-user.target
 EOF
 
-# Restart Bluetooth with new configuration
+# Admin Panel Service
+cat > /etc/systemd/system/spotify-admin.service << EOF
+[Unit]
+Description=Spotify Kids Admin Panel
+After=network.target spotify-player.service pulseaudio-spotify-kids.service
+Wants=spotify-player.service pulseaudio-spotify-kids.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=$APP_DIR/web
+Environment="SPOTIFY_CONFIG_DIR=$CONFIG_DIR"
+Environment="PULSE_RUNTIME_PATH=/run/user/$APP_USER_UID"
+Environment="XDG_RUNTIME_DIR=/run/user/$APP_USER_UID"
+Environment="PULSE_SERVER=/run/user/$APP_USER_UID/pulse/native"
+ExecStartPre=$APP_DIR/web/venv/bin/pip install -q -r requirements.txt 2>/dev/null || true
+ExecStart=$APP_DIR/web/venv/bin/python app.py
+Restart=always
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=spotify-admin
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Kiosk Service
+cat > /etc/systemd/system/spotify-kiosk.service << EOF
+[Unit]
+Description=Spotify Kids Kiosk Mode
+After=graphical.target spotify-player.service
+Wants=graphical.target
+Requires=spotify-player.service
+
+[Service]
+Type=simple
+User=$APP_USER
+Group=$APP_USER
+Environment="HOME=/home/$APP_USER"
+Environment="DISPLAY=:0"
+Environment="PULSE_RUNTIME_PATH=/run/user/$APP_USER_UID"
+Environment="XDG_RUNTIME_DIR=/run/user/$APP_USER_UID"
+Environment="PULSE_SERVER=/run/user/$APP_USER_UID/pulse/native"
+ExecStartPre=/bin/sleep 10
+ExecStart=$APP_DIR/kiosk_launcher.sh
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=spotify-kiosk
+
+[Install]
+WantedBy=graphical.target
+EOF
+
+# Set permissions
+echo -e "${YELLOW}Setting permissions...${NC}"
+chown -R $APP_USER:$APP_USER $APP_DIR
+chown -R $APP_USER:spotify-config $CONFIG_DIR
+chmod -R 775 $CONFIG_DIR
+chmod -R 755 $APP_DIR
+chown -R $APP_USER:$APP_USER /var/log/spotify-kids
+chmod 755 /var/log/spotify-kids
+chown -R $APP_USER:$APP_USER /home/$APP_USER/.config
+chmod 755 /home/$APP_USER/.config/pulse
+
+# Enable and start services
+echo -e "${YELLOW}Enabling services...${NC}"
 systemctl daemon-reload
-systemctl restart bluetooth.service
-sleep 3
-
-# Enable and start PulseAudio service
 systemctl enable pulseaudio-spotify-kids.service
+systemctl enable spotify-player.service
+systemctl enable spotify-admin.service
+systemctl enable nginx
+
+echo -e "${YELLOW}Starting services...${NC}"
+systemctl restart bluetooth
 systemctl start pulseaudio-spotify-kids.service
+systemctl start spotify-player.service
+systemctl start spotify-admin.service
+systemctl restart nginx
 
-# Wait for PulseAudio service to be ready
-echo -e "${BLUE}Waiting for PulseAudio to be ready...${NC}"
-sleep 5  # Give time for DBus session to establish
-for i in {1..10}; do
-    if sudo -u $APP_USER pactl info >/dev/null 2>&1; then
-        echo -e "${GREEN}PulseAudio is ready${NC}"
-        # Load Bluetooth modules after PulseAudio is ready
-        sudo -u $APP_USER pactl load-module module-bluetooth-policy 2>/dev/null || true
-        sudo -u $APP_USER pactl load-module module-bluetooth-discover 2>/dev/null || true
-        break
+# Wait for services to start
+sleep 5
+
+# Check service status
+echo -e "${YELLOW}Checking service status...${NC}"
+for service in pulseaudio-spotify-kids spotify-player spotify-admin nginx; do
+    if systemctl is-active --quiet $service; then
+        echo -e "${GREEN}✓ $service is running${NC}"
+    else
+        echo -e "${RED}✗ $service failed to start${NC}"
+        systemctl status $service --no-pager | head -10
     fi
-    echo "Waiting for PulseAudio... ($i/10)"
-    sleep 2
 done
-
-# Note: PulseAudio's module-bluetooth-policy handles A2DP profile switching automatically
-# No additional scripts needed for Bluetooth profile management
-# When Bluetooth devices are connected, they will automatically be set as the default sink
-
-# Disable unnecessary services
-echo -e "${YELLOW}Optimizing system...${NC}"
-systemctl disable cups.service 2>/dev/null || true
 
 # Create uninstall script
 echo -e "${YELLOW}Creating uninstall script...${NC}"
@@ -1133,8 +616,6 @@ rm -f /etc/systemd/system/spotify*.service
 rm -f /etc/systemd/system/pulseaudio-spotify-kids.service
 rm -f /etc/nginx/sites-available/spotify-admin
 rm -f /etc/nginx/sites-enabled/spotify-admin
-rm -f /etc/nginx/sites-available/spotify-admin-ssl
-rm -f /etc/nginx/sites-enabled/spotify-admin-ssl
 rm -f /etc/sudoers.d/spotify-*
 rm -f /etc/sudoers.d/90-spotify-pkgmgr
 rm -f /etc/dbus-1/system.d/spotify-bluetooth.conf
@@ -1156,10 +637,8 @@ echo "Uninstall complete"
 EOF
 chmod +x /usr/local/bin/spotify-kids-uninstall
 
-# Get the device IP address
-DEVICE_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+# Final output
 CALLBACK_URL="https://${DEVICE_IP}/callback"
-
 echo -e "${GREEN}================================${NC}"
 echo -e "${GREEN}Installation Complete!${NC}"
 echo -e "${GREEN}================================${NC}"
@@ -1170,42 +649,20 @@ echo ""
 echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${RED}CRITICAL - Spotify App Setup Required:${NC}"
 echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo ""
-echo -e "${YELLOW}Step 1: Go to Spotify Developer Dashboard${NC}"
-echo -e "        ${BLUE}https://developer.spotify.com/dashboard${NC}"
-echo ""
-echo -e "${YELLOW}Step 2: Create or Edit Your App${NC}"
-echo -e "        - Click 'Create App' or select existing app"
-echo -e "        - App name: Spotify Kids Player"
-echo ""
-echo -e "${YELLOW}Step 3: Add EXACTLY This Redirect URI:${NC}"
-echo -e "        ${GREEN}${CALLBACK_URL}${NC}"
-echo -e "        ⚠️  ${RED}MUST be HTTPS and EXACT match!${NC}"
-echo ""
-echo -e "${YELLOW}Step 4: Save Your App Settings${NC}"
-echo -e "        - Click 'Save' in Spotify Dashboard"
-echo ""
-echo -e "${YELLOW}Step 5: Get Your Credentials${NC}"
-echo -e "        - Copy your Client ID"
-echo -e "        - Copy your Client Secret"
-echo ""
-echo -e "${YELLOW}Step 6: Configure in Admin Panel${NC}"
-echo -e "        - Go to ${GREEN}https://${DEVICE_IP}${NC}"
-echo -e "        - Enter credentials in Spotify Configuration"
-echo -e "        - Click 'Authenticate with Spotify'"
-echo ""
+echo -e "${YELLOW}1. Go to: https://developer.spotify.com/dashboard${NC}"
+echo -e "${YELLOW}2. Create a new app (or use existing)${NC}"
+echo -e "${YELLOW}3. Add this Redirect URI:${NC}"
+echo -e "   ${GREEN}${CALLBACK_URL}${NC}"
+echo -e "${YELLOW}4. Save your Client ID and Client Secret${NC}"
+echo -e "${YELLOW}5. Enter them in the admin panel${NC}"
 echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
-echo -e "${YELLOW}Browser Security Warning:${NC}"
-echo -e "Your browser will show a security warning (self-signed certificate)"
-echo -e "Click 'Advanced' and 'Proceed to ${DEVICE_IP}' to continue"
+echo -e "${YELLOW}Optional: For kiosk mode (auto-start player on boot):${NC}"
+echo -e "Enable with: ${GREEN}sudo systemctl enable spotify-kiosk.service${NC}"
 echo ""
-echo -e "The system will restart in 30 seconds to apply all changes."
 echo -e "After restart, the Spotify player will start automatically."
 echo ""
 echo -e "To uninstall, run: ${YELLOW}sudo spotify-kids-uninstall${NC}"
 echo ""
-
-# Restart system
-sleep 30
-reboot
+echo -e "Your browser will show a security warning (self-signed certificate)"
+echo -e "This is normal - click 'Advanced' and 'Proceed' to continue"
