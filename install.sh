@@ -911,6 +911,13 @@ systemctl disable pipewire pipewire-pulse wireplumber 2>/dev/null || true
 systemctl mask pipewire pipewire-pulse wireplumber 2>/dev/null || true
 killall -9 pipewire pipewire-pulse wireplumber 2>/dev/null || true
 
+# CRITICAL: Disable bluealsa which conflicts with PulseAudio
+echo -e "${BLUE}Disabling bluealsa to prevent conflicts with PulseAudio...${NC}"
+systemctl stop bluealsa 2>/dev/null || true
+systemctl disable bluealsa 2>/dev/null || true
+systemctl mask bluealsa 2>/dev/null || true
+killall -9 bluealsa bluealsa-aplay 2>/dev/null || true
+
 # Configure Bluetooth for A2DP only (HiFi audio, no hands-free)
 echo -e "${BLUE}Configuring Bluetooth for HiFi audio only...${NC}"
 cat > /etc/bluetooth/main.conf << 'EOF'
@@ -963,6 +970,14 @@ default-fragments = 4
 default-fragment-size-msec = 25
 EOF
 
+# Create default.pa to load Bluetooth modules
+cat > /home/$APP_USER/.config/pulse/default.pa << 'EOF'
+.include /etc/pulse/default.pa
+load-module module-bluetooth-policy
+load-module module-bluetooth-discover
+load-module module-switch-on-connect
+EOF
+
 # Client config for spotify-kids
 cat > /home/$APP_USER/.config/pulse/client.conf << 'EOF'
 autospawn = yes
@@ -993,13 +1008,12 @@ User=spotify-kids
 Group=audio
 
 # Environment
-Environment="PULSE_RUNTIME_PATH=/tmp/pulse-spotify-kids"
 Environment="HOME=/home/spotify-kids"
+Environment="PULSE_RUNTIME_PATH=/run/user/1001"
+Environment="XDG_RUNTIME_DIR=/run/user/1001"
 
-# Start with DBus session
-ExecStartPre=/bin/mkdir -p /tmp/pulse-spotify-kids
-ExecStartPre=/bin/chown spotify-kids:audio /tmp/pulse-spotify-kids
-ExecStart=/usr/bin/dbus-launch --exit-with-session /usr/bin/pulseaudio --daemonize=no --log-target=journal --high-priority
+# Start with DBus session (systemd handles runtime directories)
+ExecStart=/usr/bin/dbus-launch --exit-with-session /usr/bin/pulseaudio --daemonize=no --log-target=journal --high-priority --realtime
 
 # Permissions
 SupplementaryGroups=audio bluetooth lp
