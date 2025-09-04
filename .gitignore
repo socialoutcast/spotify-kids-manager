@@ -58,7 +58,9 @@ user_backups/
 # Build and distribution
 build/
 dist/
+release/
 *.egg-info/
+*.tar.gz
 
 # Environment
 .env

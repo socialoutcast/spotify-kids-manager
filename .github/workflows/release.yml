@@ -1,0 +1,82 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Triggers on version tags like v1.0.0
+  workflow_dispatch:  # Allows manual triggering
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Build release packages
+      run: |
+        chmod +x build-release.sh
+        ./build-release.sh ${{ github.ref_name }}
+    
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}
+        body_path: release/release-notes.md
+        draft: false
+        prerelease: false
+    
+    - name: Upload Web Package
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./release/spotify-kids-web.tar.gz
+        asset_name: spotify-kids-web.tar.gz
+        asset_content_type: application/gzip
+    
+    - name: Upload Player Package
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./release/spotify-kids-player.tar.gz
+        asset_name: spotify-kids-player.tar.gz
+        asset_content_type: application/gzip
+    
+    - name: Upload Complete Package
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./release/spotify-kids-complete.tar.gz
+        asset_name: spotify-kids-complete.tar.gz
+        asset_content_type: application/gzip
+    
+    - name: Upload Kiosk Launcher
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./release/kiosk_launcher.sh
+        asset_name: kiosk_launcher.sh
+        asset_content_type: text/plain
+    
+    - name: Upload Checksums
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./release/checksums.txt
+        asset_name: checksums.txt
+        asset_content_type: text/plain
