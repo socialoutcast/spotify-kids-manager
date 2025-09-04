@@ -17,9 +17,8 @@ curl -sL https://github.com/socialoutcast/spotify-kids-manager/releases/latest/d
 curl -sL https://github.com/socialoutcast/spotify-kids-manager/releases/latest/download/kiosk_launcher.sh -o kiosk_launcher.sh
 
 # Extract source to match original installer's expected structure
-mkdir -p web player
-tar xzf web.tar.gz -C web/
-tar xzf player.tar.gz -C player/
+tar xzf web.tar.gz
+tar xzf player.tar.gz
 chmod +x kiosk_launcher.sh
 
 # Run the original installer - it will find files "locally"
