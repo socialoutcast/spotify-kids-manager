@@ -461,6 +461,13 @@ mkdir -p "$CONFIG_DIR/.cache"
 chown "$APP_USER:$CONFIG_GROUP" "$CONFIG_DIR/.cache"
 chmod 775 "$CONFIG_DIR/.cache"
 
+# Prevent other users from auto-spawning PulseAudio
+echo -e "${BLUE}Configuring system-wide PulseAudio settings...${NC}"
+cat > /etc/pulse/client.conf << 'EOF'
+# Prevent other users from auto-spawning PulseAudio
+autospawn = no
+EOF
+
 # Both users need access to logs
 chown -R "$APP_USER:$APP_USER" "/var/log/spotify-kids"
 chmod 775 "/var/log/spotify-kids"
@@ -537,6 +544,7 @@ Environment="PORT=5000"
 Environment="SPOTIFY_CONFIG_DIR=$CONFIG_DIR"
 Environment="PULSE_RUNTIME_PATH=/run/user/1001"
 Environment="XDG_RUNTIME_DIR=/run/user/1001"
+Environment="PULSE_SERVER=/run/user/1001/pulse/native"
 Environment="HOME=/home/$APP_USER"
 ExecStartPre=/bin/bash -c 'if [ ! -d "node_modules" ]; then npm install --omit=dev; fi'
 ExecStart=/usr/bin/node server.js
@@ -662,6 +670,7 @@ cat > "$APP_DIR/kiosk_launcher.sh" << 'EOF'
 # Set PulseAudio environment FIRST (before any exec redirects)
 export PULSE_RUNTIME_PATH=/run/user/1001
 export XDG_RUNTIME_DIR=/run/user/1001
+export PULSE_SERVER=/run/user/1001/pulse/native
 export HOME=/home/spotify-kids
 
 # Redirect all output to /dev/null to prevent terminal flashing
@@ -751,6 +760,7 @@ Environment="XAUTHORITY=/home/$APP_USER/.Xauthority"
 Environment="HOME=/home/$APP_USER"
 Environment="PULSE_RUNTIME_PATH=/run/user/1001"
 Environment="XDG_RUNTIME_DIR=/run/user/1001"
+Environment="PULSE_SERVER=/run/user/1001/pulse/native"
 
 # Wait for X11 to be ready
 ExecStartPre=/bin/bash -c 'until [ -S /tmp/.X11-unix/X0 ]; do sleep 2; done'
@@ -981,7 +991,8 @@ EOF
 # Create default.pa to load Bluetooth modules
 cat > /home/$APP_USER/.config/pulse/default.pa << 'EOF'
 .include /etc/pulse/default.pa
-load-module module-bluetooth-policy
+# Automatically switch to A2DP profile and make new devices default
+load-module module-bluetooth-policy auto_switch=2
 load-module module-bluetooth-discover
 load-module module-switch-on-connect
 EOF
@@ -1096,6 +1107,7 @@ done
 
 # Note: PulseAudio's module-bluetooth-policy handles A2DP profile switching automatically
 # No additional scripts needed for Bluetooth profile management
+# When Bluetooth devices are connected, they will automatically be set as the default sink
 
 # Disable unnecessary services
 echo -e "${YELLOW}Optimizing system...${NC}"
