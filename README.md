@@ -13,7 +13,7 @@ A secure, managed music experience for kids with comprehensive parental controls
 Install with a single command:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/main/setup.sh | sudo bash
 ```
 
 ## 🌟 Why Choose Spotify Kids Manager?
@@ -389,7 +389,7 @@ If you need to start fresh:
 sudo spotify-kids-uninstall
 
 # Then reinstall
-curl -sSL https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/main/setup.sh | sudo bash
 ```
 
 ## 📝 Environment Variables
