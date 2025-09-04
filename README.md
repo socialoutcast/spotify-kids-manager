@@ -69,30 +69,15 @@ Before you begin, ensure you have:
 - ✅ **MicroSD Card (32GB minimum)** with Raspberry Pi OS 64-bit
 - ✅ **Touch Display** (recommended: [7" 1024x600 HDMI LCD](https://www.amazon.com/dp/B09B29T8YF) for optimal kiosk experience)
 
-## 🚀 Quick Installation
+## 📦 Installation Details
 
-### Option 1: One-Line Install (Recommended)
-
-```bash
-curl -sSL https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/main/install.sh | sudo bash
-```
-
-> ⏳ **Please be patient!** This installation will take 10-20 minutes as it:
-> - Removes unnecessary software to free up space
+> ⏳ **Please be patient!** Installation will take 10-20 minutes as it:
 > - Updates all system packages to latest versions  
 > - Installs all dependencies and configures services
 > - Sets up audio, Bluetooth, and display systems
 > - Configures SSL certificates and security
 
-### Option 2: Download and Review First
-
-```bash
-wget https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/main/install.sh
-chmod +x install.sh
-sudo ./install.sh
-```
-
-> ⏳ **Installation time:** Allow 10-20 minutes for complete setup
+### What Gets Installed
 
 The installer will automatically:
 - Install all dependencies
@@ -400,11 +385,11 @@ sudo systemctl restart spotify-player spotify-admin
 If you need to start fresh:
 
 ```bash
-# Complete reset (removes all data)
-curl -sSL https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/main/force-reset.sh | sudo bash
+# Complete uninstall and reinstall
+sudo spotify-kids-uninstall
 
-# Reinstall (keeps config)
-curl -sSL https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/main/install.sh | sudo bash -s -- --reset
+# Then reinstall
+curl -sSL https://raw.githubusercontent.com/socialoutcast/spotify-kids-manager/main/install.sh | sudo bash
 ```
 
 ## 📝 Environment Variables
