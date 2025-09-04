@@ -2747,16 +2747,16 @@ def bluetooth_pair():
                 import time
                 time.sleep(2)
                 
-                # Get the Bluetooth device name for PulseAudio
-                # The device should now be available as a sink
-                subprocess.run(['sudo', '-u', 'spotify-kids', 'pactl', 'set-default-sink', 
-                              f'bluez_sink.{address.replace(":", "_")}.a2dp_sink'],
+                # Don't set default sink - module-switch-on-connect handles this automatically
+                # The PulseAudio modules will automatically switch to the new device
+                # Just ensure correct environment variables
+                subprocess.run(['sudo', '-u', 'spotify-kids', 
+                              'env', 'XDG_RUNTIME_DIR=/run/user/1001',
+                              'PULSE_RUNTIME_PATH=/run/user/1001',
+                              'pactl', 'info'],
                               capture_output=True, check=False)
                 
-                # Also try to move any existing streams to the new device
-                subprocess.run(['sudo', '-u', 'spotify-kids', 'bash', '-c',
-                              f'pactl list short sink-inputs | cut -f1 | xargs -I{{}} pactl move-sink-input {{}} bluez_sink.{address.replace(":", "_")}.a2dp_sink'],
-                              capture_output=True, check=False)
+                # No need to move streams - module-switch-on-connect handles this automatically
                 
                 return jsonify({'success': True, 'message': 'Device paired, connected and set as audio output'})
             else:
@@ -2777,13 +2777,14 @@ def bluetooth_pair():
                 import time
                 time.sleep(2)
                 
-                subprocess.run(['sudo', '-u', 'spotify-kids', 'pactl', 'set-default-sink', 
-                              f'bluez_sink.{address.replace(":", "_")}.a2dp_sink'],
+                # Don't set default sink - module-switch-on-connect handles this automatically
+                subprocess.run(['sudo', '-u', 'spotify-kids', 
+                              'env', 'XDG_RUNTIME_DIR=/run/user/1001',
+                              'PULSE_RUNTIME_PATH=/run/user/1001',
+                              'pactl', 'info'],
                               capture_output=True, check=False)
                 
-                subprocess.run(['sudo', '-u', 'spotify-kids', 'bash', '-c',
-                              f'pactl list short sink-inputs | cut -f1 | xargs -I{{}} pactl move-sink-input {{}} bluez_sink.{address.replace(":", "_")}.a2dp_sink'],
-                              capture_output=True, check=False)
+                # No need to move streams - module-switch-on-connect handles this automatically
                 
                 return jsonify({'success': True, 'message': 'Device was already paired. Now connected and set as audio output.'})
             else:
@@ -2895,10 +2896,9 @@ def bluetooth_toggle():
         is_active = result.stdout.strip() == 'active'
         
         if is_active:
-            # Disable Bluetooth
-            subprocess.run(['sudo', 'systemctl', 'stop', 'bluetooth'], check=False)
-            subprocess.run(['sudo', 'rfkill', 'block', 'bluetooth'], check=False)
-            return jsonify({'success': True, 'message': 'Bluetooth disabled'})
+            # Don't stop Bluetooth service - it's needed by PulseAudio
+            # Just disconnect devices if needed
+            return jsonify({'success': False, 'message': 'Bluetooth service must remain active for audio system'})
         else:
             # Enable Bluetooth
             subprocess.run(['sudo', 'rfkill', 'unblock', 'bluetooth'], check=False)
@@ -2996,8 +2996,11 @@ def set_bluetooth_audio_sink():
         # Wait a moment for the sink to be available
         time.sleep(2)
         
-        # Set as default sink for system PulseAudio
-        result = subprocess.run(['sudo', '-u', 'spotify-kids', 'env', 'PULSE_SERVER=unix:/tmp/pulse-socket', 
+        # Set as default sink for system PulseAudio with correct environment
+        result = subprocess.run(['sudo', '-u', 'spotify-kids', 'env', 
+                               'XDG_RUNTIME_DIR=/run/user/1001',
+                               'PULSE_RUNTIME_PATH=/run/user/1001',
+                               'PULSE_SERVER=/run/user/1001/pulse/native',
                                'pactl', 'set-default-sink', sink_name], 
                               capture_output=True, text=True, timeout=10)
         
@@ -3103,10 +3106,17 @@ def bluetooth_disable():
         return jsonify({'error': 'Not authenticated'}), 401
     
     try:
-        # Disable Bluetooth
-        subprocess.run(['sudo', 'systemctl', 'stop', 'bluetooth'], check=False)
-        subprocess.run(['sudo', 'rfkill', 'block', 'bluetooth'], check=False)
-        return jsonify({'success': True, 'message': 'Bluetooth disabled'})
+        # Don't disable Bluetooth service - it's needed by PulseAudio
+        # Just disconnect all devices
+        devices = subprocess.run(['sudo', 'bluetoothctl', 'devices', 'Connected'],
+                                capture_output=True, text=True)
+        for line in devices.stdout.split('\n'):
+            if 'Device' in line:
+                parts = line.split()
+                if len(parts) >= 2:
+                    address = parts[1]
+                    subprocess.run(['sudo', 'bluetoothctl', 'disconnect', address], check=False)
+        return jsonify({'success': True, 'message': 'Bluetooth devices disconnected'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
