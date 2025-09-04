@@ -535,8 +535,9 @@ WorkingDirectory=$APP_DIR/player
 Environment="NODE_ENV=production"
 Environment="PORT=5000"
 Environment="SPOTIFY_CONFIG_DIR=$CONFIG_DIR"
-Environment="PULSE_RUNTIME_PATH=/tmp/pulse-spotify-kids"
-Environment="XDG_RUNTIME_DIR=/tmp"
+Environment="PULSE_RUNTIME_PATH=/run/user/1001"
+Environment="XDG_RUNTIME_DIR=/run/user/1001"
+Environment="HOME=/home/$APP_USER"
 ExecStartPre=/bin/bash -c 'if [ ! -d "node_modules" ]; then npm install --omit=dev; fi'
 ExecStart=/usr/bin/node server.js
 Restart=always
@@ -658,6 +659,11 @@ cat > "$APP_DIR/kiosk_launcher.sh" << 'EOF'
 # Spotify Kids Player Kiosk Mode Launcher
 # This script launches Chromium in kiosk mode displaying the web player
 
+# Set PulseAudio environment FIRST (before any exec redirects)
+export PULSE_RUNTIME_PATH=/run/user/1001
+export XDG_RUNTIME_DIR=/run/user/1001
+export HOME=/home/spotify-kids
+
 # Redirect all output to /dev/null to prevent terminal flashing
 exec > /dev/null 2>&1
 
@@ -743,6 +749,8 @@ Group=$APP_USER
 Environment="DISPLAY=:0"
 Environment="XAUTHORITY=/home/$APP_USER/.Xauthority"
 Environment="HOME=/home/$APP_USER"
+Environment="PULSE_RUNTIME_PATH=/run/user/1001"
+Environment="XDG_RUNTIME_DIR=/run/user/1001"
 
 # Wait for X11 to be ready
 ExecStartPre=/bin/bash -c 'until [ -S /tmp/.X11-unix/X0 ]; do sleep 2; done'
