@@ -62,6 +62,10 @@ release/
 *.egg-info/
 *.tar.gz
 
+# Source directories (if you ever add them back locally)
+web/
+player/
+
 # Environment
 .env
 .venv
