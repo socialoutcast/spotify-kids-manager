@@ -531,8 +531,8 @@ echo -e "${YELLOW}Creating systemd service for player...${NC}"
 cat > /etc/systemd/system/spotify-player.service << EOF
 [Unit]
 Description=Spotify Kids Web Player
-After=network.target bluetooth.service pulseaudio.service
-Wants=network-online.target bluetooth.service
+After=network.target bluetooth.service pulseaudio-spotify-kids.service
+Wants=network-online.target bluetooth.service pulseaudio-spotify-kids.service
 
 [Service]
 Type=simple
@@ -542,8 +542,7 @@ WorkingDirectory=$APP_DIR/player
 Environment="NODE_ENV=production"
 Environment="PORT=5000"
 Environment="SPOTIFY_CONFIG_DIR=$CONFIG_DIR"
-Environment="PULSE_SERVER=unix:/tmp/pulse-socket"
-Environment="PULSE_RUNTIME_PATH=/tmp"
+Environment="PULSE_RUNTIME_PATH=/tmp/pulse-spotify-kids"
 Environment="XDG_RUNTIME_DIR=/tmp"
 ExecStartPre=/bin/bash -c 'if [ ! -d "node_modules" ]; then npm install --omit=dev; fi'
 ExecStart=/usr/bin/node server.js
@@ -949,25 +948,26 @@ sleep 3
 # Configure PulseAudio for spotify-kids user
 echo -e "${BLUE}Setting up PulseAudio for high-quality audio...${NC}"
 
-# Add spotify-kids user to audio and bluetooth groups
-usermod -aG bluetooth,audio,pulse-access "$APP_USER"
+# Add spotify-kids user to required groups (including lp for DBus)
+usermod -aG bluetooth,audio,pulse-access,lp "$APP_USER"
 
 # Create PulseAudio user config directory
 mkdir -p /home/$APP_USER/.config/pulse
 
-# High quality audio settings for spotify-kids
+# Audio settings optimized for Bluetooth compatibility
 cat > /home/$APP_USER/.config/pulse/daemon.conf << 'EOF'
-# High quality audio settings
-default-sample-format = s24le
-default-sample-rate = 48000
-alternate-sample-rate = 44100
-resample-method = speex-float-5
+# Standard quality settings for Bluetooth
+default-sample-format = s16le
+default-sample-rate = 44100
+alternate-sample-rate = 48000
+resample-method = trivial
+avoid-resampling = yes
 high-priority = yes
 nice-level = -11
 realtime-scheduling = yes
 realtime-priority = 5
-default-fragments = 2
-default-fragment-size-msec = 10
+default-fragments = 4
+default-fragment-size-msec = 25
 EOF
 
 # Client config for spotify-kids
@@ -991,45 +991,94 @@ bluetoothctl default-agent 2>/dev/null || true
 bluetoothctl discoverable on 2>/dev/null || true
 bluetoothctl pairable on 2>/dev/null || true
 
-# Create dedicated PulseAudio service for spotify-kids user
-cat > /etc/systemd/system/pulseaudio-spotify.service << 'EOF'
+# Create dedicated PulseAudio service with DBus session for Bluetooth
+cat > /etc/systemd/system/pulseaudio-spotify-kids.service << 'EOF'
 [Unit]
-Description=PulseAudio for Spotify Kids
-After=bluetooth.service
+Description=PulseAudio for Spotify Kids with Bluetooth
+After=bluetooth.service dbus.service
+Requires=dbus.service
 Wants=bluetooth.service
 
 [Service]
-Type=notify
+Type=simple
 User=spotify-kids
 Group=audio
-ExecStartPre=/bin/sleep 3
-ExecStart=/usr/bin/pulseaudio --daemonize=no --log-target=journal --high-priority --realtime
+
+# Environment
+Environment="PULSE_RUNTIME_PATH=/tmp/pulse-spotify-kids"
+Environment="HOME=/home/spotify-kids"
+
+# Start with DBus session
+ExecStartPre=/bin/mkdir -p /tmp/pulse-spotify-kids
+ExecStartPre=/bin/chown spotify-kids:audio /tmp/pulse-spotify-kids
+ExecStart=/usr/bin/dbus-launch --exit-with-session /usr/bin/pulseaudio --daemonize=no --log-target=journal --high-priority
+
+# Permissions
+SupplementaryGroups=audio bluetooth lp
+PrivateDevices=no
+
+# Auto-restart
 Restart=always
 RestartSec=5
-
-# Grant audio permissions
-SupplementaryGroups=audio bluetooth
-PrivateDevices=no
-RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK AF_BLUETOOTH
-
-# Load Bluetooth modules on start
-ExecStartPost=/bin/bash -c 'sleep 5; pactl load-module module-bluetooth-policy a2dp_source=true hfp=false 2>/dev/null || true'
-ExecStartPost=/bin/bash -c 'pactl load-module module-bluetooth-discover headset=no 2>/dev/null || true'
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-# Enable and start PulseAudio service for spotify-kids
+# Configure DBus permissions for Bluetooth access
+cat > /etc/dbus-1/system.d/spotify-bluetooth.conf << 'EOF'
+<!DOCTYPE busconfig PUBLIC "-//freedesktop//DTD D-BUS Bus Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/dbus/1.0/busconfig.dtd">
+<busconfig>
+  <policy user="spotify-kids">
+    <allow own="org.bluez"/>
+    <allow send_destination="org.bluez"/>
+    <allow send_interface="org.bluez.*"/>
+    <allow send_interface="org.freedesktop.DBus.Properties"/>
+    <allow send_interface="org.freedesktop.DBus.ObjectManager"/>
+  </policy>
+  <policy user="spotify-admin">
+    <allow send_destination="org.bluez"/>
+    <allow send_interface="org.bluez.*"/>
+    <allow send_interface="org.freedesktop.DBus.Properties"/>
+    <allow send_interface="org.freedesktop.DBus.ObjectManager"/>
+  </policy>
+  <policy group="spotify-pkgmgr">
+    <allow send_destination="org.bluez"/>
+    <allow send_interface="org.bluez.*"/>
+  </policy>
+</busconfig>
+EOF
+
+# Reload DBus configuration
+systemctl reload dbus 2>/dev/null || true
+
+# Enable Bluetooth experimental features for better PulseAudio integration
+mkdir -p /etc/systemd/system/bluetooth.service.d
+cat > /etc/systemd/system/bluetooth.service.d/override.conf << 'EOF'
+[Service]
+ExecStart=
+ExecStart=/usr/libexec/bluetooth/bluetoothd -E
+EOF
+
+# Restart Bluetooth with new configuration
 systemctl daemon-reload
-systemctl enable pulseaudio-spotify.service
-systemctl start pulseaudio-spotify.service
+systemctl restart bluetooth.service
+sleep 3
+
+# Enable and start PulseAudio service
+systemctl enable pulseaudio-spotify-kids.service
+systemctl start pulseaudio-spotify-kids.service
 
 # Wait for PulseAudio service to be ready
 echo -e "${BLUE}Waiting for PulseAudio to be ready...${NC}"
+sleep 5  # Give time for DBus session to establish
 for i in {1..10}; do
     if sudo -u $APP_USER pactl info >/dev/null 2>&1; then
         echo -e "${GREEN}PulseAudio is ready${NC}"
+        # Load Bluetooth modules after PulseAudio is ready
+        sudo -u $APP_USER pactl load-module module-bluetooth-policy 2>/dev/null || true
+        sudo -u $APP_USER pactl load-module module-bluetooth-discover 2>/dev/null || true
         break
     fi
     echo "Waiting for PulseAudio... ($i/10)"
@@ -1090,30 +1139,8 @@ EOF
 
 chmod +x /opt/spotify-kids/bluetooth-a2dp-switch.sh
 
-# Create systemd service for Bluetooth A2DP switching
-cat > /etc/systemd/system/bluetooth-a2dp-switch.service << 'EOF'
-[Unit]
-Description=Bluetooth A2DP Auto-Switch Service
-After=bluetooth.service pulseaudio.service
-Requires=bluetooth.service
-Wants=pulseaudio.service
-
-[Service]
-Type=simple
-ExecStart=/opt/spotify-kids/bluetooth-a2dp-switch.sh
-Restart=always
-RestartSec=5
-StandardOutput=journal
-StandardError=journal
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-# Reload systemd to recognize the new bluetooth service
-systemctl daemon-reload
-systemctl enable bluetooth-a2dp-switch.service
-systemctl start bluetooth-a2dp-switch.service 2>/dev/null || true
+# Note: A2DP switching script created but not started as service
+# The PulseAudio module-bluetooth-policy handles profile switching automatically
 
 # Disable unnecessary services
 echo -e "${YELLOW}Optimizing system...${NC}"
