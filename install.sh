@@ -526,6 +526,9 @@ mkdir -p "$CONFIG_DIR/cache"
 chown $APP_USER:$CONFIG_GROUP "$CONFIG_DIR/cache"
 chmod 775 "$CONFIG_DIR/cache"
 
+# Get the UID for spotify-kids user for runtime paths
+APP_USER_UID=$(id -u $APP_USER)
+
 # Create systemd service for the player
 echo -e "${YELLOW}Creating systemd service for player...${NC}"
 cat > /etc/systemd/system/spotify-player.service << EOF
@@ -542,9 +545,9 @@ WorkingDirectory=$APP_DIR/player
 Environment="NODE_ENV=production"
 Environment="PORT=5000"
 Environment="SPOTIFY_CONFIG_DIR=$CONFIG_DIR"
-Environment="PULSE_RUNTIME_PATH=/run/user/1001"
-Environment="XDG_RUNTIME_DIR=/run/user/1001"
-Environment="PULSE_SERVER=/run/user/1001/pulse/native"
+Environment="PULSE_RUNTIME_PATH=/run/user/$APP_USER_UID"
+Environment="XDG_RUNTIME_DIR=/run/user/$APP_USER_UID"
+Environment="PULSE_SERVER=/run/user/$APP_USER_UID/pulse/native"
 Environment="HOME=/home/$APP_USER"
 ExecStartPre=/bin/bash -c 'if [ ! -d "node_modules" ]; then npm install --omit=dev; fi'
 ExecStart=/usr/bin/node server.js
@@ -668,9 +671,9 @@ cat > "$APP_DIR/kiosk_launcher.sh" << 'EOF'
 # This script launches Chromium in kiosk mode displaying the web player
 
 # Set PulseAudio environment FIRST (before any exec redirects)
-export PULSE_RUNTIME_PATH=/run/user/1001
-export XDG_RUNTIME_DIR=/run/user/1001
-export PULSE_SERVER=/run/user/1001/pulse/native
+export PULSE_RUNTIME_PATH=/run/user/$APP_USER_UID
+export XDG_RUNTIME_DIR=/run/user/$APP_USER_UID
+export PULSE_SERVER=/run/user/$APP_USER_UID/pulse/native
 export HOME=/home/spotify-kids
 
 # Redirect all output to /dev/null to prevent terminal flashing
@@ -758,9 +761,9 @@ Group=$APP_USER
 Environment="DISPLAY=:0"
 Environment="XAUTHORITY=/home/$APP_USER/.Xauthority"
 Environment="HOME=/home/$APP_USER"
-Environment="PULSE_RUNTIME_PATH=/run/user/1001"
-Environment="XDG_RUNTIME_DIR=/run/user/1001"
-Environment="PULSE_SERVER=/run/user/1001/pulse/native"
+Environment="PULSE_RUNTIME_PATH=/run/user/$APP_USER_UID"
+Environment="XDG_RUNTIME_DIR=/run/user/$APP_USER_UID"
+Environment="PULSE_SERVER=/run/user/$APP_USER_UID/pulse/native"
 
 # Wait for X11 to be ready
 ExecStartPre=/bin/bash -c 'until [ -S /tmp/.X11-unix/X0 ]; do sleep 2; done'
@@ -1028,7 +1031,7 @@ SupplementaryGroups=bluetooth pulse-access lp
 
 # Environment
 Environment="HOME=/home/spotify-kids"
-Environment="XDG_RUNTIME_DIR=/run/user/1001"
+Environment="XDG_RUNTIME_DIR=/run/user/$APP_USER_UID"
 
 # Start PulseAudio in background (Type=forking works properly)
 ExecStart=/usr/bin/pulseaudio --start --log-target=syslog
@@ -1140,8 +1143,14 @@ userdel -r $APP_USER 2>/dev/null
 userdel spotify-admin 2>/dev/null
 groupdel spotify-pkgmgr 2>/dev/null
 groupdel spotify-config 2>/dev/null
-# Unmask PipeWire if it was masked
+# Unmask PipeWire and bluealsa if they were masked
 systemctl unmask pipewire pipewire-pulse wireplumber 2>/dev/null
+systemctl unmask bluealsa 2>/dev/null
+# Remove Bluetooth configuration files
+rm -f /etc/systemd/system/bluetooth.service.d/override.conf
+rm -f /etc/bluetooth/audio.conf
+# Remove PulseAudio system config
+rm -f /etc/pulse/client.conf
 rm -f /usr/local/bin/spotify-kids-uninstall
 echo "Uninstall complete"
 EOF
