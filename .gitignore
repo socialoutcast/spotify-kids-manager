@@ -81,3 +81,9 @@ claude.md
 *.claude
 .claude-*
 claude-*
+
+# Local source files (not in public repo)
+force-reset.sh
+kiosk_launcher.sh
+requirements.txt
+build-release.sh
