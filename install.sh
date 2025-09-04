@@ -912,53 +912,71 @@ fi
 # Configure Bluetooth and audio
 echo -e "${YELLOW}Configuring Bluetooth and audio...${NC}"
 
-# Stop conflicting services
-systemctl stop pipewire pipewire-pulse 2>/dev/null || true
-systemctl disable pipewire pipewire-pulse 2>/dev/null || true
+# Stop and mask conflicting services (PipeWire)
+echo -e "${BLUE}Disabling PipeWire to use PulseAudio...${NC}"
+systemctl stop pipewire pipewire-pulse wireplumber 2>/dev/null || true
+systemctl disable pipewire pipewire-pulse wireplumber 2>/dev/null || true
+systemctl mask pipewire pipewire-pulse wireplumber 2>/dev/null || true
+killall -9 pipewire pipewire-pulse wireplumber 2>/dev/null || true
+
+# Configure Bluetooth for A2DP only (HiFi audio, no hands-free)
+echo -e "${BLUE}Configuring Bluetooth for HiFi audio only...${NC}"
+cat > /etc/bluetooth/main.conf << 'EOF'
+[General]
+Name = raspberrypi
+Class = 0x00041C
+DiscoverableTimeout = 0
+PairableTimeout = 0
+FastConnectable = true
+
+[Policy]
+AutoEnable=true
+EOF
+
+# Disable HFP/HSP profiles, keep only A2DP
+cat > /etc/bluetooth/audio.conf << 'EOF'
+[General]
+Enable=Source,Sink,Media,Socket
+Disable=Headset,Gateway
+AutoConnect=true
+EOF
 
 # Enable Bluetooth service
 systemctl enable bluetooth.service
-systemctl start bluetooth.service
+systemctl restart bluetooth.service
+sleep 3
 
-# Configure PulseAudio System Mode
-echo -e "${BLUE}Setting up PulseAudio in system mode...${NC}"
-cat > /etc/pulse/system.pa << 'EOF'
-#!/usr/bin/pulseaudio -nF
-
-# Load audio drivers
-load-module module-device-restore
-load-module module-stream-restore  
-load-module module-card-restore
-
-# Load ALSA modules
-load-module module-alsa-sink device=hw:0,0
-load-module module-alsa-source device=hw:0,0
-
-# Bluetooth support
-load-module module-bluetooth-policy
-load-module module-bluetooth-discover
-
-# Network access for applications
-load-module module-native-protocol-unix auth-anonymous=1 socket=/tmp/pulse-socket
-load-module module-native-protocol-tcp auth-anonymous=1 port=4713
-
-# Set default sink (will be overridden when Bluetooth connects)
-set-default-sink alsa_output.hw_0_0
-set-default-source alsa_input.hw_0_0
-EOF
+# Configure PulseAudio for spotify-kids user
+echo -e "${BLUE}Setting up PulseAudio for high-quality audio...${NC}"
 
 # Add spotify-kids user to audio and bluetooth groups
 usermod -aG bluetooth,audio,pulse-access "$APP_USER"
 
-# Configure PulseAudio client for spotify-kids user
+# Create PulseAudio user config directory
 mkdir -p /home/$APP_USER/.config/pulse
-cat > /home/$APP_USER/.config/pulse/client.conf << 'EOF'
-default-server = unix:/tmp/pulse-socket
-autospawn = no
+
+# High quality audio settings for spotify-kids
+cat > /home/$APP_USER/.config/pulse/daemon.conf << 'EOF'
+# High quality audio settings
+default-sample-format = s24le
+default-sample-rate = 48000
+alternate-sample-rate = 44100
+resample-method = speex-float-5
+high-priority = yes
+nice-level = -11
+realtime-scheduling = yes
+realtime-priority = 5
+default-fragments = 2
+default-fragment-size-msec = 10
 EOF
 
-# Set PULSE_SERVER environment variable
-echo 'export PULSE_SERVER=unix:/tmp/pulse-socket' >> /home/$APP_USER/.bashrc
+# Client config for spotify-kids
+cat > /home/$APP_USER/.config/pulse/client.conf << 'EOF'
+autospawn = yes
+daemon-binary = /usr/bin/pulseaudio
+extra-arguments = --log-target=syslog
+EOF
+
 chown -R $APP_USER:$APP_USER /home/$APP_USER/.config
 chown $APP_USER:$APP_USER /home/$APP_USER/.bashrc
 
@@ -973,58 +991,49 @@ bluetoothctl default-agent 2>/dev/null || true
 bluetoothctl discoverable on 2>/dev/null || true
 bluetoothctl pairable on 2>/dev/null || true
 
-# Configure Bluetooth for audio
-cat > /etc/bluetooth/audio.conf << 'EOF'
-[General]
-Enable=Source,Sink,Media,Socket
-AutoConnect=true
-EOF
-
-# Configure Bluetooth main settings for better audio
-sed -i 's/#DiscoverableTimeout = 0/DiscoverableTimeout = 0/' /etc/bluetooth/main.conf
-sed -i 's/#PairableTimeout = 0/PairableTimeout = 0/' /etc/bluetooth/main.conf
-sed -i 's/#Class = 0x000100/Class = 0x0c0420/' /etc/bluetooth/main.conf  # Audio device class
-
-# Ensure Bluetooth service starts with proper settings
-cat > /etc/systemd/system/bluetooth-audio-setup.service << 'EOF'
+# Create dedicated PulseAudio service for spotify-kids user
+cat > /etc/systemd/system/pulseaudio-spotify.service << 'EOF'
 [Unit]
-Description=Bluetooth Audio Setup
-After=bluetooth.service dbus.service
-Requires=bluetooth.service
-Wants=dbus.service
+Description=PulseAudio for Spotify Kids
+After=bluetooth.service
+Wants=bluetooth.service
 
 [Service]
-Type=oneshot
-ExecStartPre=/bin/sleep 5
-ExecStart=/bin/bash -c 'timeout 2 bluetoothctl power on; timeout 2 bluetoothctl agent NoInputNoOutput; timeout 2 bluetoothctl default-agent; timeout 2 bluetoothctl discoverable on; timeout 2 bluetoothctl pairable on; exit 0'
-RemainAfterExit=yes
-StandardOutput=journal
-StandardError=journal
+Type=notify
+User=spotify-kids
+Group=audio
+ExecStartPre=/bin/sleep 3
+ExecStart=/usr/bin/pulseaudio --daemonize=no --log-target=journal --high-priority --realtime
+Restart=always
+RestartSec=5
+
+# Grant audio permissions
+SupplementaryGroups=audio bluetooth
+PrivateDevices=no
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK AF_BLUETOOTH
+
+# Load Bluetooth modules on start
+ExecStartPost=/bin/bash -c 'sleep 5; pactl load-module module-bluetooth-policy a2dp_source=true hfp=false 2>/dev/null || true'
+ExecStartPost=/bin/bash -c 'pactl load-module module-bluetooth-discover headset=no 2>/dev/null || true'
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-systemctl enable bluetooth-audio-setup.service
+# Enable and start PulseAudio service for spotify-kids
+systemctl daemon-reload
+systemctl enable pulseaudio-spotify.service
+systemctl start pulseaudio-spotify.service
 
-# Start PulseAudio in system mode with proper settings
-echo -e "${BLUE}Starting PulseAudio in system mode...${NC}"
-# Kill any existing PulseAudio processes
-killall pulseaudio 2>/dev/null || true
-sleep 2
-
-# Start PulseAudio in system mode with module loading enabled
-pulseaudio --system --daemonize --disallow-exit --disallow-module-loading=false
-sleep 3
-
-# Wait for PulseAudio to start and test connection
+# Wait for PulseAudio service to be ready
+echo -e "${BLUE}Waiting for PulseAudio to be ready...${NC}"
 for i in {1..10}; do
-    if PULSE_SERVER=unix:/tmp/pulse-socket pactl info >/dev/null 2>&1; then
-        echo -e "${GREEN}PulseAudio started successfully${NC}"
+    if sudo -u $APP_USER pactl info >/dev/null 2>&1; then
+        echo -e "${GREEN}PulseAudio is ready${NC}"
         break
     fi
-    echo "Waiting for PulseAudio to start... ($i/10)"
-    sleep 1
+    echo "Waiting for PulseAudio... ($i/10)"
+    sleep 2
 done
 
 # Add automatic A2DP profile switching script
@@ -1042,16 +1051,16 @@ switch_to_a2dp() {
     
     # Wait for card to be available
     for i in {1..10}; do
-        if PULSE_SERVER=unix:/tmp/pulse-socket pactl list cards short | grep -q "$card_name"; then
+        if pactl list cards short | grep -q "$card_name"; then
             echo "Card $card_name found, switching to A2DP..."
             
-            # Try to set A2DP profile
-            if PULSE_SERVER=unix:/tmp/pulse-socket pactl set-card-profile "$card_name" a2dp_sink 2>/dev/null; then
-                echo "Successfully switched to A2DP profile"
+            # Try to set A2DP profile (HiFi only, no HSP/HFP)
+            if pactl set-card-profile "$card_name" a2dp_sink 2>/dev/null; then
+                echo "Successfully switched to A2DP HiFi profile"
                 
                 # Set as default audio sink
                 local sink_name="bluez_sink.${device_mac//:/_}.a2dp_sink"
-                if PULSE_SERVER=unix:/tmp/pulse-socket pactl set-default-sink "$sink_name" 2>/dev/null; then
+                if pactl set-default-sink "$sink_name" 2>/dev/null; then
                     echo "Set $sink_name as default audio sink"
                 fi
                 return 0
