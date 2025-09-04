@@ -49,18 +49,18 @@ If you're interested in any of the following, you'll need a commercial license:
 
 ## Licensing Tiers
 
-### Starter Commercial License
+### Starter Commercial License ($100/Month)
 - Up to 10 commercial deployments
 - Basic support included
 - Modification rights
 
-### Professional License  
+### Professional License ($200/Month)  
 - Unlimited deployments
 - Priority support
 - Custom development consultation
 - White-labeling rights
 
-### Enterprise/OEM License
+### Enterprise/OEM License (Request a quote)
 - Manufacturing/resale rights
 - Source code access
 - Custom development
@@ -70,9 +70,7 @@ If you're interested in any of the following, you'll need a commercial license:
 
 **Ready to discuss commercial licensing?**
 
-📧 **Email:** [Your Email Here]
-📞 **Phone:** [Your Phone Here]  
-🌐 **Website:** [Your Business Website]
+📧 **Email:** support@savageindustries.com
 
 ### Information to Include in Your Inquiry:
 
