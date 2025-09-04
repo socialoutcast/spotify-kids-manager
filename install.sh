@@ -429,7 +429,7 @@ else
     mkdir -p "$APP_DIR/player/client"
     wget -q "$REPO_URL/player/package.json" -O "$APP_DIR/player/package.json"
     wget -q "$REPO_URL/player/server.js" -O "$APP_DIR/player/server.js"
-    wget -q "$REPO_URL/player/spotify-player.service" -O "$APP_DIR/player/spotify-player.service"
+    # Service file is created by installer, not downloaded
     wget -q "$REPO_URL/player/client/index.html" -O "$APP_DIR/player/client/index.html"
     
     # Kiosk launcher

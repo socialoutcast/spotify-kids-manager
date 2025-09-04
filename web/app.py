@@ -2750,9 +2750,11 @@ def bluetooth_pair():
                 # Don't set default sink - module-switch-on-connect handles this automatically
                 # The PulseAudio modules will automatically switch to the new device
                 # Just ensure correct environment variables
+                import pwd
+                spotify_uid = pwd.getpwnam('spotify-kids').pw_uid
                 subprocess.run(['sudo', '-u', 'spotify-kids', 
-                              'env', 'XDG_RUNTIME_DIR=/run/user/1001',
-                              'PULSE_RUNTIME_PATH=/run/user/1001',
+                              'env', f'XDG_RUNTIME_DIR=/run/user/{spotify_uid}',
+                              f'PULSE_RUNTIME_PATH=/run/user/{spotify_uid}',
                               'pactl', 'info'],
                               capture_output=True, check=False)
                 
@@ -2779,8 +2781,8 @@ def bluetooth_pair():
                 
                 # Don't set default sink - module-switch-on-connect handles this automatically
                 subprocess.run(['sudo', '-u', 'spotify-kids', 
-                              'env', 'XDG_RUNTIME_DIR=/run/user/1001',
-                              'PULSE_RUNTIME_PATH=/run/user/1001',
+                              'env', f'XDG_RUNTIME_DIR=/run/user/{spotify_uid}',
+                              f'PULSE_RUNTIME_PATH=/run/user/{spotify_uid}',
                               'pactl', 'info'],
                               capture_output=True, check=False)
                 
@@ -2997,10 +2999,12 @@ def set_bluetooth_audio_sink():
         time.sleep(2)
         
         # Set as default sink for system PulseAudio with correct environment
+        import pwd
+        spotify_uid = pwd.getpwnam('spotify-kids').pw_uid
         result = subprocess.run(['sudo', '-u', 'spotify-kids', 'env', 
-                               'XDG_RUNTIME_DIR=/run/user/1001',
-                               'PULSE_RUNTIME_PATH=/run/user/1001',
-                               'PULSE_SERVER=/run/user/1001/pulse/native',
+                               f'XDG_RUNTIME_DIR=/run/user/{spotify_uid}',
+                               f'PULSE_RUNTIME_PATH=/run/user/{spotify_uid}',
+                               f'PULSE_SERVER=/run/user/{spotify_uid}/pulse/native',
                                'pactl', 'set-default-sink', sink_name], 
                               capture_output=True, text=True, timeout=10)
         
