@@ -997,31 +997,30 @@ chown -R $APP_USER:$APP_USER /home/$APP_USER/.config/bluetooth
 # Create dedicated PulseAudio service with DBus session for Bluetooth
 cat > /etc/systemd/system/pulseaudio-spotify-kids.service << 'EOF'
 [Unit]
-Description=PulseAudio for Spotify Kids with Bluetooth
-After=bluetooth.service dbus.service
-Requires=dbus.service
+Description=PulseAudio for Spotify Kids
+After=bluetooth.service sound.target
 Wants=bluetooth.service
 
 [Service]
-Type=simple
+Type=forking
 User=spotify-kids
 Group=audio
+SupplementaryGroups=bluetooth pulse-access lp
 
 # Environment
 Environment="HOME=/home/spotify-kids"
-Environment="PULSE_RUNTIME_PATH=/run/user/1001"
 Environment="XDG_RUNTIME_DIR=/run/user/1001"
 
-# Start with DBus session (systemd handles runtime directories)
-ExecStart=/usr/bin/dbus-launch --exit-with-session /usr/bin/pulseaudio --daemonize=no --log-target=journal --high-priority --realtime
+# Start PulseAudio in background (Type=forking works properly)
+ExecStart=/usr/bin/pulseaudio --start --log-target=syslog
+ExecStop=/usr/bin/pulseaudio --kill
 
-# Permissions
-SupplementaryGroups=audio bluetooth lp
-PrivateDevices=no
-
-# Auto-restart
+# Restart policy
 Restart=always
 RestartSec=5
+
+# Permissions
+PrivateDevices=no
 
 [Install]
 WantedBy=multi-user.target
