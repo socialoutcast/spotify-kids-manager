@@ -6,21 +6,30 @@
 
 set -e
 
+# Encrypted password for the release archive
+# This is decrypted at runtime using a known key
+ENCRYPTED_PASSWORD="U2FsdGVkX1+IEH1XgeMD5d+kF3/ENMNeDyKqFFD9VDHyXeJissWFA+NcgDg7QlTouKbU4X1f63d7Qk68fpx3AQ=="
+
+# Decrypt the password using standard Linux tools
+SETUP_KEY="SpotifyKidsManager2025"
+RELEASE_PASSWORD=$(echo "$ENCRYPTED_PASSWORD" | openssl enc -aes-256-cbc -a -d -salt -pbkdf2 -pass pass:"$SETUP_KEY")
+
 # Create temp directory and download release
 TEMP_DIR=$(mktemp -d)
 cd "$TEMP_DIR"
 
-# Download the installer package from release
-curl -sL https://github.com/socialoutcast/spotify-kids-manager/releases/latest/download/installer-scripts.tar.gz | tar xz
+# Download the encrypted package from release
+echo "Downloading Spotify Kids Manager..."
+curl -sL https://github.com/socialoutcast/spotify-kids-manager/releases/latest/download/spotify-kids-manager-complete.tar.gz.enc -o spotify-kids-manager-complete.tar.gz.enc
 
-# Download source packages from release
-curl -sL https://github.com/socialoutcast/spotify-kids-manager/releases/latest/download/spotify-kids-web.tar.gz -o web.tar.gz
-curl -sL https://github.com/socialoutcast/spotify-kids-manager/releases/latest/download/spotify-kids-player.tar.gz -o player.tar.gz
-curl -sL https://github.com/socialoutcast/spotify-kids-manager/releases/latest/download/kiosk_launcher.sh -o kiosk_launcher.sh
+# Decrypt and extract using the decrypted password
+echo "Extracting package..."
+openssl enc -aes-256-cbc -d -salt -pbkdf2 -pass pass:"$RELEASE_PASSWORD" -in spotify-kids-manager-complete.tar.gz.enc | tar xz
 
-# Extract source to match original installer's expected structure
-tar xzf web.tar.gz
-tar xzf player.tar.gz
+# Extract the nested tarballs
+tar xzf installer-scripts.tar.gz
+tar xzf spotify-kids-web.tar.gz
+tar xzf spotify-kids-player.tar.gz
 chmod +x kiosk_launcher.sh
 
 # Run the original installer - it will find files "locally"
