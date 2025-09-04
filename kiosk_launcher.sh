@@ -3,6 +3,13 @@
 # Spotify Kids Player Kiosk Mode Launcher
 # This script launches Chromium in kiosk mode displaying the web player
 
+# Set PulseAudio environment FIRST (before any exec redirects)
+APP_USER_UID=$(id -u spotify-kids)
+export PULSE_RUNTIME_PATH=/run/user/$APP_USER_UID
+export XDG_RUNTIME_DIR=/run/user/$APP_USER_UID
+export PULSE_SERVER=/run/user/$APP_USER_UID/pulse/native
+export HOME=/home/spotify-kids
+
 # Redirect all output to /dev/null to prevent terminal flashing
 exec > /dev/null 2>&1
 
