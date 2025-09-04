@@ -1,6 +1,8 @@
 #!/bin/bash
 # Spotify Kids Manager - Setup Script
 # This downloads everything from the release and runs the original installer
+# Usage: curl -fsSL .../setup.sh | sudo bash
+#    or: curl -fsSL .../setup.sh | sudo bash -s -- --reset
 
 set -e
 
@@ -22,7 +24,8 @@ tar xzf player.tar.gz
 chmod +x kiosk_launcher.sh
 
 # Run the original installer - it will find files "locally"
-sudo bash installer-full.sh
+# Pass through any arguments (like --reset)
+sudo bash installer-full.sh "$@"
 
 # Cleanup
 cd /
