@@ -72,17 +72,11 @@ wait_for_apt() {
 # Wait for apt to be available before starting
 wait_for_apt
 
-# Clean up old spotify-terminal installation if exists
-if [ -d "/opt/spotify-terminal" ] || systemctl list-units --all | grep -q "spotify-terminal"; then
-    echo -e "${YELLOW}Found old spotify-terminal installation. Cleaning up...${NC}"
-    systemctl stop spotify-terminal-admin 2>/dev/null || true
-    systemctl stop spotify-terminal 2>/dev/null || true
-    systemctl disable spotify-terminal-admin 2>/dev/null || true
-    systemctl disable spotify-terminal 2>/dev/null || true
-    rm -f /etc/systemd/system/spotify-terminal*.service
-    rm -rf /opt/spotify-terminal
-    rm -f /etc/nginx/sites-*/spotify-terminal
-    systemctl daemon-reload
+# Clean up any old installations
+if [ -d "/opt/spotify-terminal" ] || [ -d "/opt/spotify-kids" ] && [ "$RESET_MODE" = false ]; then
+    echo -e "${YELLOW}Found existing installation. Use --reset to remove it first.${NC}"
+    echo -e "${RED}Installation aborted to prevent data loss.${NC}"
+    exit 1
 fi
 
 # Reset function
@@ -100,9 +94,8 @@ if [ "$RESET_MODE" = true ]; then
     
     echo -e "${YELLOW}Removing ALL Spotify files...${NC}"
     # Remove ALL spotify-related directories
-    rm -rf /opt/spotify*
-    rm -rf /opt/spotify-terminal
     rm -rf /opt/spotify-kids
+    rm -rf /opt/spotify-terminal 2>/dev/null || true
     
     # Remove ALL service files
     rm -f /etc/systemd/system/spotify*.service
@@ -984,12 +977,7 @@ chown $APP_USER:$APP_USER /home/$APP_USER/.bashrc
 mkdir -p /home/$APP_USER/.config/bluetooth
 chown -R $APP_USER:$APP_USER /home/$APP_USER/.config/bluetooth
 
-# Set Bluetooth to be discoverable and pairable
-bluetoothctl power on 2>/dev/null || true
-bluetoothctl agent NoInputNoOutput 2>/dev/null || true
-bluetoothctl default-agent 2>/dev/null || true
-bluetoothctl discoverable on 2>/dev/null || true
-bluetoothctl pairable on 2>/dev/null || true
+# Bluetooth will be configured when devices are paired through the admin interface
 
 # Create dedicated PulseAudio service with DBus session for Bluetooth
 cat > /etc/systemd/system/pulseaudio-spotify-kids.service << 'EOF'
@@ -1085,62 +1073,8 @@ for i in {1..10}; do
     sleep 2
 done
 
-# Add automatic A2DP profile switching script
-echo -e "${BLUE}Creating Bluetooth A2DP auto-switching service...${NC}"
-cat > /opt/spotify-kids/bluetooth-a2dp-switch.sh << 'EOF'
-#!/bin/bash
-# Script to automatically switch Bluetooth devices to A2DP profile when connected
-
-# Function to switch device to A2DP
-switch_to_a2dp() {
-    local device_mac=$1
-    local card_name="bluez_card.${device_mac//:/_}"
-    
-    echo "Attempting to switch $device_mac to A2DP profile..."
-    
-    # Wait for card to be available
-    for i in {1..10}; do
-        if pactl list cards short | grep -q "$card_name"; then
-            echo "Card $card_name found, switching to A2DP..."
-            
-            # Try to set A2DP profile (HiFi only, no HSP/HFP)
-            if pactl set-card-profile "$card_name" a2dp_sink 2>/dev/null; then
-                echo "Successfully switched to A2DP HiFi profile"
-                
-                # Set as default audio sink
-                local sink_name="bluez_sink.${device_mac//:/_}.a2dp_sink"
-                if pactl set-default-sink "$sink_name" 2>/dev/null; then
-                    echo "Set $sink_name as default audio sink"
-                fi
-                return 0
-            else
-                echo "Failed to set A2DP profile, trying again..."
-            fi
-        fi
-        sleep 2
-    done
-    echo "Failed to switch $device_mac to A2DP after 20 seconds"
-    return 1
-}
-
-# Monitor bluetoothctl events
-bluetoothctl | while read -r line; do
-    # Look for device connection events
-    if echo "$line" | grep -q "Device.*Connected: yes"; then
-        device_mac=$(echo "$line" | grep -o '[A-F0-9:]\{17\}')
-        if [ -n "$device_mac" ]; then
-            echo "Device connected: $device_mac"
-            # Switch to A2DP in background
-            switch_to_a2dp "$device_mac" &
-        fi
-    fi
-done
-EOF
-
-chmod +x /opt/spotify-kids/bluetooth-a2dp-switch.sh
-
-# Note: A2DP switching script created but not started as service
-# The PulseAudio module-bluetooth-policy handles profile switching automatically
+# Note: PulseAudio's module-bluetooth-policy handles A2DP profile switching automatically
+# No additional scripts needed for Bluetooth profile management
 
 # Disable unnecessary services
 echo -e "${YELLOW}Optimizing system...${NC}"
@@ -1153,21 +1087,28 @@ cat > /usr/local/bin/spotify-kids-uninstall << EOF
 echo "Uninstalling Spotify Kids Manager..."
 systemctl stop spotify-player.service 2>/dev/null
 systemctl stop spotify-admin.service 2>/dev/null
+systemctl stop spotify-kiosk.service 2>/dev/null
+systemctl stop pulseaudio-spotify-kids.service 2>/dev/null
 systemctl disable spotify-player.service 2>/dev/null
 systemctl disable spotify-admin.service 2>/dev/null
-rm -f /etc/systemd/system/spotify-player.service
-rm -f /etc/systemd/system/spotify-admin.service
+systemctl disable spotify-kiosk.service 2>/dev/null
+systemctl disable pulseaudio-spotify-kids.service 2>/dev/null
+rm -f /etc/systemd/system/spotify*.service
+rm -f /etc/systemd/system/pulseaudio-spotify-kids.service
 rm -f /etc/nginx/sites-available/spotify-admin
 rm -f /etc/nginx/sites-enabled/spotify-admin
 rm -f /etc/nginx/sites-available/spotify-admin-ssl
 rm -f /etc/nginx/sites-enabled/spotify-admin-ssl
-rm -f /etc/sudoers.d/spotify-admin
-rm -f /etc/sudoers.d/spotify-pkgmgr
+rm -f /etc/sudoers.d/spotify-*
+rm -f /etc/sudoers.d/90-spotify-pkgmgr
+rm -f /etc/dbus-1/system.d/spotify-bluetooth.conf
 rm -rf $APP_DIR
 userdel -r $APP_USER 2>/dev/null
 userdel spotify-admin 2>/dev/null
 groupdel spotify-pkgmgr 2>/dev/null
 groupdel spotify-config 2>/dev/null
+# Unmask PipeWire if it was masked
+systemctl unmask pipewire pipewire-pulse wireplumber 2>/dev/null
 rm -f /usr/local/bin/spotify-kids-uninstall
 echo "Uninstall complete"
 EOF
