@@ -8,7 +8,7 @@ set -e
 
 # Encrypted password for the release archive
 # This is decrypted at runtime using a known key
-ENCRYPTED_PASSWORD="U2FsdGVkX1/7jmJNrON9G4N52rnbmEjogDr313J/gav/h/kZIizNnYANuwxFjW5zXvPTKUaFaKZlHRpUi7dGyw=="
+ENCRYPTED_PASSWORD="U2FsdGVkX1/saRsOSW7uIxJf6CUvV5GpiW31mDXLJCePZ+gPO10IPMYB2+FdYZW4Z2W6+eenIEy0uxbyVYl9FQ=="
 
 # Decrypt the password using standard Linux tools
 # Use -md sha256 for compatibility with older OpenSSL
@@ -33,9 +33,30 @@ tar xzf spotify-kids-web.tar.gz
 tar xzf spotify-kids-player.tar.gz
 chmod +x kiosk_launcher.sh
 
+# Detect the real user for the installer
+if [ -n "$SUDO_USER" ]; then
+    REAL_USER="$SUDO_USER"
+else
+    # Find first regular user
+    for user_home in /home/*; do
+        if [ -d "$user_home" ]; then
+            user_name=$(basename "$user_home")
+            if [ "$user_name" != "lost+found" ] && id "$user_name" &>/dev/null; then
+                user_id=$(id -u "$user_name")
+                if [ "$user_id" -ge 1000 ] && [ "$user_id" -lt 60000 ]; then
+                    REAL_USER="$user_name"
+                    break
+                fi
+            fi
+        fi
+    done
+fi
+
 # Run the original installer - it will find files "locally"
 # Pass through any arguments (like --reset)
-sudo bash installer-full.sh "$@"
+# Export REAL_USER so installer can use it
+export REAL_USER
+bash installer-full.sh "$@"
 
 # Cleanup
 cd /
