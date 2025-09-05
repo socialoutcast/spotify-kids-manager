@@ -59,6 +59,29 @@ user_backups/
 build/
 dist/
 *.egg-info/
+release-*/
+release-v*/
+
+# Release passwords (NEVER commit these!)
+*.password
+release-*/.password
+.password
+
+# Source files (only setup.sh should be committed)
+install.sh
+install-single-user.sh
+master-installer.sh
+kiosk_launcher.sh
+player/
+web/
+requirements.txt
+*.tar.gz
+*.tar.gz.enc
+fix-old-install.sh
+force-clean.sh
+force-reset.sh
+setup_kiosk.sh
+spotify-kiosk.service
 
 # Environment
 .env
