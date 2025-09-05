@@ -8,7 +8,7 @@ set -e
 
 # Encrypted password for the release archive
 # This is decrypted at runtime using a known key
-ENCRYPTED_PASSWORD="U2FsdGVkX1+r5aNkoEfUnQhOV2gO+oDCA527bXsOKgI0N8SH1g5mUXxsW1+rqirbu/UhW7KxjrvTBD6+tjOXPA=="
+ENCRYPTED_PASSWORD="U2FsdGVkX1/TM9DJoI0UBzws/zvAwTUUHzqWxGgviQ3+iinWDkRmsN1qlmP734Wc7Be9PCPEjPgSpVqUCQFuDQ=="
 
 # Decrypt the password using standard Linux tools
 SETUP_KEY="SpotifyKidsManager2025"
