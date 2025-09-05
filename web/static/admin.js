@@ -1,0 +1,1125 @@
+/*
+ * Spotify Kids Manager - Admin Panel JavaScript
+ * Copyright (c) 2025 SavageIndustries. All rights reserved.
+ * 
+ * This is proprietary software. Unauthorized copying, modification, distribution,
+ * or reverse engineering is strictly prohibited. See LICENSE file for details.
+ */
+
+// API Functions
+async function apiCall(url, method = 'GET', data = null) {
+    const options = {
+        method: method,
+        headers: {'Content-Type': 'application/json'},
+        credentials: 'same-origin'
+    };
+    if (data) {
+        options.body = JSON.stringify(data);
+    }
+    try {
+        const response = await fetch(url, options);
+        const result = await response.json();
+        return result;
+    } catch (error) {
+        console.error('API Error:', error);
+        return {success: false, error: error.message};
+    }
+}
+
+// Show status message
+function showStatus(elementId, message, isError = false) {
+    const statusDiv = document.getElementById(elementId);
+    const statusBox = document.getElementById(elementId + 'Box');
+    const statusMessage = document.getElementById(elementId + 'Message');
+    
+    if (statusDiv && statusBox && statusMessage) {
+        statusDiv.style.display = 'block';
+        statusBox.style.background = isError ? '#ef4444' : '#10b981';
+        statusBox.style.color = 'white';
+        statusMessage.innerHTML = message;
+        setTimeout(() => { statusDiv.style.display = 'none'; }, 3000);
+    } else if (statusDiv) {
+        // Fallback if structure is different
+        statusDiv.style.display = 'block';
+        statusDiv.style.background = isError ? '#ef4444' : '#10b981';
+        statusDiv.style.color = 'white';
+        statusDiv.style.padding = '10px';
+        statusDiv.innerHTML = message;
+        setTimeout(() => { statusDiv.style.display = 'none'; }, 3000);
+    }
+}
+
+// Spotify Functions
+async function saveSpotifyConfig() {
+    const clientId = document.getElementById('clientId').value;
+    const clientSecret = document.getElementById('clientSecret').value;
+    
+    const result = await apiCall('/api/spotify/config', 'POST', {
+        client_id: clientId,
+        client_secret: clientSecret
+    });
+    
+    if (result.success) {
+        showStatus('spotifyStatus', '✓ Configuration saved successfully');
+    } else {
+        showStatus('spotifyStatus', '✗ Failed to save: ' + (result.error || 'Unknown error'), true);
+    }
+}
+
+async function testSpotifyConfig() {
+    const result = await apiCall('/api/spotify/test', 'POST');
+    
+    if (result.success) {
+        showStatus('spotifyStatus', '✓ Connection successful!');
+    } else {
+        showStatus('spotifyStatus', '✗ ' + (result.error || 'Connection failed'), true);
+    }
+}
+
+// Player Control
+async function controlPlayer(action) {
+    const result = await apiCall('/api/player/' + action, 'POST');
+    
+    if (result.success) {
+        showStatus('playerStatus', '✓ Player ' + action);
+    } else {
+        showStatus('playerStatus', '✗ ' + (result.error || 'Command failed'), true);
+    }
+}
+
+// Playlist Management
+async function loadPlaylists() {
+    const container = document.getElementById('playlistContainer');
+    if (container) {
+        container.innerHTML = '<div style="text-align: center; color: #6b7280; padding: 20px;">Loading playlists...</div>';
+    }
+    
+    try {
+        const result = await apiCall('/api/spotify/playlists');
+        
+        if (result.success && result.playlists) {
+            displayPlaylists(result.playlists);
+        } else {
+            if (container) {
+                container.innerHTML = '<div style="text-align: center; color: #ef4444; padding: 20px;">Failed to load playlists: ' + (result.error || 'Unknown error') + '</div>';
+            }
+        }
+    } catch (error) {
+        if (container) {
+            container.innerHTML = '<div style="text-align: center; color: #ef4444; padding: 20px;">Error loading playlists: ' + error.message + '</div>';
+        }
+    }
+}
+
+function displayPlaylists(playlists) {
+    const container = document.getElementById('playlistContainer');
+    if (!container) return;
+    
+    if (playlists.length === 0) {
+        container.innerHTML = '<div style="text-align: center; color: #6b7280; padding: 20px;">No playlists available</div>';
+        return;
+    }
+    
+    let html = '<div style="display: grid; gap: 10px;">';
+    
+    playlists.forEach(playlist => {
+        html += `
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #f9fafb; border-radius: 5px; hover: background: #f3f4f6;">
+                <div style="flex: 1;">
+                    <div style="font-weight: 500; color: #1f2937;">${playlist.name}</div>
+                    <div style="font-size: 12px; color: #6b7280;">${playlist.tracks} tracks</div>
+                </div>
+                <button onclick="playPlaylist('${playlist.uri}')" style="padding: 5px 10px; background: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                    ▶ Play
+                </button>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+async function playPlaylist(uri) {
+    try {
+        const result = await apiCall('/api/spotify/play', 'POST', { uri: uri });
+        
+        if (result.success) {
+            showStatus('playerStatus', '✓ Playing playlist');
+        } else {
+            showStatus('playerStatus', '✗ Failed to play: ' + (result.error || 'Unknown error'), true);
+        }
+    } catch (error) {
+        showStatus('playerStatus', '✗ Error: ' + error.message, true);
+    }
+}
+
+// System Functions
+async function restartServices() {
+    if (!confirm('Restart all services?')) return;
+    
+    const result = await apiCall('/api/system/restart-services', 'POST');
+    if (result.success || result.status === 502) {
+        alert('Services restarting. Page will reload in 5 seconds.');
+        setTimeout(() => location.reload(), 5000);
+    }
+}
+
+async function rebootSystem() {
+    if (!confirm('Reboot the system?')) return;
+    
+    await apiCall('/api/system/reboot', 'POST');
+    alert('System rebooting...');
+}
+
+async function powerOffSystem() {
+    if (!confirm('Power off the system?')) return;
+    
+    await apiCall('/api/system/poweroff', 'POST');
+    alert('System powering off...');
+}
+
+// Admin Settings
+async function saveAdminSettings() {
+    const password = document.getElementById('adminPassword').value;
+    const autoStart = document.getElementById('autoStart').checked;
+    const fullscreen = document.getElementById('fullscreen').checked;
+    const idleTimeout = document.getElementById('idleTimeout').value;
+    const volumeLimit = document.getElementById('volumeLimit').value;
+    
+    const result = await apiCall('/api/admin/settings', 'POST', {
+        password: password,
+        auto_start: autoStart,
+        fullscreen: fullscreen,
+        idle_timeout: parseInt(idleTimeout),
+        volume_limit: parseInt(volumeLimit)
+    });
+    
+    if (result.success) {
+        showStatus('adminStatus', '✓ Settings saved');
+    } else {
+        showStatus('adminStatus', '✗ Failed to save settings', true);
+    }
+}
+
+// Parental Controls
+async function saveContentFilter() {
+    const explicitBlocked = document.getElementById('explicitBlock').checked;
+    const playlistApproval = document.getElementById('playlistApproval').checked;
+    const blockedArtists = document.getElementById('blockedArtists').value.split('\n').filter(a => a.trim());
+    
+    const result = await apiCall('/api/parental/content-filter', 'POST', {
+        explicit_blocked: explicitBlocked,
+        require_playlist_approval: playlistApproval,
+        blocked_artists: blockedArtists,
+        blocked_songs: [],
+        allowed_playlists: []
+    });
+    
+    if (result.success) {
+        showStatus('parentalStatus', '✓ Content filter saved');
+    } else {
+        showStatus('parentalStatus', '✗ Failed to save', true);
+    }
+}
+
+async function saveSchedule() {
+    const enabled = document.getElementById('scheduleEnabled').checked;
+    const schedule = {
+        enabled: enabled,
+        weekday: {
+            morning: {
+                start: document.getElementById('weekdayMorningStart').value,
+                end: document.getElementById('weekdayMorningEnd').value
+            },
+            afternoon: {
+                start: document.getElementById('weekdayAfternoonStart').value,
+                end: document.getElementById('weekdayAfternoonEnd').value
+            }
+        },
+        weekend: {
+            morning: {
+                start: document.getElementById('weekendMorningStart').value,
+                end: document.getElementById('weekendMorningEnd').value
+            },
+            afternoon: {
+                start: document.getElementById('weekendAfternoonStart').value,
+                end: document.getElementById('weekendAfternoonEnd').value
+            }
+        }
+    };
+    
+    const result = await apiCall('/api/parental/schedule', 'POST', schedule);
+    
+    if (result.success) {
+        showStatus('scheduleStatus', '✓ Schedule saved');
+    } else {
+        showStatus('scheduleStatus', '✗ Failed to save', true);
+    }
+}
+
+async function saveLimits() {
+    const dailyLimit = document.getElementById('dailyLimit').value;
+    const sessionLimit = document.getElementById('sessionLimit').value;
+    const breakTime = document.getElementById('breakTime').value;
+    const skipLimit = document.getElementById('skipLimit').value;
+    
+    const result = await apiCall('/api/parental/limits', 'POST', {
+        daily_limit_minutes: parseInt(dailyLimit),
+        session_limit_minutes: parseInt(sessionLimit),
+        break_time_minutes: parseInt(breakTime),
+        skip_limit_per_hour: parseInt(skipLimit)
+    });
+    
+    if (result.success) {
+        showStatus('limitsStatus', '✓ Limits saved');
+    } else {
+        showStatus('limitsStatus', '✗ Failed to save', true);
+    }
+}
+
+async function sendMessage() {
+    const message = document.getElementById('playerMessage').value;
+    if (!message.trim()) {
+        alert('Please enter a message');
+        return;
+    }
+    
+    const result = await apiCall('/api/parental/send-message', 'POST', {message: message});
+    
+    if (result.success) {
+        document.getElementById('playerMessage').value = '';
+        showStatus('messageStatus', '✓ Message sent');
+    } else {
+        showStatus('messageStatus', '✗ Failed to send', true);
+    }
+}
+
+async function emergencyStop() {
+    if (!confirm('Stop music immediately?')) return;
+    
+    const result = await apiCall('/api/parental/emergency-stop', 'POST');
+    
+    if (result.success) {
+        alert('Emergency stop activated');
+    }
+}
+
+// Logs
+let logModal = null;
+let logRefreshInterval = null;
+
+async function openLogModal(type) {
+    if (!logModal) {
+        // Create modal if it doesn't exist
+        logModal = document.createElement('div');
+        logModal.id = 'logModal';
+        logModal.className = 'modal';
+        logModal.style.cssText = 'display:none;position:fixed;top:0;left:0;width:100%;height:100%;z-index:1000;';
+        logModal.innerHTML = `
+            <div class="modal-content" style="margin:50px auto;padding:20px;width:80%;max-width:800px;max-height:80vh;overflow:auto;border-radius:8px;">
+                <div class="modal-header" style="padding:16px 0;margin-bottom:16px;">
+                    <h3>Log Viewer</h3>
+                </div>
+                <div class="modal-body">
+                    <pre id="logContent" class="log-viewer" style="max-height:400px;overflow:auto;"></pre>
+                    <button onclick="closeLogModal()" style="margin-top:16px;">Close</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(logModal);
+    }
+    
+    logModal.style.display = 'block';
+    document.getElementById('logContent').textContent = 'Loading logs...';
+    
+    const response = await fetch(`/api/logs/${type}?lines=100`);
+    const logs = await response.text();
+    document.getElementById('logContent').textContent = logs;
+    
+    // Refresh every 2 seconds
+    logRefreshInterval = setInterval(async () => {
+        const response = await fetch(`/api/logs/${type}?lines=100`);
+        const logs = await response.text();
+        document.getElementById('logContent').textContent = logs;
+    }, 2000);
+}
+
+function closeLogModal() {
+    if (logModal) {
+        logModal.style.display = 'none';
+    }
+    if (logRefreshInterval) {
+        clearInterval(logRefreshInterval);
+        logRefreshInterval = null;
+    }
+}
+
+async function clearLogs() {
+    if (!confirm('Clear all logs?')) return;
+    
+    const result = await apiCall('/api/logs/clear', 'POST');
+    
+    if (result.success) {
+        alert('Logs cleared');
+    }
+}
+
+// Bluetooth
+// Bluetooth Modal Functions
+function openBluetoothScanModal() {
+    const modal = document.getElementById('bluetoothScanModal');
+    if (modal) {
+        modal.style.display = 'flex';
+        startBluetoothScan();
+    }
+}
+
+function closeBluetoothScanModal() {
+    const modal = document.getElementById('bluetoothScanModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+// Alias functions for modal buttons
+function closeScanModal() {
+    closeBluetoothScanModal();
+}
+
+function stopScan() {
+    // Stop scanning and close modal
+    const scanStatus = document.getElementById('scanStatusText');
+    if (scanStatus) {
+        scanStatus.textContent = 'Scan stopped';
+    }
+    setTimeout(() => {
+        closeBluetoothScanModal();
+    }, 500);
+}
+
+async function startBluetoothScan() {
+    const deviceList = document.getElementById('scanDeviceList');
+    const scanStatus = document.getElementById('scanStatus');
+    const scanSpinner = document.getElementById('scanSpinner');
+    
+    // Show scanning status
+    if (scanStatus) scanStatus.textContent = 'Scanning for devices...';
+    if (scanSpinner) scanSpinner.style.display = 'block';
+    if (deviceList) deviceList.innerHTML = '<p>Searching for Bluetooth devices...</p>';
+    
+    try {
+        const result = await apiCall('/api/bluetooth/scan');
+        
+        if (scanSpinner) scanSpinner.style.display = 'none';
+        
+        if (result.devices && result.devices.length > 0) {
+            if (scanStatus) scanStatus.textContent = `Found ${result.devices.length} device(s)`;
+            
+            let html = '<div class="device-list">';
+            for (const device of result.devices) {
+                const name = device.name || 'Unknown Device';
+                const address = device.address || '';
+                const isPaired = device.paired || false;
+                
+                html += `
+                    <div class="device-item">
+                        <div>
+                            <strong>${name}</strong><br>
+                            <small>${address}</small>
+                            ${isPaired ? '<span class="success-message" style="margin-left: 10px;">✓ Paired</span>' : ''}
+                        </div>
+                        <div>
+                            ${!isPaired ? `<button onclick="pairBluetoothDevice('${address}')" class="small">Pair</button>` : 
+                              `<button onclick="connectBluetooth('${address}')" class="small secondary">Connect</button>`}
+                        </div>
+                    </div>`;
+            }
+            html += '</div>';
+            
+            if (deviceList) deviceList.innerHTML = html;
+        } else {
+            if (scanStatus) scanStatus.textContent = 'No devices found';
+            if (deviceList) deviceList.innerHTML = '<p style="text-align: center;" class="scan-status">No Bluetooth devices found. Make sure devices are in pairing mode.</p>';
+        }
+    } catch (error) {
+        if (scanSpinner) scanSpinner.style.display = 'none';
+        if (scanStatus) scanStatus.textContent = 'Scan failed';
+        if (deviceList) deviceList.innerHTML = `<p class="error-message">Error: ${error.message || 'Failed to scan for devices'}</p>`;
+    }
+}
+
+async function scanBluetooth() {
+    // Open the modal if not already open, or refresh scan if modal is open
+    const modal = document.getElementById('bluetoothScanModal');
+    if (modal && modal.style.display === 'flex') {
+        // Modal is already open, just refresh the scan
+        startBluetoothScan();
+    } else {
+        // Open the modal and start scanning
+        openBluetoothScanModal();
+    }
+}
+
+async function pairBluetoothDevice(address) {
+    const result = await apiCall('/api/bluetooth/pair', 'POST', {address: address});
+    
+    if (result.success) {
+        alert('Device paired successfully!');
+        // Refresh both the scan and paired devices list
+        startBluetoothScan();
+        loadPairedDevices();
+        // Auto-connect and switch audio to newly paired device
+        await connectBluetooth(address);
+    } else {
+        alert('Pairing failed: ' + (result.error || 'Unknown error'));
+    }
+}
+
+async function connectBluetooth(address) {
+    const result = await apiCall('/api/bluetooth/connect', 'POST', {address: address});
+    
+    if (result.success) {
+        alert('Connected successfully');
+        loadPairedDevices();
+        // Switch audio to the newly connected device
+        await switchAudioToBluetoothDevice(address);
+    } else {
+        alert('Connection failed: ' + (result.error || 'Unknown error'));
+    }
+}
+
+async function disconnectBluetooth(address) {
+    const result = await apiCall('/api/bluetooth/disconnect', 'POST', {address: address});
+    
+    if (result.success) {
+        alert('Disconnected');
+        loadPairedDevices();
+    } else {
+        alert('Disconnect failed: ' + (result.error || 'Unknown error'));
+    }
+}
+
+async function removeBluetooth(address) {
+    if (!confirm('Remove device ' + address + '?')) return;
+    
+    const result = await apiCall('/api/bluetooth/remove', 'POST', {address: address});
+    
+    if (result.success) {
+        alert('Device removed');
+        loadPairedDevices();
+    } else {
+        alert('Remove failed: ' + (result.error || 'Unknown error'));
+    }
+}
+
+async function loadPairedDevices() {
+    const pairedList = document.getElementById('pairedList');
+    if (!pairedList) return;
+    
+    try {
+        pairedList.innerHTML = '<p class="scan-status" style="text-align: center;">Loading paired devices...</p>';
+        
+        const result = await apiCall('/api/bluetooth/paired-devices');
+        
+        if (result.success && result.devices && result.devices.length > 0) {
+            let html = '';
+            for (const device of result.devices) {
+                const name = device.name || 'Unknown Device';
+                const address = device.address || '';
+                const isConnected = device.connected || false;
+                
+                html += `
+                    <div class="device-item" onclick="connectBluetooth('${address}')" style="cursor: pointer;">
+                        <div>
+                            <strong>${name}</strong><br>
+                            <small>${address}</small>
+                            ${isConnected ? '<span class="success-message" style="margin-left: 10px;">✓ Connected</span>' : '<span class="scan-status" style="margin-left: 10px;">Disconnected</span>'}
+                        </div>
+                        <div class="device-buttons" onclick="event.stopPropagation();">
+                            ${isConnected ? 
+                                `<button onclick="disconnectBluetooth('${address}')" class="small">Disconnect</button>` : 
+                                `<button onclick="connectBluetooth('${address}')" class="small">Connect</button>`
+                            }
+                            <button onclick="removeBluetooth('${address}')" class="danger small">Remove</button>
+                        </div>
+                    </div>`;
+            }
+            pairedList.innerHTML = html;
+        } else {
+            pairedList.innerHTML = '<p class="scan-status" style="text-align: center;">No paired devices</p>';
+        }
+    } catch (error) {
+        pairedList.innerHTML = `<p class="error-message" style="text-align: center;">Error loading paired devices: ${error.message}</p>`;
+    }
+}
+
+async function switchAudioToBluetoothDevice(address) {
+    try {
+        const result = await apiCall('/api/bluetooth/set-audio-sink', 'POST', {address: address});
+        if (result.success) {
+            console.log('Audio switched to Bluetooth device:', address);
+        } else {
+            console.error('Failed to switch audio:', result.error);
+        }
+    } catch (error) {
+        console.error('Error switching audio:', error);
+    }
+}
+
+async function toggleBluetooth() {
+    const result = await apiCall('/api/bluetooth/toggle', 'POST');
+    
+    if (result.success) {
+        alert(result.message || 'Bluetooth toggled');
+        location.reload();
+    } else {
+        alert('Toggle failed: ' + (result.error || 'Unknown error'));
+    }
+}
+
+async function enableBluetooth() {
+    showBluetoothStatus('Enabling Bluetooth...', false);
+    const result = await apiCall('/api/bluetooth/enable', 'POST');
+    
+    if (result.success) {
+        showBluetoothStatus('Bluetooth enabled successfully!', false);
+        setTimeout(() => updateBluetoothStatus(), 1000);
+    } else {
+        showBluetoothStatus('Failed to enable: ' + (result.error || 'Unknown error'), true);
+    }
+}
+
+async function disableBluetooth() {
+    showBluetoothStatus('Disabling Bluetooth...', false);
+    const result = await apiCall('/api/bluetooth/disable', 'POST');
+    
+    if (result.success) {
+        showBluetoothStatus('Bluetooth disabled successfully!', false);
+        setTimeout(() => updateBluetoothStatus(), 1000);
+    } else {
+        showBluetoothStatus('Failed to disable: ' + (result.error || 'Unknown error'), true);
+    }
+}
+
+async function checkBluetoothStatus() {
+    await updateBluetoothStatus();
+    await loadPairedDevices();
+}
+
+async function updateBluetoothStatus() {
+    const result = await apiCall('/api/bluetooth/status');
+    
+    if (result.success) {
+        const stateElement = document.getElementById('bluetoothState');
+        const statusText = document.getElementById('bluetoothStatusText');
+        const enableBtn = document.getElementById('enableBtBtn');
+        const disableBtn = document.getElementById('disableBtBtn');
+        
+        if (stateElement) {
+            stateElement.textContent = result.enabled ? 'Enabled' : 'Disabled';
+        }
+        
+        if (statusText) {
+            statusText.className = 'status ' + (result.enabled ? 'online' : 'offline');
+        }
+        
+        if (enableBtn) {
+            enableBtn.disabled = result.enabled;
+        }
+        
+        if (disableBtn) {
+            disableBtn.disabled = !result.enabled;
+        }
+    }
+}
+
+function showBluetoothStatus(message, isError = false) {
+    const statusMsg = document.getElementById('bluetoothStatusMessage');
+    if (statusMsg) {
+        statusMsg.style.display = 'block';
+        statusMsg.style.background = isError ? '#ef4444' : '#10b981';
+        statusMsg.style.color = 'white';
+        statusMsg.innerHTML = message;
+        
+        if (!message.includes('...')) {
+            setTimeout(() => { statusMsg.style.display = 'none'; }, 3000);
+        }
+    }
+}
+
+// System functions
+async function checkUpdateStatus() {
+    const statusText = document.getElementById('updateStatusText');
+    const updateCount = document.getElementById('updateCount');
+    const updateDetails = document.getElementById('updateDetails');
+    const updateList = document.getElementById('updateList');
+    
+    // Show checking status
+    if (updateCount) updateCount.textContent = 'Checking...';
+    
+    try {
+        const result = await apiCall('/api/system/check-updates');
+        
+        if (result.success) {
+            if (result.count && result.count > 0) {
+                updateCount.textContent = `${result.count} available`;
+                if (statusText) statusText.className = 'status offline';
+                
+                // Show update list from message HTML
+                if (updateList && result.message) {
+                    updateList.innerHTML = result.message;
+                }
+                
+                if (updateDetails) {
+                    updateDetails.style.display = 'block';
+                }
+            } else {
+                updateCount.textContent = 'System up to date';
+                if (statusText) statusText.className = 'status online';
+                if (updateDetails) {
+                    updateDetails.style.display = 'none';
+                }
+            }
+        } else {
+            updateCount.textContent = 'Check failed';
+            if (statusText) statusText.className = 'status offline';
+        }
+    } catch (error) {
+        console.error('Update check error:', error);
+        updateCount.textContent = 'Error checking';
+        if (statusText) statusText.className = 'status offline';
+    }
+}
+
+async function checkUpdates() {
+    // Update the status display
+    await checkUpdateStatus();
+    
+    // Also show in the message area if it exists
+    const updateMessage = document.getElementById('updateMessage');
+    const updateStatus = document.getElementById('updateStatus');
+    
+    if (updateMessage) {
+        const result = await apiCall('/api/system/check-updates');
+        if (result.success) {
+            updateMessage.innerHTML = result.message;
+            if (updateStatus) updateStatus.style.display = 'block';
+        } else {
+            updateMessage.textContent = 'Check failed: ' + (result.error || 'Unknown error');
+            if (updateStatus) updateStatus.style.display = 'block';
+        }
+    }
+}
+
+function closeUpdateModal() {
+    const modal = document.getElementById('updateModal');
+    if (modal) modal.style.display = 'none';
+}
+
+async function runUpdate() {
+    if (!confirm('Run system update? This may take several minutes.')) return;
+    
+    // Show the update modal
+    const modal = document.getElementById('updateModal');
+    const output = document.getElementById('updateOutput');
+    const closeBtn = document.getElementById('closeUpdateModal');
+    
+    if (modal) modal.style.display = 'block';
+    if (output) output.textContent = 'Starting system update...\n';
+    if (closeBtn) closeBtn.style.display = 'none';
+    
+    // Use EventSource to stream update progress
+    const eventSource = new EventSource('/api/system/update-stream');
+    
+    eventSource.onmessage = function(event) {
+        if (output) {
+            output.textContent += event.data + '\n';
+            output.scrollTop = output.scrollHeight;
+        }
+    };
+    
+    eventSource.onerror = function(error) {
+        console.error('Update stream error:', error);
+        if (output) {
+            output.textContent += '\n=== Update process ended ===\n';
+        }
+        if (closeBtn) closeBtn.style.display = 'inline-block';
+        eventSource.close();
+        
+        // Refresh update status after completion
+        setTimeout(() => {
+            checkUpdateStatus();
+        }, 2000);
+    };
+    
+    eventSource.addEventListener('done', function(event) {
+        if (output) {
+            output.textContent += '\n=== Update completed successfully! ===\n';
+        }
+        if (closeBtn) closeBtn.style.display = 'inline-block';
+        eventSource.close();
+        
+        // Refresh update status after completion
+        setTimeout(() => {
+            checkUpdateStatus();
+        }, 2000);
+    });
+}
+
+// Package Management Functions
+async function showPackageManager() {
+    const modal = document.getElementById('packageModal');
+    if (modal) {
+        modal.style.display = 'block';
+        await loadUpgradablePackages();
+    }
+}
+
+async function closePackageModal() {
+    const modal = document.getElementById('packageModal');
+    if (modal) modal.style.display = 'none';
+}
+
+async function loadUpgradablePackages() {
+    const packageList = document.getElementById('packageList');
+    const packageStatus = document.getElementById('packageStatus');
+    
+    if (packageList) {
+        packageList.innerHTML = '<div style="padding: 20px;">Loading upgradable packages...</div>';
+    }
+    
+    try {
+        const result = await apiCall('/api/system/packages/upgradable');
+        
+        if (result.success === false) {
+            if (packageList) {
+                packageList.innerHTML = '<div style="padding: 20px; color: #ef4444;">Error: ' + (result.error || 'Failed to load packages') + '</div>';
+            }
+            return;
+        }
+        
+        if (result.packages && result.packages.length > 0) {
+            let html = '<table style="width: 100%; border-collapse: collapse;">';
+            html += '<thead><tr>';
+            html += '<th style="text-align: left; padding: 8px; border-bottom: 2px solid #ddd;">Package</th>';
+            html += '<th style="text-align: left; padding: 8px; border-bottom: 2px solid #ddd;">Version</th>';
+            html += '<th style="text-align: left; padding: 8px; border-bottom: 2px solid #ddd;">Action</th>';
+            html += '</tr></thead><tbody>';
+            
+            result.packages.forEach(pkg => {
+                html += '<tr>';
+                html += `<td style="padding: 8px; border-bottom: 1px solid #eee;">${pkg.name}</td>`;
+                html += `<td style="padding: 8px; border-bottom: 1px solid #eee;">${pkg.current_version}</td>`;
+                html += `<td style="padding: 8px; border-bottom: 1px solid #eee;">`;
+                html += `<button onclick="updatePackage('${pkg.name}')" style="padding: 4px 8px; background: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer;">Update</button>`;
+                html += `</td>`;
+                html += '</tr>';
+            });
+            
+            html += '</tbody></table>';
+            
+            if (packageList) {
+                packageList.innerHTML = html;
+            }
+            
+            if (packageStatus) {
+                packageStatus.innerHTML = `<div style="padding: 10px; background: #f0f9ff; border-left: 4px solid #3b82f6;">Found ${result.count} upgradable packages</div>`;
+            }
+        } else {
+            if (packageList) {
+                packageList.innerHTML = '<div style="padding: 20px; text-align: center; color: #10b981;">✓ All packages are up to date!</div>';
+            }
+        }
+    } catch (error) {
+        if (packageList) {
+            packageList.innerHTML = '<div style="padding: 20px; color: #ef4444;">Error loading packages: ' + error.message + '</div>';
+        }
+    }
+}
+
+async function updatePackage(packageName) {
+    if (!confirm(`Update package ${packageName}?`)) return;
+    
+    const packageStatus = document.getElementById('packageStatus');
+    if (packageStatus) {
+        packageStatus.innerHTML = `<div style="padding: 10px; background: #fef3c7; border-left: 4px solid #f59e0b;">Updating ${packageName}...</div>`;
+    }
+    
+    try {
+        const result = await apiCall('/api/system/packages/update', 'POST', { package: packageName });
+        
+        if (result.success) {
+            if (packageStatus) {
+                packageStatus.innerHTML = `<div style="padding: 10px; background: #d1fae5; border-left: 4px solid #10b981;">✓ ${packageName} updated successfully!</div>`;
+            }
+            // Reload the package list
+            setTimeout(() => loadUpgradablePackages(), 2000);
+        } else {
+            if (packageStatus) {
+                packageStatus.innerHTML = `<div style="padding: 10px; background: #fee2e2; border-left: 4px solid #ef4444;">✗ Failed to update ${packageName}: ${result.error}</div>`;
+            }
+        }
+    } catch (error) {
+        if (packageStatus) {
+            packageStatus.innerHTML = `<div style="padding: 10px; background: #fee2e2; border-left: 4px solid #ef4444;">✗ Error: ${error.message}</div>`;
+        }
+    }
+}
+
+async function runDistUpgrade() {
+    if (!confirm('Run distribution upgrade? This will update all packages and may take a long time.')) return;
+    
+    const packageStatus = document.getElementById('packageStatus');
+    const packageList = document.getElementById('packageList');
+    
+    if (packageStatus) {
+        packageStatus.innerHTML = `<div style="padding: 10px; background: #fef3c7; border-left: 4px solid #f59e0b;">Running distribution upgrade... This may take several minutes.</div>`;
+    }
+    
+    if (packageList) {
+        packageList.innerHTML = '<div style="padding: 20px; text-align: center;"><div class="spinner"></div> Upgrading system packages...</div>';
+    }
+    
+    try {
+        const result = await apiCall('/api/system/packages/dist-upgrade', 'POST');
+        
+        if (result.success) {
+            if (packageStatus) {
+                packageStatus.innerHTML = `<div style="padding: 10px; background: #d1fae5; border-left: 4px solid #10b981;">✓ Distribution upgrade completed successfully!</div>`;
+            }
+            // Reload the package list
+            setTimeout(() => loadUpgradablePackages(), 2000);
+        } else {
+            if (packageStatus) {
+                packageStatus.innerHTML = `<div style="padding: 10px; background: #fee2e2; border-left: 4px solid #ef4444;">✗ Upgrade failed: ${result.error}</div>`;
+            }
+            loadUpgradablePackages();
+        }
+    } catch (error) {
+        if (packageStatus) {
+            packageStatus.innerHTML = `<div style="padding: 10px; background: #fee2e2; border-left: 4px solid #ef4444;">✗ Error: ${error.message}</div>`;
+        }
+        loadUpgradablePackages();
+    }
+}
+
+// Points system
+async function addBonusPoints() {
+    const points = prompt('How many points to add?', '10');
+    if (!points) return;
+    
+    const result = await apiCall('/api/parental/add-points', 'POST', {points: parseInt(points)});
+    
+    if (result.success) {
+        alert('Points added');
+        location.reload();
+    }
+}
+
+async function resetPoints() {
+    if (!confirm('Reset all points?')) return;
+    
+    const result = await apiCall('/api/parental/reset-points', 'POST');
+    
+    if (result.success) {
+        alert('Points reset');
+        location.reload();
+    }
+}
+
+// Utility functions
+async function logout() {
+    await apiCall('/api/logout', 'POST');
+    location.reload();
+}
+
+async function clearUsageStats() {
+    if (!confirm('Clear all usage statistics?')) return;
+    
+    const result = await apiCall('/api/parental/clear-stats', 'POST');
+    
+    if (result.success) {
+        alert('Usage statistics cleared');
+        location.reload();
+    }
+}
+
+async function refreshUsageStats() {
+    location.reload();
+}
+
+async function copyLogsToClipboard() {
+    const logContent = document.getElementById('logContent');
+    if (logContent) {
+        try {
+            await navigator.clipboard.writeText(logContent.textContent);
+            alert('Logs copied to clipboard');
+        } catch (err) {
+            alert('Failed to copy logs: ' + err);
+        }
+    }
+}
+
+async function takeScreenshot() {
+    const result = await apiCall('/api/parental/screenshot', 'POST');
+    
+    if (result.success && result.screenshot) {
+        window.open(result.screenshot, '_blank');
+    } else {
+        alert('Screenshot captured');
+    }
+}
+
+async function login() {
+    const username = document.getElementById('loginUser').value;
+    const password = document.getElementById('loginPass').value;
+    
+    const result = await apiCall('/api/login', 'POST', {
+        username: username,
+        password: password
+    });
+    
+    if (result.success) {
+        location.reload();
+    } else {
+        alert('Invalid credentials');
+    }
+}
+
+// Export stats
+function exportUsageStats() {
+    window.location.href = '/api/parental/export-stats';
+}
+
+function downloadLogs() {
+    window.location.href = '/api/logs/download';
+}
+
+// Submit OAuth callback URL
+async function submitAuthCallback() {
+    const callbackUrl = document.getElementById('authCallbackUrl').value;
+    
+    if (!callbackUrl) {
+        alert('Please paste the callback URL');
+        return;
+    }
+    
+    // Extract the code from the URL
+    let code = null;
+    try {
+        const url = new URL(callbackUrl);
+        code = url.searchParams.get('code');
+    } catch (e) {
+        alert('Invalid URL. Please paste the complete URL from your browser.');
+        return;
+    }
+    
+    if (!code) {
+        alert('No authorization code found in the URL. Make sure you paste the complete URL after Spotify redirects you.');
+        return;
+    }
+    
+    // Submit the code to the backend
+    const result = await apiCall('/api/spotify/submit-auth-code', 'POST', { code: code });
+    
+    if (result.success) {
+        showStatus('spotifyStatus', '✓ Authentication successful! The player is now connected to Spotify.');
+        // Hide the auth section
+        document.getElementById('spotifyAuthSection').style.display = 'none';
+        // Clear the input
+        document.getElementById('authCallbackUrl').value = '';
+        // Refresh auth status
+        checkSpotifyAuthStatus();
+    } else {
+        alert('Authentication failed: ' + (result.error || 'Unknown error'));
+    }
+}
+
+// Check Spotify authentication status
+async function checkSpotifyAuthStatus() {
+    try {
+        const result = await apiCall('/api/spotify/auth-status');
+        console.log('Auth status result:', result);
+        
+        const authRequired = document.getElementById('spotifyAuthRequired');
+        const authConnected = document.getElementById('spotifyAuthConnected');
+        const authLink = document.getElementById('spotifyAuthLink');
+        const redirectUriDisplay = document.getElementById('redirectUriDisplay');
+        
+        // Display the redirect URI that needs to be added to Spotify app
+        if (redirectUriDisplay) {
+            const currentUrl = window.location.href.split('#')[0].split('?')[0];
+            const baseUrl = currentUrl.endsWith('/') ? currentUrl.slice(0, -1) : currentUrl;
+            redirectUriDisplay.textContent = baseUrl + '/callback';
+        }
+        
+        if (result.success && result.auth_url && !result.authenticated) {
+            // Show auth required section
+            console.log('Showing auth link:', result.auth_url);
+            if (authRequired) authRequired.style.display = 'block';
+            if (authConnected) authConnected.style.display = 'none';
+            if (authLink) {
+                authLink.href = result.auth_url;
+            }
+        } else if (result.authenticated) {
+            // Show connected status
+            console.log('Player is authenticated, showing connected status');
+            if (authRequired) authRequired.style.display = 'none';
+            if (authConnected) authConnected.style.display = 'block';
+        } else {
+            console.log('Unknown auth state:', result);
+            if (authRequired) authRequired.style.display = 'none';
+            if (authConnected) authConnected.style.display = 'none';
+        }
+    } catch (error) {
+        console.error('Error checking auth status:', error);
+    }
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Set up any event listeners
+    const loginPass = document.getElementById('loginPass');
+    if (loginPass) {
+        loginPass.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') login();
+        });
+    }
+    
+    // Check Spotify auth status
+    checkSpotifyAuthStatus();
+    // Check auth status periodically
+    setInterval(checkSpotifyAuthStatus, 30000); // Check every 30 seconds
+    
+    // Load playlists if logged in
+    if (document.getElementById('playlistContainer')) {
+        loadPlaylists();
+    }
+    
+    // Volume slider
+    const volumeLimit = document.getElementById('volumeLimit');
+    if (volumeLimit) {
+        volumeLimit.addEventListener('input', function(e) {
+            const display = document.getElementById('volumeValue');
+            if (display) display.textContent = e.target.value + '%';
+        });
+    }
+    
+    // Check Bluetooth status on page load
+    if (document.getElementById('bluetoothState')) {
+        updateBluetoothStatus();
+    }
+    
+    // Check for system updates on page load
+    if (document.getElementById('updateCount')) {
+        checkUpdateStatus();
+    }
+    
+    // Close modals on ESC
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeLogModal();
+        }
+    });
+});

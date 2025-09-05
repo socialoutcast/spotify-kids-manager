@@ -58,13 +58,7 @@ user_backups/
 # Build and distribution
 build/
 dist/
-release/
 *.egg-info/
-*.tar.gz
-
-# Source directories (if you ever add them back locally)
-web/
-player/
 
 # Environment
 .env
@@ -81,9 +75,3 @@ claude.md
 *.claude
 .claude-*
 claude-*
-
-# Local source files (not in public repo)
-force-reset.sh
-kiosk_launcher.sh
-requirements.txt
-build-release.sh
