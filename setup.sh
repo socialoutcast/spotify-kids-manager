@@ -8,7 +8,7 @@ set -e
 
 # Encrypted password for the release archive
 # This is decrypted at runtime using a known key
-ENCRYPTED_PASSWORD="U2FsdGVkX1+TlYeaYIWbr/ELPbJtH/sXp/1YCc0zavvC06J9mZ7Xhzc6QiBcmozP+ZwTwUBydY8jFB7azHU5yw=="
+ENCRYPTED_PASSWORD="U2FsdGVkX1/KVYy9JmLadlX/NXZ3/x8224vKdqNtYNxmZrSO4nRDlU/CNAgFTIXZA6FmFBdTfBMpAU6BbR/9LA=="
 
 # Decrypt the password using standard Linux tools
 # Use pbkdf2 for OpenSSL 3.0+ (matching encryption)
